@@ -74,4 +74,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # при повторном запуске той же сборки старый релиз с этим номером удаляем
+          gh release delete "v${GITHUB_RUN_NUMBER}" --yes --cleanup-tag || true
           gh release create "v${GITHUB_RUN_NUMBER}" game-catalog.apk --title "Каталог игр, сборка ${GITHUB_RUN_NUMBER}" --notes "APK для Android. Версия для браузера: https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/"

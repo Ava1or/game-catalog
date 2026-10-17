@@ -1,0 +1,8 @@
+{
+  "appId": "com.example.gamecatalog",
+  "appName": "Каталог игр",
+  "webDir": "www",
+  "plugins": {
+    "CapacitorHttp": { "enabled": true }
+  }
+}

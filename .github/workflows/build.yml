@@ -15,8 +15,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  test:
+    name: Проверка логики
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Тесты
+        run: node --test tests/logic.test.js tests/smoke.test.js
+
   web:
     name: Версия для браузера (GitHub Pages)
+    needs: test
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -37,6 +49,7 @@ jobs:
 
   apk:
     name: Android APK
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -55,6 +68,7 @@ jobs:
           # versionCode должен расти, иначе новый apk не установится поверх старого
           sed -i "s/versionCode 1/versionCode ${GITHUB_RUN_NUMBER}/" android/app/build.gradle
           sed -i "s/versionName \"1.0\"/versionName \"1.${GITHUB_RUN_NUMBER}\"/" android/app/build.gradle
+          grep -q "versionCode ${GITHUB_RUN_NUMBER}" android/app/build.gradle || { echo "::error::Не удалось задать versionCode: изменился шаблон Capacitor"; exit 1; }
           # иконка приложения: обычные png вместо адаптивной иконки по умолчанию
           cp -r android-res/. android/app/src/main/res/
           rm -rf android/app/src/main/res/mipmap-anydpi-v26
@@ -63,16 +77,29 @@ jobs:
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon
       - name: Подпись
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEYSTORE_PASS: ${{ secrets.KEYSTORE_PASS }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > release.keystore
+            KS=release.keystore; PASS="$KEYSTORE_PASS"; ALIAS="${KEY_ALIAS:-gamecatalog}"
+            echo "Подпись личным ключом из GitHub Secrets"
+          else
+            KS=android-signing/release.keystore; PASS=gamecatalog; ALIAS=gamecatalog
+            echo "::warning::Используется ключ из репозитория (он публичный). Для безопасности перенесите ключ в GitHub Secrets, см. README."
+          fi
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           OUT=android/app/build/outputs/apk/release
           "$BT/zipalign" -p 4 "$OUT/app-release-unsigned.apk" aligned.apk
-          "$BT/apksigner" sign --ks android-signing/release.keystore --ks-pass pass:gamecatalog --key-pass pass:gamecatalog --out game-catalog.apk aligned.apk
+          "$BT/apksigner" sign --ks "$KS" --ks-key-alias "$ALIAS" --ks-pass "pass:$PASS" --key-pass "pass:$PASS" --out game-catalog.apk aligned.apk
           "$BT/apksigner" verify game-catalog.apk
       - uses: actions/upload-artifact@v4
         with:
           name: game-catalog-apk
           path: game-catalog.apk
+          retention-days: 14
       - name: Публикация в Releases
         env:
           GH_TOKEN: ${{ github.token }}
@@ -80,3 +107,5 @@ jobs:
           # при повторном запуске той же сборки старый релиз с этим номером удаляем
           gh release delete "v${GITHUB_RUN_NUMBER}" --yes --cleanup-tag || true
           gh release create "v${GITHUB_RUN_NUMBER}" game-catalog.apk --title "Каталог игр, сборка ${GITHUB_RUN_NUMBER}" --notes "APK для Android. Версия для браузера: https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/"
+          # оставляем 10 последних релизов
+          gh release list --limit 100 --json tagName -q '.[10:] | .[].tagName' | while read -r t; do gh release delete "$t" --yes --cleanup-tag || true; done

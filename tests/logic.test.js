@@ -1,0 +1,30 @@
+// Запуск: node --test tests/logic.test.js
+const L = require('../www/app.js');
+const eq = (a,b,m)=>{ if (JSON.stringify(a)!==JSON.stringify(b)) { console.log('FAIL',m,JSON.stringify(a),'!=',JSON.stringify(b)); process.exitCode=1; } else console.log('ok',m); };
+eq(L.seriesName(['Fallout 3','Fallout 4','Fallout: New Vegas','Fallout 76']),'Fallout','fallout');
+eq(L.seriesName(['The Witcher 3: Wild Hunt','Thronebreaker: The Witcher Tales','The Witcher 2']),'The Witcher','witcher');
+eq(L.seriesName(['Call of Duty: World at War','Call of Duty 2','Call of Duty']),'Call of Duty','cod');
+eq(L.seriesName(['Persona 2: Eternal Punishment','Shin Megami Tensei: Persona']),'Persona','persona-fallback');
+eq(L.shortPlat('PlayStation 4'),'PS4','ps4'); eq(L.shortPlat('Xbox One'),'XONE','xone'); eq(L.shortPlat('Nintendo Switch'),'Switch','sw');eq(L.shortPlat('PC'),'PC','pc');
+const g=[{name:'B',year:2000,genres:['RPG'],platforms:['PC'],series:'S',collections:['a'],props:{}},{name:'A',year:2005,genres:['Action'],platforms:['PS4'],series:'',collections:['a','b'],props:{p1:'x'}},{name:'C',year:2000,genres:['RPG','Action'],platforms:['PC'],series:'S',collections:[],props:{}}];
+const f=()=>JSON.parse(JSON.stringify(L.DEFAULTS.f));
+let x=f(); x.genres=['RPG']; eq(L.filterGames(g,x).map(z=>z.name),['B','C'],'genre');
+x=f(); x.genres=['RPG']; x.platforms=['PS4']; eq(L.filterGames(g,x).map(z=>z.name),[],'genre AND platform');
+x=f(); x.collections=['a','b']; x.collMode='and'; eq(L.filterGames(g,x).map(z=>z.name),['A'],'coll AND');
+x=f(); x.collections=['a','b']; x.collMode='or'; eq(L.filterGames(g,x).map(z=>z.name),['B','A'],'coll OR');
+x=f(); x.years=[2000]; eq(L.filterGames(g,x).map(z=>z.name),['B','C'],'year');
+x=f(); x.props=['p1']; eq(L.filterGames(g,x).map(z=>z.name),['A'],'prop');
+x=f(); x.sort='year'; x.dir='desc'; eq(L.sortGames(g.slice(),x).map(z=>z.name),['A','B','C'],'sort year desc');
+x=f(); x.sort='series'; eq(L.sortGames(g.slice(),x).map(z=>z.name),['B','C','A'],'sort series');
+
+{ const g2=[{name:'A',done:true,genres:[],platforms:[],collections:[],props:{}},{name:'B',done:false,genres:[],platforms:[],collections:[],props:{}}];
+  const f=()=>JSON.parse(JSON.stringify(L.DEFAULTS.f));
+  let x=f(); x.done='yes'; eq(L.filterGames(g2,x).map(z=>z.name),['A'],'done yes');
+  x=f(); x.done='no'; eq(L.filterGames(g2,x).map(z=>z.name),['B'],'done no');
+  x=f(); x.sort='done'; x.dir='desc'; eq(L.sortGames(g2.slice(),x).map(z=>z.name),['A','B'],'sort done'); }
+
+{ const d=[{game_id:1,game_name:'The Witcher 3: Wild Hunt',comp_main:189000,comp_plus:294000,comp_100:414000,release_world:2015},{game_id:2,game_name:'The Witcher',comp_main:100800,comp_plus:0,release_world:2007},{game_id:3,game_name:'No time',comp_main:0,comp_plus:0}];
+  const r=L.hltbCandidates(d,'The Witcher 3'); eq(r.length,2,'hltb filter'); eq(r[0].name,'The Witcher 3: Wild Hunt','hltb best match'); eq(r[0].hours,67.1,'hltb avg main+extra'); eq(r[1].hours,28,'hltb main only'); }
+
+{ const p=L.parseLine; eq(p('Doom | 12ч | 2016'),{text:'Doom',year:2016,hours:12},'parse pipe'); eq(p('1. Hades\t2020\t35.5 h'),{text:'Hades',year:2020,hours:35.5},'parse tab');
+  eq(p('Cyberpunk 2077'),{text:'Cyberpunk 2077',year:0,hours:0},'no bare year'); eq(p('Doom (2016)'),{text:'Doom',year:2016,hours:0},'paren year'); eq(p('   '),null,'empty'); eq(p('- Half-Life 2 ; 2004'),{text:'Half-Life 2',year:2004,hours:0},'semicolon'); }

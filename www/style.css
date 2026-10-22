@@ -143,3 +143,26 @@ button,[data-act],.opt,.acts span,.p,.chip,.btn,.ib,.tile,.card,.lcard,.it .tx,.
 .sbar .sub{flex:1;text-align:center;font-size:12px}
 .ib.red{color:#ff6b6b}
 .ib.red svg{stroke:#ff6b6b}
+
+#toast.act{pointer-events:auto}
+.tbtn{margin-left:14px;color:var(--acc);font-weight:700}
+.stg{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:6px}
+.stc{background:var(--card);border-radius:14px;padding:14px}.stc b{display:block;font-size:22px}.stc span{color:var(--mut);font-size:12px}
+.st-row{display:flex;align-items:center;gap:8px;padding:5px 0}
+.st-l{width:34%;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st-b{flex:1;height:8px;border-radius:4px;background:var(--tag2);overflow:hidden}.st-b i{display:block;height:100%;background:var(--acc)}
+.st-row b{width:34px;text-align:right;font-size:13px}
+
+.opt.accent{color:var(--acc);font-weight:600}
+.tile{border-top:4px solid transparent}
+.p[style*="border-color"]{border-width:1px 1px 1px 4px}
+
+/* плотность строк списка: d1 компактно, d2 средне, d3 крупно */
+.wrap.d1 td{padding:3px 8px;font-size:12px}.wrap.d1 th{padding:8px 8px;font-size:10px}
+.wrap.d1 .thumb{width:26px;height:36px}.wrap.d1 .n{font-size:12px;line-height:14px;max-height:28px;overflow:hidden}.wrap.d1 .sub{display:none}
+.wrap.d1 td.nmc{min-width:110px;max-width:160px}
+.wrap.d2 td{padding:5px 8px;font-size:13px}.wrap.d2 .thumb{width:34px;height:46px}.wrap.d2 .n{font-size:13px}.wrap.d2 .sub{font-size:10px;max-height:12px;overflow:hidden}
+.wrap.d2 td.nmc{max-width:200px}
+button.tag{cursor:pointer;font-family:inherit}
+.card,.wrap tbody tr{content-visibility:auto;contain-intrinsic-size:auto 190px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:4px;margin-right:6px}

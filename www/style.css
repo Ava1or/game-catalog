@@ -113,7 +113,7 @@ h3{margin:16px 2px 8px;font-size:16px}
 .it.done .tx{color:var(--mut)}.it .okc{color:var(--green);font-weight:700}
 .it .ia{display:flex;gap:2px}.it .ia button{padding:8px;font-size:17px}
 
-/* отметка «Прошёл», вертикальные скриншоты, десктоп */
+/* отметка «Пройдено», вертикальные скриншоты, десктоп */
 .dn{position:absolute;right:5px;top:5px;color:#fff;width:22px;height:22px;line-height:22px;text-align:center;border-radius:11px;background:var(--green);font-size:13px;box-shadow:0 1px 4px #0008}
 .shotv{display:flex;flex-direction:column;gap:10px}
 .shotv img{width:100%;border-radius:10px;background:var(--ph);cursor:pointer}
@@ -166,3 +166,47 @@ button,[data-act],.opt,.acts span,.p,.chip,.btn,.ib,.tile,.card,.lcard,.it .tx,.
 button.tag{cursor:pointer;font-family:inherit}
 .card,.wrap tbody tr{content-visibility:auto;contain-intrinsic-size:auto 190px}
 .dot{display:inline-block;width:8px;height:8px;border-radius:4px;margin-right:6px}
+
+/* цифра масштаба: чёрно-белая, без акцентного цвета */
+.ib .cnt.bw{background:var(--hl);color:var(--tx);border:1px solid var(--bd2);line-height:16px}
+
+/* кнопки-фильтры: «Пройдено» и «новая коллекция» */
+.p.done{color:var(--green);border-color:var(--green);background:transparent}
+.p.done.on{background:var(--green);color:#fff}
+.p.done.on b{color:#fff}
+.p.new{color:var(--green);border:1px dashed var(--green);background:transparent}
+
+/* жанры в карточке игры */
+.hdr3{display:flex;justify-content:space-between;align-items:center;margin:16px 2px 8px}
+.hdr3 h3{margin:0}
+
+/* скриншоты в базе */
+.shotg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:6px 0 10px}
+.shotg .sh{position:relative;aspect-ratio:16/9}
+.shotg img{width:100%;height:100%;object-fit:cover;border-radius:8px;background:var(--ph);cursor:pointer}
+.shotg .sx{position:absolute;right:4px;top:4px;width:26px;height:26px;border-radius:13px;background:#000b;color:#fff;font-size:13px}
+.shw{position:relative}
+.shw img{display:block}
+.shw .sv{position:absolute;right:8px;bottom:8px;background:var(--acc);color:#fff;border-radius:10px;padding:6px 12px;font-size:13px;box-shadow:0 1px 4px #0008}
+.shw .sv.saved{background:var(--green)}
+
+/* коллекции и серии списком */
+.lrows{display:flex;flex-direction:column;gap:8px}
+.lrow{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:14px;padding:8px 8px 8px 10px;cursor:pointer;border-left:4px solid transparent}
+.lrow .lth{width:36px;height:48px;flex:0 0 36px;border-radius:6px;background:var(--ph) center/cover no-repeat}
+.lrow .lm{flex:1;min-width:0}
+.lrow .nm{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lrow .ct{color:var(--mut);font-size:12px;margin-top:2px}
+
+/* плитки коллекций и серий: крупные обложки, обычный шрифт, мелкая строка «количество / % пройдено» */
+.mos i{top:0;height:100%;border-radius:5px}
+.tile .nm{font-weight:400;font-size:13px;line-height:16px;padding:6px 8px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .ct,.lrow .ct{display:flex;justify-content:space-between;gap:8px;color:var(--mut);font-size:11px}
+.tile .ct{padding:2px 8px 7px}
+.lrow .nm{font-weight:400}
+.lrow .ct{margin-top:2px}
+.tile,.lrow,.wrap tbody tr{-webkit-touch-callout:none}
+
+/* панель кнопок над списком: 7 кнопок помещаются в строку, иначе переносятся */
+.tools{flex-wrap:wrap;gap:5px}
+.ib{min-width:40px;padding:0 8px}

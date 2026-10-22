@@ -38,7 +38,7 @@ const L = require('../www/app.js');
   await step('open rawg sheet', () => G.openRawgSheet(100));
   await step('add from rawg', async () => { const g = await G.addFromRawg(1, []); if (!g || g.series !== 'Fallout') throw new Error('series=' + (g && g.series)); });
   await step('quick add + render', async () => { await G.addFromRawg(101); G.renderSearchBody(); });
-  await step('collections + library', async () => { S.collections.push({ id: 'c1', name: 'Прошёл' }); S.games[0].collections.push('c1'); S.tab = 'collections'; G.render(); S.tab = 'library'; G.render(); G.ACT.collChip({ dataset: { id: 'c1' } }); G.ACT.openFilters(); G.ACT.openCols(); G.ACT.toggleView(); G.ACT.fToggle({ dataset: { k: 'genres', v: 'RPG' } }); G.ACT.rmF({ dataset: { k: 'genres', v: 'RPG' } }); G.ACT.resetF(); });
+  await step('collections + library', async () => { S.collections.push({ id: 'c1', name: 'Любимые' }); S.games[0].collections.push('c1'); S.tab = 'collections'; G.render(); S.tab = 'library'; G.render(); G.ACT.collChip({ dataset: { id: 'c1' } }); G.ACT.openFilters(); G.ACT.openCols(); G.ACT.toggleView(); G.ACT.fToggle({ dataset: { k: 'genres', v: 'RPG' } }); G.ACT.rmF({ dataset: { k: 'genres', v: 'RPG' } }); G.ACT.resetF(); });
   await step('series tab', async () => { S.tab = 'series'; G.render(); G.ACT.serOpen({ dataset: { name: 'Fallout' } }); if (S.tab !== 'library' || S.set.f.series[0] !== 'Fallout') throw new Error('serOpen'); G.ACT.serOpen({ dataset: { name: '' } }); G.render(); });
   await step('rawg sheet with shots + colls', async () => { S.tab = 'search'; await G.openRawgSheet(1); });
   await step('inbox flow', async () => {
@@ -119,5 +119,38 @@ const L = require('../www/app.js');
   });
   await step('game sheet', () => { G.openGameSheet(S.games[0].id); G.openGameSheet(null); });
   await step('selection', async () => { S.tab = 'library'; G.ACT.selToggle(); S.sel.add(S.games[0].id); G.render(); });
+
+  await step('Пройдено: встроенная коллекция, плитка и список', async () => {
+    S.set.f.collections = [G.DONE_ID]; S.tab = 'library'; G.render();
+    const done = S.games.filter(g => g.done).length; const shown = G.filterGames(S.games, S.set.f).length; if (shown !== done) throw new Error('done filter ' + shown + '/' + done);
+    S.set.f.collections = []; S.tab = 'collections';
+    for (const m of ['tiles', 'list']) { S.set.vmode.coll = m; G.render(); const h = G.collTilesHtml(); if (!h.includes('Пройдено') || !h.includes('Все игры')) throw new Error('system tiles ' + m); if (m === 'list' && !G.viewCollections().includes('lrows')) throw new Error('list view'); }
+    G.ACT.vmode({ dataset: { k: 'coll' } }); G.ACT.vmode({ dataset: { k: 'series' } }); S.tab = 'series'; G.render(); if (!G.viewSeries().includes('lrows')) throw new Error('series list'); G.ACT.vmode({ dataset: { k: 'series' } });
+    G.ACT.collOpen({ dataset: { id: G.DONE_ID } }); if (S.set.f.collections[0] !== G.DONE_ID) throw new Error('collOpen'); S.set.f.collections = []; S.tab = 'library';
+  });
+  await step('жанры за кнопкой и скриншоты в базе', async () => {
+    const g = S.games.find(x => x.genres && x.genres.length) || S.games[0]; G.openGameSheet(g.id);
+    G.ACT.editGenres({}); if (!S.sheet.genresEdit) throw new Error('edit on'); G.ACT.editGenres({}); if (S.sheet.genresEdit) throw new Error('edit off');
+    await G.putShots(g.id, [{ n: 'a', src: 'u1', blob: new Blob(['x']) }, { n: 'b', src: '', blob: new Blob(['y']) }]); if (g.shotCount !== 2 || (await G.getShots(g.id)).length !== 2) throw new Error('put shots');
+    S.tab = 'library'; const id = g.id; await G.removeGame(id); if ((await G.getShots(id)).length) throw new Error('shots not removed'); await G.restoreGames([id]); if ((await G.getShots(id)).length !== 2) throw new Error('shots not restored');
+    await G.putShots(id, []); if (S.games.find(x => x.id === id).shotCount !== 0) throw new Error('clear shots');
+  });
+  await step('импорт: коллекции с цветом и скриншоты', async () => {
+    const d = { app: 'game-catalog', games: [{ id: 'imp1', name: 'Import Game', year: 1999, genres: [], platforms: [], collections: ['ic'], props: {}, done: true, doneDate: '2020-01-02', shotCount: 5 }], collections: [{ id: 'ic', name: 'Импорт-коллекция', color: '#ff7a1a', order: 3, coverGame: 'imp1' }], props: [], covers: {}, shots: { imp1: [{ src: 'u', d: 'data:image/jpeg;base64,AAAA' }] } };
+    await G.importData(d, 'merge'); const c = S.collections.find(x => x.name === 'Импорт-коллекция'); if (!c || c.color !== '#ff7a1a') throw new Error('color lost');
+    const g = S.games.find(x => x.name === 'Import Game'); if (c.coverGame !== g.id) throw new Error('coverGame ' + c.coverGame); if (g.shotCount !== 1 || (await G.getShots(g.id)).length !== 1) throw new Error('shots import');
+    S.set.f.collections = ['нет-такой']; await G.importData({ app: 'game-catalog', games: [] }, 'merge'); if (S.set.f.collections.length) throw new Error('stale filter');
+  });
+  await step('коллекции в фильтрах, окно коллекций, долгий тап, платформы', async () => {
+    S.tab = 'library'; S.set.f.collections = []; G.render();
+    G.ACT.openColls(); G.ACT.collChip({ dataset: { id: G.DONE_ID } }); G.ACT.collMode({ dataset: { v: 'and' } }); if (S.set.f.collections[0] !== G.DONE_ID || S.set.f.collMode !== 'and') throw new Error('collChip/collMode');
+    G.ACT.collMode({ dataset: { v: 'or' } });
+    const h = S.collections.length || true ? G.libToolsHtml() : ''; if (!h.includes('Коллекции')) throw new Error('no collections button'); if (!h.includes('cnt')) throw new Error('no counter on collections button');
+    G.ACT.openFilters(); G.ACT.collChip({ dataset: { id: 'c1' } }); G.ACT.rmF({ dataset: { k: 'collections', v: 'c1' } }); if (S.set.f.collections.includes('c1')) throw new Error('rmF collections');
+    G.ACT.collClear(); if (S.set.f.collections.length) throw new Error('collClear');
+    if (G.collTilesHtml().includes('⋮') || !G.collTilesHtml().includes('data-lpm="coll"') || !G.seriesTilesHtml().includes('data-lpm="ser"')) throw new Error('long tap markup');
+    if (!/✓ \d+%/.test(G.collTilesHtml())) throw new Error('percent');
+    const g = S.games[0]; G.openGameSheet(g.id); G.ACT.editPlats({}); if (!S.sheet.platsEdit) throw new Error('plats on'); G.ACT.editPlats({}); if (S.sheet.platsEdit) throw new Error('plats off'); G.closeSheet();
+  });
   await step('export/import', async () => { const d = { app: 'game-catalog', games: S.games, collections: S.collections, props: [], covers: {} }; const before = S.games.length; const n = await G.importData(JSON.parse(JSON.stringify(d)), 'merge'); if (S.games.length !== before) throw new Error('dup ' + S.games.length + ' vs ' + before); });
 })();

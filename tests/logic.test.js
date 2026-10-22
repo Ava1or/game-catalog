@@ -28,3 +28,7 @@ x=f(); x.sort='series'; eq(L.sortGames(g.slice(),x).map(z=>z.name),['B','C','A']
 
 { const p=L.parseLine; eq(p('Doom | 12ч | 2016'),{text:'Doom',year:2016,hours:12},'parse pipe'); eq(p('1. Hades\t2020\t35.5 h'),{text:'Hades',year:2020,hours:35.5},'parse tab');
   eq(p('Cyberpunk 2077'),{text:'Cyberpunk 2077',year:0,hours:0},'no bare year'); eq(p('Doom (2016)'),{text:'Doom',year:2016,hours:0},'paren year'); eq(p('   '),null,'empty'); eq(p('- Half-Life 2 ; 2004'),{text:'Half-Life 2',year:2004,hours:0},'semicolon'); }
+
+{ const x=f(); x.collections=[L.DONE_ID]; const g3=[{name:'A',done:true,genres:[],platforms:[],collections:[],props:{}},{name:'B',done:false,genres:[],platforms:[],collections:['k'],props:{}}];
+  eq(L.filterGames(g3,x).map(z=>z.name),['A'],'virtual Пройдено'); x.collections=[L.DONE_ID,'k']; x.collMode='and'; eq(L.filterGames(g3,x).map(z=>z.name),[],'Пройдено AND k'); x.collMode='or'; eq(L.filterGames(g3,x).map(z=>z.name),['A','B'],'Пройдено OR k');
+  eq([1,2,5,11,21,22,111].map(L.gWord),['1 игра','2 игры','5 игр','11 игр','21 игра','22 игры','111 игр'],'gWord'); }

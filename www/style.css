@@ -158,7 +158,7 @@ button,[data-act],.opt,.acts span,.p,.chip,.btn,.ib,.tile,.card,.lcard,.it .tx,.
 .p[style*="border-color"]{border-width:1px 1px 1px 4px}
 
 /* плотность строк списка: d1 компактно, d2 средне, d3 крупно */
-.wrap.d1 td{padding:3px 8px;font-size:12px}.wrap.d1 th{padding:8px 8px;font-size:10px}
+.wrap.d1 td{padding:3px 8px;font-size:12px}
 .wrap.d1 .thumb{width:26px;height:36px}.wrap.d1 .n{font-size:12px;line-height:14px;max-height:28px;overflow:hidden}.wrap.d1 .sub{display:none}
 .wrap.d1 td.nmc{min-width:110px;max-width:160px}
 .wrap.d2 td{padding:5px 8px;font-size:13px}.wrap.d2 .thumb{width:34px;height:46px}.wrap.d2 .n{font-size:13px}.wrap.d2 .sub{font-size:10px;max-height:12px;overflow:hidden}
@@ -210,3 +210,66 @@ button.tag{cursor:pointer;font-family:inherit}
 /* панель кнопок над списком: 7 кнопок помещаются в строку, иначе переносятся */
 .tools{flex-wrap:wrap;gap:5px}
 .ib{min-width:40px;padding:0 8px}
+
+/* закреплённая верхняя часть: поиск, кнопки и отбор не прокручиваются, список прокручивается сам */
+#view.fx{display:flex;flex-direction:column;overflow:hidden;padding-bottom:0}
+#view.fx>*{width:100%}
+#view.fx>.top{flex:0 0 auto;background:var(--bg);position:relative;z-index:5}
+#view.fx>.scrl{flex:1 1 auto;min-height:0;overflow:auto;padding-bottom:90px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.actv{max-height:76px;overflow-y:auto}
+
+/* шапка таблицы: всегда маленькая и закреплена сверху, не зависит от масштаба списка */
+.wrap{overflow:visible}
+.wrap th{position:sticky;top:0;z-index:2;background:var(--bg2);padding:6px 8px;font-size:10px;line-height:14px;letter-spacing:.5px}
+.wrap th.pc{z-index:4}
+
+/* строки списка ниже, обложки квадратные */
+.thumb{width:48px;height:48px}
+.wrap td{padding-top:5px;padding-bottom:5px}
+.wrap.d1 td{padding:1px 8px}
+.wrap.d1 .thumb{width:26px;height:26px}
+.wrap.d1 .n{line-height:13px;max-height:26px}
+.wrap.d2 td{padding:3px 8px}
+.wrap.d2 .thumb{width:36px;height:36px}
+.wrap.d2 .n{line-height:15px;max-height:30px;overflow:hidden}
+.mp{font-weight:600}
+
+/* поиск IGDB: лупа вместо плюса, чёрно-белая */
+.qa{width:32px;height:32px;background:#000b;color:#fff;border:1px solid #fff5;display:flex;align-items:center;justify-content:center;font-size:0;line-height:0;padding:0}
+.card.busy{opacity:.5;pointer-events:none}
+.chip.green{background:var(--green)}
+.oi{font-size:20px;width:26px;text-align:center;flex:0 0 26px}
+.card,.tile,.lrow,.wrap tbody tr{-webkit-user-select:none;user-select:none}
+
+/* просмотр скриншотов */
+.lb{touch-action:none}
+.lb img{-webkit-user-drag:none;user-select:none}
+.lbc{position:absolute;left:0;right:0;top:calc(14px + env(safe-area-inset-top));text-align:center;color:#fff;font-size:14px;text-shadow:0 1px 3px #000;pointer-events:none}
+.lbx{position:absolute;right:12px;top:calc(8px + env(safe-area-inset-top));width:40px;height:40px;border-radius:20px;background:#0009;color:#fff;font-size:18px}
+.lbn{position:absolute;top:50%;margin-top:-26px;width:44px;height:52px;background:#0008;color:#fff;font-size:30px;line-height:50px;border-radius:10px}
+.lbp{left:8px}
+.lbf{right:8px}
+
+/* значки на плитках уменьшаются вместе с масштабом: время, галочка, лупа */
+.grid.z3 .badge{font-size:10px;padding:1px 6px}
+.grid.z3 .ok,.grid.z3 .dn{width:19px;height:19px;line-height:19px;font-size:11px}
+.grid.z3 .qa{width:26px;height:26px}
+.grid.z3 .qa svg{width:15px;height:15px}
+.grid.z4 .badge{font-size:9px;padding:0 5px;left:4px;top:4px}
+.grid.z4 .ok,.grid.z4 .dn{width:16px;height:16px;line-height:16px;font-size:10px;right:4px;top:4px}
+.grid.z4 .qa{width:21px;height:21px;right:3px;bottom:3px}
+.grid.z4 .qa svg{width:12px;height:12px}
+.grid.z5 .badge{font-size:8px;padding:0 4px;left:3px;top:3px;border-radius:6px}
+.grid.z5 .ok,.grid.z5 .dn{width:13px;height:13px;line-height:13px;font-size:8px;right:3px;top:3px}
+.grid.z5 .qa{width:17px;height:17px;right:3px;bottom:3px}
+.grid.z5 .qa svg{width:10px;height:10px}
+.grid.z6 .badge{font-size:7px;padding:0 3px;left:2px;top:2px;border-radius:5px}
+.grid.z6 .ok,.grid.z6 .dn{width:11px;height:11px;line-height:11px;font-size:7px;right:2px;top:2px}
+.grid.z6 .qa{width:14px;height:14px;right:2px;bottom:2px}
+.grid.z6 .qa svg{width:8px;height:8px}
+.grid.z5 .chk,.grid.z6 .chk{transform:scale(.7);transform-origin:top left}
+
+/* разбор: настройки списка */
+.lrw{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0}
+.lrw .btn{max-width:62%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tag.m2{cursor:pointer}

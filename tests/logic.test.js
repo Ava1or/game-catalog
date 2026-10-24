@@ -32,3 +32,12 @@ x=f(); x.sort='series'; eq(L.sortGames(g.slice(),x).map(z=>z.name),['B','C','A']
 { const x=f(); x.collections=[L.DONE_ID]; const g3=[{name:'A',done:true,genres:[],platforms:[],collections:[],props:{}},{name:'B',done:false,genres:[],platforms:[],collections:['k'],props:{}}];
   eq(L.filterGames(g3,x).map(z=>z.name),['A'],'virtual Пройдено'); x.collections=[L.DONE_ID,'k']; x.collMode='and'; eq(L.filterGames(g3,x).map(z=>z.name),[],'Пройдено AND k'); x.collMode='or'; eq(L.filterGames(g3,x).map(z=>z.name),['A','B'],'Пройдено OR k');
   eq([1,2,5,11,21,22,111].map(L.gWord),['1 игра','2 игры','5 игр','11 игр','21 игра','22 игры','111 игр'],'gWord'); }
+
+{ eq(L.parseLine("id 4545 | Assassin's Creed IV (2013 | PC, PS3) – 23 ч"), { text: "Assassin's Creed IV", year: 2013, hours: 23, x: { gid: '4545', platforms: ['PC', 'PS3'] } }, 'parseLine id + платформы + время');
+  const gms = [{ id: 'a1', name: 'Game; "X"', year: 2020, platforms: ['PC', 'PS4'], mainPlatform: 'PC', genres: ['RPG'], time: 12, rating: 8.1, series: 'S', collections: ['c1'], done: true, doneDate: '2021-01-02', igdbId: 5 }];
+  const keys = ['id', 'name', 'year', 'platforms', 'mainPlatform', 'genres', 'time', 'rating', 'series', 'collections', 'done', 'doneDate', 'igdbId'];
+  for (const fmt of ['csv', 'txt']) {
+    const rows = L.parseInboxText(L.buildExport(gms, keys, fmt, () => 'Кол'));
+    eq([rows.length, rows[0].text, rows[0].year, rows[0].hours, rows[0].x.gid, rows[0].x.platforms, rows[0].x.mainPlatform, rows[0].x.colls, rows[0].x.done, rows[0].x.igdbId], [1, 'Game; "X"', 2020, 12, 'a1', ['PC', 'PS4'], 'PC', ['Кол'], true, 5], 'выгрузка и обратный разбор ' + fmt);
+  }
+  eq(L.parseInboxText('Zelda | 2017\nMario (2020)').map(x => [x.text, x.year]), [['Zelda', 2017], ['Mario', 2020]], 'обычные строки без заголовков'); }

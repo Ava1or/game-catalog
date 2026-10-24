@@ -273,3 +273,69 @@ button.tag{cursor:pointer;font-family:inherit}
 .lrw{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0}
 .lrw .btn{max-width:62%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tag.m2{cursor:pointer}
+
+/* просмотр скриншотов: счётчик снизу, картинку можно двигать и увеличивать */
+.lbc{top:auto;bottom:calc(16px + env(safe-area-inset-bottom))}
+.lb img{touch-action:none;transform-origin:center;will-change:transform}
+
+/* лупа на масштабах 5 и 6 не меньше, чем на 4 */
+.grid.z5 .qa,.grid.z6 .qa{width:21px;height:21px}
+.grid.z5 .qa svg,.grid.z6 .qa svg{width:12px;height:12px}
+
+/* коллекции и серии: цветной прогресс «Пройдено» */
+.tile .ct{padding-bottom:3px}
+.tile .pb{height:3px;margin:0 8px 7px}
+.lrow .pb{height:4px;margin-top:4px}
+.tiles.z3 .nm{font-size:12px}
+.tiles.z3 .ct{font-size:10px}
+.tiles.z4 .nm{font-size:11px;line-height:14px;padding:4px 5px 0}
+.tiles.z4 .ct{font-size:9px;padding:1px 5px 2px}
+.tiles.z4 .pb{height:2px;margin:0 5px 5px}
+
+/* поиск списком */
+.srl{display:flex;flex-direction:column;gap:6px}
+.srow{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:12px;padding:6px 8px;cursor:pointer}
+.srow .sth{width:44px;height:44px;flex:0 0 44px;border-radius:8px;background:var(--ph) center/cover no-repeat}
+.srow .sm{flex:1;min-width:0}
+.srow .nm{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.srow .m{font-size:11px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.srow .qa{position:static;flex:0 0 auto;width:30px;height:30px}
+.srow .ok2{color:var(--green);font-weight:700}
+
+/* таблица: фон задан самой таблице, чтобы при прокрутке вправо цвет не менялся */
+.wrap table{background:var(--bg2);min-width:100%}
+
+/* плитки каталога: тёмная полоса снизу с платформой, временем и зелёной галочкой */
+.strip{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-between;align-items:center;gap:4px;padding:2px 5px;background:rgba(0,0,0,.66);color:#fff;font-size:10px;line-height:13px;pointer-events:none}
+.strip .sp{font-size:8px;opacity:.9;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.strip .sr{white-space:nowrap}
+.strip .ck{color:#4ade80;font-style:normal;font-weight:700}
+.card.isdone .cv{box-shadow:inset 0 0 0 2px rgba(74,222,128,.55)}
+.grid.z5 .strip,.grid.z6 .strip{font-size:8px;padding:1px 3px;line-height:11px}
+.grid.z5 .strip .sp,.grid.z6 .strip .sp{font-size:7px}
+/* пройденные игры в списке: едва заметный зелёный фон и полоска слева */
+tr.isdone td{background-image:linear-gradient(rgba(74,222,128,.10),rgba(74,222,128,.10))}
+tr.isdone td:first-child{box-shadow:inset 3px 0 0 rgba(74,222,128,.7)}
+
+/* карточка игры: компактная */
+.cmp h3{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--mut);margin:10px 2px 4px}
+.cmp .hdr3{margin:8px 2px 4px}
+.cmp .hdr3 h3{margin:0}
+.cmp .hdr3 .btn{padding:3px 8px;line-height:0}
+.hero2{display:flex;gap:12px;align-items:flex-start}
+.hero2 .cv{width:92px;aspect-ratio:3/4;flex:0 0 92px;border-radius:10px;background:var(--ph) center/cover no-repeat}
+.hero2 .hr{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px}
+.hero2 input.nm{width:100%;font-size:17px;font-weight:600;padding:6px 8px;box-sizing:border-box}
+.srcrow2,.srcrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.srcb{display:inline-flex;align-items:center;gap:4px;border:1px solid;border-radius:9px;padding:3px 9px;font-weight:700;font-size:12px;background:rgba(255,255,255,.04);text-decoration:none;cursor:pointer}
+.mpchip{display:inline-flex;align-items:center;gap:5px;border-radius:9px;padding:3px 10px;font-weight:700;font-size:13px;background:rgba(120,140,255,.14);color:#8ea2ff}
+.infochips{display:flex;flex-wrap:wrap;gap:6px}
+.ichip{display:inline-flex;align-items:center;gap:5px;background:var(--hl);border-radius:14px;padding:4px 10px;font-size:13px;color:var(--tx);max-width:100%}
+.tbar{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 2px}
+.btn.sm{padding:4px 9px;font-size:12px;border-radius:9px;display:inline-flex;align-items:center;gap:4px}
+.ic{width:14px;height:14px;flex:0 0 auto}
+.rowc{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.inl2{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mut)}
+.inl2 input{padding:4px 6px}
+.srcrow{margin:6px 0}
+.srcb.srcsw,.ib.srcsw{min-width:0}

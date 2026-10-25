@@ -730,8 +730,13 @@ function openSheet(html) {
   sheetEl._key = key; $('#layer').appendChild(sheetEl);
   return sheetEl.querySelector('.sheet');
 }
+// перерисовка с сохранением места прокрутки (список остаётся на той же игре)
+function renderKeep() {
+  const els = () => [$('#libBody'), $('#srBody'), $('#view .scrl'), $('#view')], sc = els().map(e => e ? e.scrollTop : 0);
+  render(); els().forEach((e, i) => { if (e) e.scrollTop = sc[i]; });
+}
 function closeSheet() {
-  if (S.sheet && S.sheet.dirty && sheetEl) { collectSheet(); const sh = S.sheet; sh.dirty = false; persistDraft(sh).then(ok => { if (ok) render(); else if (!sh.draft.name) toast('Игра не сохранена: не заполнено название'); }); }
+  if (S.sheet && S.sheet.dirty && sheetEl) { collectSheet(); const sh = S.sheet; sh.dirty = false; persistDraft(sh).then(ok => { if (ok) renderKeep(); else if (!sh.draft.name) toast('Игра не сохранена: не заполнено название'); }); }
   if (sheetEl) { sheetEl.remove(); sheetEl = null; } S.sheet = null;
   S.shotUrls.forEach(u => URL.revokeObjectURL(u)); S.shotUrls = [];
 }
@@ -800,10 +805,10 @@ async function createCollection() {
 }
 
 /* ====================== Каталог ====================== */
-function meta(o) {
+function meta(o, noPlat) {
   const p = [];
   if (o.rating) p.push('<span class="st">★' + o.rating + '</span>');
-  const mp = mainOf(o), pl = mp ? shortPlat(mp) : (o.platforms || []).slice(0, 2).map(shortPlat).join(', '); if (pl) p.push(esc(pl));
+  const mp = mainOf(o), pl = mp ? shortPlat(mp) : (o.platforms || []).slice(0, 2).map(shortPlat).join(', '); if (pl && !noPlat) p.push(esc(pl));
   if (o.year) p.push(o.year);
   return p.join(' · ');
 }
@@ -811,7 +816,7 @@ function cardHtml(g) {
   const src = coverSrc(g), sel = S.sel.has(g.id), mp = mainOf(g);
   const strip = (mp || g.time || g.done) ? '<div class="strip"><span class="sp">' + esc(mp ? shortPlat(mp) : '') + '</span><span class="sr">' + (g.time ? '⏱ ' + g.time + 'ч' : '') + (g.done ? ' <i class="ck">✓</i>' : '') + '</span></div>' : '';
   return '<div class="card' + (sel ? ' sel' : '') + (g.done ? ' isdone' : '') + '" data-gid="' + g.id + '" data-act="openGame"><div class="cv' + (src ? '' : ' nocover') + '"' + (src ? ' style="background-image:url(\'' + bgu(src) + '\')"' : '') + '>'
-    + (S.selMode ? '<span class="chk">' + (sel ? '✓' : '') + '</span>' : '') + strip + '</div><div class="t">' + esc(g.name) + '</div><div class="m">' + meta(g) + '</div></div>';
+    + (S.selMode ? '<span class="chk">' + (sel ? '✓' : '') + '</span>' : '') + strip + '</div><div class="t">' + esc(g.name) + '</div><div class="m">' + meta(g, true) + '</div></div>';
 }
 // текст из другого приложения («Поделиться»): в поиск игры или в список разбора
 async function handleShared(text) {
@@ -829,8 +834,8 @@ async function handleShared(text) {
 const checkShared = () => { try { const A = window.AndroidShare, t = A && A.take ? A.take() : ''; if (t) handleShared(t); } catch (e) { /* общего текста нет */ } };
 function gameLine(g) { return g.name + ' (' + [g.year || '', (g.platforms || []).join(', ')].filter(Boolean).join(' | ') + ')' + (g.time ? ' – ' + g.time + ' ч' : ''); }
 function tagsHtml(g) {
-  const names = (g.collections || []).map(id => collById(id)).filter(Boolean).map(c => c.name);
-  return names.slice(0, 2).map(n => '<span class="tag">' + esc(n) + '</span>').join('') + (names.length > 2 ? '<span class="tag m2" data-act="gameColls" data-gid="' + g.id + '">+' + (names.length - 2) + '</span>' : '');
+  const names = (g.collections || []).map(id => collById(id)).filter(Boolean);
+  return names.slice(0, 2).map(c => '<span class="tag"' + (okColor(c.color) ? ' style="color:' + okColor(c.color) + ';border-color:' + okColor(c.color) + '"' : '') + '>' + esc(c.name) + '</span>').join('') + (names.length > 2 ? '<span class="tag m2" data-act="gameColls" data-gid="' + g.id + '">+' + (names.length - 2) + '</span>' : '');
 }
 function listHtml(list) {
   const c = S.set.cols, f = S.set.f, pin = !!S.set.pin, pcols = S.set.propCols || {}, lvl = colsFor('list');
@@ -949,11 +954,12 @@ async function bulkMore(ids) {
   const m = await askChoose({ title: 'Выбрано игр: ' + games.length, items: [
     { id: 'done', label: 'Отметить завершёнными' }, { id: 'undone', label: 'Снять отметку «Завершено»' },
     { id: 'series', label: 'Задать серию…' }, { id: 'noseries', label: 'Убрать серию' },
-    { id: 'main', label: 'Задать основную платформу…' }, { id: 'move', label: 'Переместить в другую коллекцию', sub: 'убирает из выбранной сверху коллекции и добавляет в новую' }, { id: 'genre', label: 'Добавить жанр…' }, { id: 'plat', label: 'Добавить платформу…' },
+    { id: 'main', label: 'Задать основную платформу…' }, { id: 'merge', label: 'Объединить карточки…', sub: 'сравнить выбранные игры и слить в одну' }, { id: 'move', label: 'Переместить в другую коллекцию', sub: 'убирает из выбранной сверху коллекции и добавляет в новую' }, { id: 'genre', label: 'Добавить жанр…' }, { id: 'plat', label: 'Добавить платформу…' },
     { id: 'export', label: 'Выгрузить выбранные…' }, { id: 'igdb', label: 'Обновить из ' + PROV[S.set.mainSrc].name }] });
   if (!m) return;
   if (m === 'igdb') return bulkRefresh(games);
   if (m === 'move') return selectionAction('move');
+  if (m === 'merge') { if (games.length < 2) return toast('Выберите две карточки или больше'); S.selMode = false; S.sel.clear(); renderLibrary(); return openMergeCompare(games.map(g => g.id), true); }
   if (m === 'export') return openExport(games, 'Выбранные игры');
   let n = 0;
   if (m === 'done') { for (const g of games) if (!g.done) { g.done = true; g.doneDate = g.doneDate || todayStr(); await saveGame(g); n++; } }
@@ -1112,7 +1118,7 @@ function openGameSheet(id) {
 }
 function drawShColls() {
   const d = S.sheet.draft;
-  $('#shColls').innerHTML = sortedColls().map(c => '<button class="p' + (d.collections.includes(c.id) ? ' on' : '') + '" data-act="shColl" data-id="' + c.id + '">' + esc(c.name) + '</button>').join('') + '<button class="p new" data-act="shNewColl">＋ новая</button>';
+  $('#shColls').innerHTML = sortedColls().map(c => '<button class="p' + (d.collections.includes(c.id) ? ' on' : '') + '"' + (okColor(c.color) ? ' style="color:' + okColor(c.color) + ';border-color:' + okColor(c.color) + '"' : '') + ' data-act="shColl" data-id="' + c.id + '">' + esc(c.name) + '</button>').join('') + '<button class="p new" data-act="shNewColl">＋ новая</button>';
 }
 const EDIT_KEYS = ['name', 'year', 'rating', 'time', 'series', 'genres', 'platforms', 'collections', 'props', 'done', 'doneDate', 'mainPlatform'];
 let autoT;
@@ -1176,6 +1182,72 @@ async function mergeGames(list) {
     await removeGame(o.id, { noTrash: true });
   }
   p.series = canonSeries(p.series); await saveGame(p);
+}
+/* ====================== Объединение карточек вручную ====================== */
+const MG_FIELDS = [['name', 'Название', 't'], ['year', 'Год', 'n'], ['platforms', 'Платформы', 'l'], ['mainPlatform', 'Основная платформа', 'p'], ['genres', 'Жанры', 'l'], ['rating', 'Рейтинг', 'n'], ['time', 'Время, ч', 'n'], ['series', 'Серия', 't'], ['collections', 'Коллекции', 'c'], ['done', 'Завершено', 'b'], ['doneDate', 'Дата завершения', 'd'], ['description', 'Описание', 'x']];
+const mgGet = (g, k) => (k === 'platforms' || k === 'genres' || k === 'collections') ? (g[k] || []).slice() : g[k];
+const mgShow = (g, k) => {
+  const v = mgGet(g, k);
+  if (k === 'collections') return v.map(id => (collById(id) || {}).name).filter(Boolean).join(', ') || '—';
+  if (Array.isArray(v)) return v.map(x => k === 'platforms' ? shortPlat(x) : x).join(', ') || '—';
+  if (k === 'done') return v ? 'да' : 'нет';
+  if (k === 'mainPlatform') return v ? shortPlat(v) : '—';
+  if (k === 'description') return v ? String(v).slice(0, 70) + (String(v).length > 70 ? '…' : '') : '—';
+  return v === '' || v == null || v === 0 ? '—' : String(v);
+};
+const mgUnion = (a, b) => Array.from(new Set((a || []).concat(b || [])));
+const mgScore = g => (g.igdbId || g.rawgId ? 4 : 0) + (g.hasCover ? 2 : 0) + ((g.collections || []).length ? 1 : 0);
+function mergeGroups(withYear) { // группы карточек с одинаковым названием (и годом), где карточек две и больше
+  const m = new Map();
+  S.games.forEach(g => { const k = normName(g.name) + (withYear ? '|' + (g.year || 0) : ''); if (!m.has(k)) m.set(k, []); m.get(k).push(g); });
+  return Array.from(m.values()).filter(a => a.length > 1).sort((a, b) => b.length - a.length || a[0].name.localeCompare(b[0].name, 'ru'));
+}
+function mgBase(main, cards) { // результат: данные основной карточки, коллекции собраны со всех
+  const r = {}; MG_FIELDS.forEach(f => { r[f[0]] = mgGet(main, f[0]); });
+  r.collections = cards.reduce((a, c) => mgUnion(a, c.collections), []); return r;
+}
+function openMergeTool() {
+  const y = !!S.mgYear, groups = mergeGroups(y);
+  sheetKey = 'mgtool'; openSheet('<div class="hdr2"><h2>Объединение карточек</h2></div><div class="chips"><button class="p' + (!y ? ' on' : '') + '" data-act="mgMode" data-v="0">Название</button><button class="p' + (y ? ' on' : '') + '" data-act="mgMode" data-v="1">Название + год</button></div>'
+    + '<p class="sub">Названия, у которых две карточки и больше: ' + groups.length + '. Нажмите на название, чтобы сравнить карточки, выбрать основную и перенести данные.</p><div class="mglist">'
+    + (groups.map(a => '<div class="mgrow" data-act="mgOpen" data-ids="' + a.map(g => g.id).join(',') + '"><span class="mgn">' + esc(a[0].name) + '</span><span class="mgc">' + a.length + '</span><span class="sub mgs">' + esc(a.map(g => (g.year || '—') + (mainOf(g) ? ' ' + shortPlat(mainOf(g)) : '')).join(' · ')) + '</span></div>').join('') || '<p class="hint">Одинаковых названий нет</p>') + '</div>');
+}
+function openMergeCompare(ids, fresh) {
+  const cards = ids.map(gameById).filter(Boolean); if (cards.length < 2) return toast('Нужно минимум две карточки');
+  if (fresh || !S.mg || S.mg.ids.join() !== ids.join()) { const main = cards.slice().sort((a, b) => mgScore(b) - mgScore(a) || (a.added || 0) - (b.added || 0))[0]; S.mg = { ids, main: main.id, res: mgBase(main, cards) }; }
+  drawMergeCompare();
+}
+function drawMergeCompare() {
+  const m = S.mg, cards = m.ids.map(gameById).filter(Boolean), list = k => ['platforms', 'genres', 'collections'].includes(k);
+  const head = '<tr><th class="mgl"></th><th class="mgres">Результат</th>' + cards.map(c => '<th><button class="p' + (c.id === m.main ? ' on' : '') + '" data-act="mgMain" data-id="' + c.id + '">' + (c.id === m.main ? '✓ ' : '') + 'Основная</button><div class="sub">' + esc([c.year || '', mainOf(c) ? shortPlat(mainOf(c)) : '', srcsOf(c).map(k => PROV[k].name).join('+')].filter(Boolean).join(' · ')) + '</div></th>').join('') + '</tr>';
+  const rows = MG_FIELDS.map(f => { const k = f[0]; return '<tr><th class="mgl">' + f[1] + (list(k) ? '<br><button class="btn sm" data-act="mgUnion" data-k="' + k + '">∪ все</button>' : '') + '</th><td class="mgres" data-act="mgEdit" data-k="' + k + '">' + esc(mgShow(m.res, k)) + ' ✎</td>'
+    + cards.map(c => '<td>' + esc(mgShow(c, k)) + (c.id === m.main ? '' : '<div class="mgb"><button class="btn sm" data-act="mgTake" data-id="' + c.id + '" data-k="' + k + '" title="Взять в результат">⇒</button>' + (list(k) ? '<button class="btn sm" data-act="mgAdd" data-id="' + c.id + '" data-k="' + k + '" title="Добавить к результату">＋</button>' : '') + '</div>') + '</td>').join('') + '</tr>'; }).join('');
+  sheetKey = 'mgcmp'; openSheet('<div class="hdr2"><h2>' + esc(cards[0].name) + '</h2></div><p class="sub">Выберите основную карточку. «⇒» берёт значение из карточки в результат, «＋» добавляет к списку, «∪ все» объединяет списки всех карточек, нажатие на значение в «Результате» меняет его вручную. Обложка, источники, свойства и скриншоты переносятся сами.</p>'
+    + '<div class="mgwrap"><table class="mgt">' + head + rows + '</table></div><div class="toolbar"><button class="btn acc" data-act="mgDo">Объединить…</button><button class="btn" data-act="mgBack">К списку названий</button></div>');
+}
+function openMergePreview() {
+  const m = S.mg, cards = m.ids.map(gameById).filter(Boolean), main = gameById(m.main), others = cards.filter(c => c.id !== m.main), r = m.res;
+  const shots = others.reduce((a, c) => a + (c.shotCount || 0), main.shotCount || 0);
+  const lines = MG_FIELDS.map(f => '<tr><th class="mgl">' + f[1] + '</th><td>' + esc(mgShow(r, f[0])) + '</td></tr>').join('')
+    + '<tr><th class="mgl">Источники</th><td>' + esc(cards.reduce((a, c) => mgUnion(a, srcsOf(c)), []).map(k => PROV[k].name).join(', ') || '—') + '</td></tr>'
+    + '<tr><th class="mgl">Скриншоты</th><td>' + shots + '</td></tr><tr><th class="mgl">Обложка</th><td>' + (main.hasCover || !others.some(c => c.hasCover) ? 'основной карточки' : 'из другой карточки') + '</td></tr>';
+  sheetKey = 'mgprev'; openSheet('<div class="hdr2"><h2>Проверка перед объединением</h2></div><p class="sub">Новая карточка будет такой. Будут удалены карточки: <b>' + others.length + '</b> (' + esc(others.map(c => c.name + (c.year ? ' ' + c.year : '') + (mainOf(c) ? ' ' + shortPlat(mainOf(c)) : '')).join('; ')) + '). Они попадут в корзину и хранятся там 30 дней, можно вернуть.</p><div class="mgwrap"><table class="mgt">' + lines + '</table></div>'
+    + '<div class="toolbar"><button class="btn acc" data-act="mgGo">Объединить</button><button class="btn" data-act="mgCompare">Назад к сравнению</button></div>');
+}
+async function applyMerge(m) {
+  const p = gameById(m.main), others = m.ids.filter(i => i !== m.main).map(gameById).filter(Boolean), r = m.res; if (!p) return;
+  p.name = r.name || p.name; p.year = +r.year || 0; p.rating = +r.rating || 0; p.time = +r.time || 0; p.series = canonSeries(r.series || ''); p.description = r.description || ''; p.doneDate = r.doneDate || '';
+  p.platforms = (r.platforms || []).slice(); p.genres = (r.genres || []).slice(); p.collections = (r.collections || []).filter(id => collById(id)); p.done = !!r.done; p.mainPlatform = r.mainPlatform && p.platforms.includes(r.mainPlatform) ? r.mainPlatform : '';
+  for (const o of others) {
+    ['igdbId', 'rawgId', 'igdbUrl', 'rawgUrl', 'coverUrl'].forEach(k => { if (!p[k] && o[k]) p[k] = o[k]; });
+    p.props = Object.assign({}, o.props || {}, p.props || {});
+    if (!p.hasCover && o.hasCover) { const c = await DB.get('covers', o.id); if (c) await setCover(p.id, c.blob); }
+    for (const i of S.inbox.items) if (i.gameId === o.id) { i.gameId = p.id; await DB.put('inboxItems', i); }
+    const os = await getShots(o.id);
+    if (os.length) { const ps = await getShots(p.id), have = new Set(ps.map(x => x.src).filter(Boolean)), add = os.filter(x => !x.src || !have.has(x.src)); if (add.length) await putShots(p.id, ps.concat(add)); }
+  }
+  await saveGame(p);
+  for (const o of others) await removeGame(o.id);
 }
 async function mergeAllDupes(d) {
   for (const names of d.series) { const canon = names[0]; for (const g of S.games) if (g.series && normName(g.series) === normName(canon) && g.series !== canon) { g.series = canon; await saveGame(g); } }
@@ -1711,6 +1783,7 @@ function viewSettings() {
     + '<div class="sec"><h3 style="margin-top:0">Ключ RAWG</h3>' + blockBanner(false, 'rawg') + '<label class="field"><input id="rawgIn" value="' + esc(S.set.rawgKey) + '" placeholder="вставьте ключ RAWG" autocomplete="off"></label><div class="toolbar"><button class="btn acc" data-act="saveRawg">Сохранить и проверить</button></div>' + rawgUsageHtml() + '<p class="sub">Бесплатный ключ: rawg.io/apidocs (регистрация, «Get API Key»).</p></div>'
     + '<div class="sec"><h3 style="margin-top:0">SteamGridDB (обложки)</h3><div class="chips"><button class="p' + (S.set.sgdbOn ? ' on' : '') + '" data-act="toggleSgdb">' + (S.set.sgdbOn ? '✓ Включено' : 'Выключено') + '</button></div><label class="field"><input id="sgdbIn" value="' + esc(S.set.sgdbKey) + '" placeholder="ключ SteamGridDB"></label><div class="toolbar"><button class="btn acc" data-act="saveSgdb">Сохранить ключ</button></div><p class="sub">Запросов в этом месяце: <b>' + usageCount('sgdb') + '</b>. Пока выключено, в карточке игры вместо кнопок только маленькая кнопка с подсказкой. Если включено и у игры нет обложки в источнике, она подгружается отсюда сама. Лимит SteamGridDB: 120 запросов в минуту, приложение держит паузы между запросами и при ответе 429 останавливается на время, которое просит сервер. Ключ: steamgriddb.com, профиль, настройки, API.</p></div>'
     + '<div class="sec"><h3 style="margin-top:0">Время прохождения</h3><p class="sub">В карточке игры кнопки HowLongToBeat и Cubiq.ru сразу открывают страницу сайта с игрой (в приложении Android внутри приложения, в браузере в новой вкладке). Время впишите в карточку вручную.</p></div>'
+    + '<div class="sec"><h3 style="margin-top:0">Объединение карточек</h3><p class="sub">Одна и та же игра на разных платформах, добавленная несколькими карточками: сравните их, выберите основную, перенесите данные и объедините. Перед объединением показывается, какая карточка получится.</p><div class="toolbar"><button class="btn acc" data-act="mgTool">Открыть инструмент объединения</button></div></div>'
     + '<div class="sec"><h3 style="margin-top:0">Скриншоты в базе</h3><div id="shStats" class="sub">считаем…</div><div class="toolbar"><button class="btn" data-act="shMgr">Выбрать игры…</button><button class="btn red" data-act="shDelAll">Удалить все</button></div></div>'
     + '<div class="sec"><h3 style="margin-top:0">Данные</h3><p class="sub">Игр: ' + S.games.length + ' · коллекций: ' + S.collections.length + ' · скриншотов: ' + S.games.reduce((a, g) => a + (g.shotCount || 0), 0) + '<br>Занято на устройстве: <b id="stEst">считаем…</b>. ' + (S.set.lastExport ? 'Последняя копия: ' + new Date(S.set.lastExport).toLocaleDateString('ru-RU') + '. ' : 'Копии ещё не было. ') + 'Данные хранятся только на этом устройстве. Делайте резервную копию и переносите её между телефоном и компьютером файлом.</p><div class="toolbar"><button class="btn acc" data-act="export">Экспорт в файл</button><button class="btn" data-act="import">Импорт из файла</button><button class="btn" data-act="fixDupes">Проверить дубли</button><button class="btn" data-act="openStats">Статистика</button></div><input type="file" id="impFile" accept=".json,.zip,application/json,application/zip" class="hidden"></div>'
     + '<div class="sec"><h3 style="margin-top:0">Корзина</h3>' + (S.trash.length ? S.trash.slice().sort((a, b) => b.t - a.t).slice(0, 30).map(r => '<div class="row"><span>' + esc(r.game.name) + ' <span class="sub">' + new Date(r.t).toLocaleDateString('ru-RU') + '</span></span><button class="btn" data-act="trashRestore" data-id="' + r.id + '">Вернуть</button></div>').join('') + '<div class="toolbar"><button class="btn red" data-act="trashClear">Очистить корзину</button></div>' : '<p class="sub">Удалённые игры хранятся 30 дней, их можно вернуть.</p>') + '</div>'
@@ -2059,7 +2132,7 @@ const ACT = {
   sgdbOpen: () => { const id = S.sheet.draft.id; closeSheet(); openSgdb(id); },
   sgdbUse: async t => { const gr = S.sgdb && S.sgdb.grids[+t.dataset.i], g = S.sgdb && gameById(S.sgdb.gid); if (!gr || !g) return; toast('Загрузка обложки…'); await applyCoverUrl(g, gr.url); closeSheet(); toast('Обложка заменена'); render(); },
   hltbOpen: () => { const n = (($('#f_name') || {}).value || '').trim(); if (!n) return toast('Укажите название'); openExternal('https://howlongtobeat.com/?q=' + encodeURIComponent(n)); },
-  cubiqOpen: () => { const n = (($('#f_name') || {}).value || '').trim(); if (!n) return toast('Укажите название'); openExternal('https://cubiq.ru/?s=' + encodeURIComponent(n)); },
+  cubiqOpen: () => { const n = (($('#f_name') || {}).value || '').trim(); if (!n) return toast('Укажите название'); openExternal('https://cubiq.ru/gametime/?s=' + encodeURIComponent(n).replace(/%20/g, '+')); },
   sgdbOff: () => toast('SteamGridDB включается в настройках'),
   toggleSgdb: () => { S.set.sgdbOn = !S.set.sgdbOn; saveSet(); render(); },
   setMainSrc: t => { S.set.mainSrc = t.dataset.v === 'rawg' ? 'rawg' : 'igdb'; S.search.src = S.set.mainSrc; S.search.results = []; S.search.started = false; saveSet(); render(); },
@@ -2095,6 +2168,26 @@ const ACT = {
     if (sh.genresEdit) { const i = $('#f_genres'); if (i && i.focus) i.focus(); }
   },
   noop: () => {},
+  mgTool: () => openMergeTool(),
+  mgMode: t => { S.mgYear = t.dataset.v === '1'; openMergeTool(); },
+  mgOpen: t => openMergeCompare(t.dataset.ids.split(','), true),
+  mgBack: () => openMergeTool(),
+  mgCompare: () => drawMergeCompare(),
+  mgMain: t => { const cards = S.mg.ids.map(gameById).filter(Boolean); S.mg.main = t.dataset.id; S.mg.res = mgBase(gameById(t.dataset.id), cards); drawMergeCompare(); },
+  mgTake: t => { S.mg.res[t.dataset.k] = mgGet(gameById(t.dataset.id), t.dataset.k); drawMergeCompare(); },
+  mgAdd: t => { const k = t.dataset.k; S.mg.res[k] = mgUnion(S.mg.res[k], gameById(t.dataset.id)[k]); drawMergeCompare(); },
+  mgUnion: t => { const k = t.dataset.k; S.mg.res[k] = S.mg.ids.map(gameById).filter(Boolean).reduce((a, c) => mgUnion(a, c[k]), S.mg.res[k] || []); drawMergeCompare(); },
+  mgEdit: async t => {
+    const k = t.dataset.k, f = MG_FIELDS.find(x => x[0] === k), r = S.mg.res, cards = S.mg.ids.map(gameById).filter(Boolean); let v;
+    if (f[2] === 'b') r.done = !r.done;
+    else if (f[2] === 'c') { v = await pickCollections('Коллекции результата', r.collections || [], true); if (v === null) return; r.collections = v; }
+    else if (f[2] === 'p') { const all = cards.reduce((a, c) => mgUnion(a, c.platforms), r.platforms || []); v = await askChoose({ title: 'Основная платформа', items: all.map(x => ({ id: x, label: shortPlat(x), ico: '🎮' })) }); if (v === null) return; r.mainPlatform = v; if (!(r.platforms || []).includes(v)) r.platforms = mgUnion(r.platforms, [v]); }
+    else if (f[2] === 'l') { v = await askPrompt(f[1] + ' (через запятую)', (r[k] || []).join(', ')); if (v === null) return; r[k] = csv(v); }
+    else { v = await askPrompt(f[1], r[k] == null ? '' : String(r[k])); if (v === null) return; r[k] = f[2] === 'n' ? (parseFloat(String(v).replace(',', '.')) || 0) : v.trim(); }
+    drawMergeCompare();
+  },
+  mgDo: () => openMergePreview(),
+  mgGo: async () => { const n = S.mg.ids.length - 1; try { await applyMerge(S.mg); } catch (e) { return toast(e.message); } S.mg = null; closeSheet(); toast('Объединено, удалено карточек: ' + n); renderKeep(); },
   statGo: t => { // график статистики: открыть список игр с этим фильтром
     const f = S.set.f, k = t.dataset.k, v = t.dataset.v;
     Object.assign(f, { q: '', years: [], genres: [], platforms: [], series: [], props: [], mainPlats: [], collections: [], done: '', minRating: 0 });
@@ -2251,7 +2344,7 @@ function applyTheme() {
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
   const m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', dark ? '#0b0b0d' : '#f2f3f6');
 }
-window.__GC = { toggleInSel, handleShared, applyExtra, addParsed, openExport, exportText, copyText, gameLine, zipBuild, zipRead, shotStats, delShots, rawgQuotaTick, refreshOne, rawg, requirePlatform, effItem, applyDefaults, linkItem, pickPlatform, itemOpts, viewInbox, mainOf, NO_MAIN, askMainPlatform, quickTap, bulkMore, openAddCollSheet, openLb, libToolsHtml: () => { renderLibHead(); return $('#libTools').innerHTML; }, filterGames, getShots, putShots, collTilesHtml, seriesTilesHtml, viewCollections, viewSeries, DONE_ID, autoResolve, viewStats, restoreGames, removeGame, canonSeries, findDupes, mergeAllDupes, collectSheet, persistDraft, closeSheet, S, ACT, bump, igdb, hltbFind, sgdbAuto, openSgdb, applyTheme, colsFor, usageHtml, serMenu, viewInbox, addItems, linkItem, createList, pendingItem, render, runSearch, addFromIgdb, importData, openIgdbSheet, openGameSheet, openFilters, openCols, selectionAction, loadAll, renderSearchBody };
+window.__GC = { mergeGroups, openMergeCompare, applyMerge, mgBase, renderKeep, toggleInSel, handleShared, applyExtra, addParsed, openExport, exportText, copyText, gameLine, zipBuild, zipRead, shotStats, delShots, rawgQuotaTick, refreshOne, rawg, requirePlatform, effItem, applyDefaults, linkItem, pickPlatform, itemOpts, viewInbox, mainOf, NO_MAIN, askMainPlatform, quickTap, bulkMore, openAddCollSheet, openLb, libToolsHtml: () => { renderLibHead(); return $('#libTools').innerHTML; }, filterGames, getShots, putShots, collTilesHtml, seriesTilesHtml, viewCollections, viewSeries, DONE_ID, autoResolve, viewStats, restoreGames, removeGame, canonSeries, findDupes, mergeAllDupes, collectSheet, persistDraft, closeSheet, S, ACT, bump, igdb, hltbFind, sgdbAuto, openSgdb, applyTheme, colsFor, usageHtml, serMenu, viewInbox, addItems, linkItem, createList, pendingItem, render, runSearch, addFromIgdb, importData, openIgdbSheet, openGameSheet, openFilters, openCols, selectionAction, loadAll, renderSearchBody };
 (async () => {
   try {
     await loadAll();

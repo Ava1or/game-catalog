@@ -377,3 +377,15 @@ tr.sel td:first-child{box-shadow:inset 4px 0 0 #4f8cff}
 .it.isel .ichk{background:#4f8cff;border-color:#4f8cff}
 /* статистика: строки-ссылки */
 .st-row.link,.stc.link{cursor:pointer}
+
+/* объединение карточек */
+.mgwrap{overflow-x:auto;margin:8px -4px}
+.mgt{border-collapse:collapse;min-width:100%;font-size:12px}
+.mgt th,.mgt td{border:1px solid var(--bd2);padding:5px 6px;vertical-align:top;min-width:96px;max-width:170px;overflow-wrap:anywhere;text-align:left;font-weight:400}
+.mgt th.mgl{position:sticky;left:0;background:var(--bg2);min-width:78px;z-index:1;font-weight:600}
+.mgt .mgres{background:rgba(74,222,128,.09);cursor:pointer}
+.mgb{display:flex;gap:4px;margin-top:4px}
+.mgrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:9px 6px;border-bottom:1px solid var(--bd2);cursor:pointer}
+.mgn{flex:1;min-width:0;font-weight:600;overflow-wrap:anywhere}
+.mgc{background:var(--acc);color:#fff;border-radius:10px;padding:1px 8px;font-size:12px}
+.mgs{flex-basis:100%}

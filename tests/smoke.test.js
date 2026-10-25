@@ -290,5 +290,24 @@ const L = require('../www/app.js');
     S.retGame = { id: S.games[0].id, tab: 'library' }; S.tab = 'search'; G.ACT.retGame(); if (S.tab !== 'library' || !S.sheet) throw new Error('retGame'); G.closeSheet();
     S.inboxList = null; S.tab = 'library'; G.render();
   });
+  await step('объединение карточек вручную', async () => {
+    const W = global.window || global;
+    const mk = (id, y, pl, gn, col) => ({ id, name: 'Merge Quest', year: y, platforms: pl, genres: gn, collections: col, props: {}, done: false, doneDate: '', hasCover: false, series: '', rating: 0, time: 0, description: '', mainPlatform: pl[0], igdbId: 0, rawgId: 0, shotCount: 0, added: 1 });
+    const a = mk('mqa', 2008, ['PC'], ['RPG'], ['zz']), b = mk('mqb', 2010, ['PS3'], ['Action', 'RPG'], []), c = mk('mqc', 2008, ['Xbox 360'], [], []); b.rating = 8; b.done = true; b.doneDate = '2020-05-05'; b.igdbId = 777; b.shotCount = 0;
+    S.games.push(a, b, c);
+    const byName = G.mergeGroups(false).find(x => x[0].name === 'Merge Quest'), byYear = G.mergeGroups(true).find(x => x[0].name === 'Merge Quest'); if (!byName || byName.length !== 3 || !byYear || byYear.length !== 2) throw new Error('groups ' + (byName && byName.length) + '/' + (byYear && byYear.length));
+    G.ACT.mgTool(); G.ACT.mgMode({ dataset: { v: '1' } }); G.ACT.mgMode({ dataset: { v: '0' } });
+    G.ACT.mgOpen({ dataset: { ids: 'mqa,mqb,mqc' } }); if (!S.mg || S.mg.main !== 'mqb') throw new Error('default main ' + (S.mg && S.mg.main)); // у карточки b есть источник
+    G.ACT.mgMain({ dataset: { id: 'mqa' } }); if (S.mg.res.platforms[0] !== 'PC') throw new Error('mgMain');
+    G.ACT.mgTake({ dataset: { id: 'mqb', k: 'rating' } }); if (S.mg.res.rating !== 8) throw new Error('mgTake');
+    G.ACT.mgAdd({ dataset: { id: 'mqb', k: 'genres' } }); if (S.mg.res.genres.length !== 2) throw new Error('mgAdd');
+    G.ACT.mgUnion({ dataset: { k: 'platforms' } }); if (S.mg.res.platforms.length !== 3) throw new Error('mgUnion');
+    G.ACT.mgTake({ dataset: { id: 'mqb', k: 'done' } }); G.ACT.mgTake({ dataset: { id: 'mqb', k: 'doneDate' } });
+    W.__promptHook = async () => 'Merge Quest HD'; await G.ACT.mgEdit({ dataset: { k: 'name' } }); delete W.__promptHook; if (S.mg.res.name !== 'Merge Quest HD') throw new Error('mgEdit');
+    G.ACT.mgDo(); await G.ACT.mgGo();
+    const left = S.games.filter(g => g.name.startsWith('Merge Quest')); if (left.length !== 1 || left[0].id !== 'mqa' || left[0].name !== 'Merge Quest HD' || left[0].rating !== 8 || !left[0].done || left[0].igdbId !== 777 || left[0].platforms.length !== 3 || !left[0].collections.includes('zz')) throw new Error('merge result ' + JSON.stringify(left.map(x => x.id)));
+    if (!S.trash.some(x => x.id === 'mqb')) throw new Error('trash ' + S.trash.length);
+    S.sel = new Set(['mqa']); S.selMode = true; S.tab = 'library'; G.render(); G.renderKeep(); S.selMode = false; S.sel.clear(); G.render();
+  });
   await step('export/import', async () => { const d = { app: 'game-catalog', games: S.games, collections: S.collections, props: [], covers: {} }; const before = S.games.length; const n = await G.importData(JSON.parse(JSON.stringify(d)), 'merge'); if (S.games.length !== before) throw new Error('dup ' + S.games.length + ' vs ' + before); });
 })();

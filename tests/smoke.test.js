@@ -132,11 +132,11 @@ const L = require('../www/app.js');
   await step('game sheet', () => { G.openGameSheet(S.games[0].id); G.openGameSheet(null); });
   await step('selection', async () => { S.tab = 'library'; G.ACT.selToggle(); S.sel.add(S.games[0].id); G.render(); });
 
-  await step('Пройдено: встроенная коллекция, плитка и список', async () => {
+  await step('Завершено: встроенная коллекция, плитка и список', async () => {
     S.set.f.collections = [G.DONE_ID]; S.tab = 'library'; G.render();
     const done = S.games.filter(g => g.done).length; const shown = G.filterGames(S.games, S.set.f).length; if (shown !== done) throw new Error('done filter ' + shown + '/' + done);
     S.set.f.collections = []; S.tab = 'collections';
-    for (const m of ['tiles', 'list']) { S.set.vmode.coll = m; G.render(); const h = G.collTilesHtml(); if (!h.includes('Пройдено') || !h.includes('Все игры')) throw new Error('system tiles ' + m); if (m === 'list' && !G.viewCollections().includes('lrows')) throw new Error('list view'); }
+    for (const m of ['tiles', 'list']) { S.set.vmode.coll = m; G.render(); const h = G.collTilesHtml(); if (!h.includes('Завершено') || !h.includes('Все игры')) throw new Error('system tiles ' + m); if (m === 'list' && !G.viewCollections().includes('lrows')) throw new Error('list view'); }
     G.ACT.vmode({ dataset: { k: 'coll' } }); G.ACT.vmode({ dataset: { k: 'series' } }); S.tab = 'series'; G.render(); if (!G.viewSeries().includes('lrows')) throw new Error('series list'); G.ACT.vmode({ dataset: { k: 'series' } });
     G.ACT.collOpen({ dataset: { id: G.DONE_ID } }); if (S.set.f.collections[0] !== G.DONE_ID) throw new Error('collOpen'); S.set.f.collections = []; S.tab = 'library';
   });
@@ -186,7 +186,7 @@ const L = require('../www/app.js');
     const f = JSON.parse(JSON.stringify(S.set.f)); f.mainPlats = ['PC']; if (!G.filterGames(S.games, f).every(g => G.mainOf(g) === 'PC')) throw new Error('mainPlats filter');
     f.mainPlats = [G.NO_MAIN]; if (G.filterGames(S.games, f).some(g => G.mainOf(g))) throw new Error('no main filter');
     S.tab = 'search'; G.render(); S.search.addColls = ['zz', G.DONE_ID]; G.renderSearchBody();
-    const tools = document.querySelector('#sTools').innerHTML; if (!tools.includes('Добавлять в')) throw new Error('add colls button'); if (!document.querySelector('#sActive').innerHTML.includes('Пройдено')) throw new Error('add colls chips');
+    const tools = document.querySelector('#sTools').innerHTML; if (!tools.includes('Добавлять в')) throw new Error('add colls button'); if (!document.querySelector('#sActive').innerHTML.includes('Завершено')) throw new Error('add colls chips');
     await G.quickTap('igdb:1', S.search.addColls); const q = S.games.find(g => g.igdbId === 1); if (!q || !q.collections.includes('zz') || !q.done) throw new Error('quick tap');
     G.ACT.acRm({ dataset: { id: 'zz' } }); if (S.search.addColls.includes('zz')) throw new Error('acRm');
     G.ACT.acClear(); if (S.search.addColls.length) throw new Error('acClear'); G.ACT.igdbTap({ dataset: { rid: 'igdb:1' } });
@@ -258,6 +258,37 @@ const L = require('../www/app.js');
     S.set.igdbProxy = 'http://localhost:8787/'; S.set.igdbId = ''; S.set.igdbSecret = ''; global.__urls = []; const f0 = global.fetch; global.fetch = async (u, o) => { global.__urls.push(String(u)); return f0(u, o); };
     S.block = null; S.lists = {}; await G.igdb('/genres', 'fields id; limit 1;'); global.fetch = f0; if (!global.__urls.some(u => u.startsWith('http://localhost:8787/genres')) || global.__urls.some(u => u.includes('twitch'))) throw new Error('proxy url ' + global.__urls);
     S.set.igdbProxy = ''; S.set.igdbId = 'ID'; S.set.igdbSecret = 'SEC'; S.tab = 'library'; G.render();
+  });
+  await step('карточка: название, завершено, обложка, меню; выбор в разборе; график статистики', async () => {
+    const W = global.window || global;
+    const g = S.games[0]; G.openGameSheet(g.id);
+    W.__promptHook = async () => 'Cthulhu Saves the World: Super Hyper Enhanced Championship Edition Alpha Diamond DX Plus Alpha FES HD – Premium Enhanced Game of the Year Collector\'s Edition';
+    await G.ACT.shEditName(); if (!document.querySelector('#f_name').value.startsWith('Cthulhu')) throw new Error('shEditName'); delete W.__promptHook;
+    G.ACT.shDone(); if (!S.sheet.draft.done || !document.querySelector('#f_donedate').value) throw new Error('shDone on');
+    G.ACT.shDone(); if (S.sheet.draft.done) throw new Error('shDone off');
+    G.ACT.shCover(); W.__chooseHook = async () => 'shareGame'; (global.window || global).open = () => {}; await G.ACT.shMenu(); delete W.__chooseHook; G.closeSheet();
+    const lst = S.inbox.lists[0]; const a = { id: 'sa1', listId: lst.id, text: 'Sel A', done: false, gameId: '', created: 1 }, b = { id: 'sb1', listId: lst.id, text: 'Sel B', done: false, gameId: '', created: 2 }; S.inbox.items.push(a, b);
+    S.inboxList = lst.id; S.tab = 'inbox'; G.render(); G.toggleInSel('sa1', true); G.toggleInSel('sb1'); if (S.inSel.size !== 2 || !S.inSelMode) throw new Error('inbox select');
+    W.__chooseHook = async () => 'PC'; await G.ACT.inAct({ dataset: { m: 'plat' } }); delete W.__chooseHook; if (a.platform !== 'PC' || b.platform !== 'PC') throw new Error('inbox platform for selected');
+    G.toggleInSel('sa1', true); W.__chooseHook = async () => 'yes'; await G.ACT.inAct({ dataset: { m: 'done' } }); delete W.__chooseHook; if (a.markDone !== true) throw new Error('inbox done');
+    S.inboxList = null; S.tab = 'stats'; G.render(); G.ACT.statGo({ dataset: { k: 'genres', v: 'RPG' } }); if (S.tab !== 'library' || S.set.f.genres[0] !== 'RPG') throw new Error('statGo');
+    G.ACT.statGo({ dataset: { k: 'done' } }); if (S.set.f.done !== 'yes' || S.set.f.genres.length) throw new Error('statGo done'); S.set.f.done = '';
+    S.selMode = true; S.sel = new Set([S.games[0].id]); S.tab = 'library'; G.render(); if (!document.querySelector('#selbar').innerHTML.includes('data-m="add"') || document.querySelector('#selbar').innerHTML.includes('data-m="move"')) throw new Error('selbar'); S.selMode = false; S.sel.clear(); G.render();
+  });
+  await step('карточка: название, обложка, завершено; выбор строк; статистика; назад в карточку', async () => {
+    const W = global.window || global; const g = S.games[0];
+    G.openGameSheet(g.id); W.__promptHook = async () => 'Cthulhu Saves the World: Super Hyper Enhanced Championship Edition Alpha Diamond DX Plus Alpha FES HD – Premium Enhanced Game of the Year Collector\'s Edition';
+    await G.ACT.shEditName(); if (document.querySelector('#f_name').value.length < 100 || !S.sheet.dirty) throw new Error('long name edit'); delete W.__promptHook;
+    G.ACT.shDone({}); if (!S.sheet.draft.done) throw new Error('shDone on'); G.ACT.shDone({}); if (S.sheet.draft.done) throw new Error('shDone off');
+    G.ACT.shCover(); G.closeLb && G.closeLb(); W.__chooseHook = async () => 'hltbOpen'; (global.window || global).open = () => {}; document.querySelector('#f_name').value = 'X'; await G.ACT.shMenu(); delete W.__chooseHook; G.closeSheet();
+    S.tab = 'library'; S.selMode = true; S.sel = new Set([S.games[0].id]); G.render(); const bar = document.querySelector('#selbar').innerHTML; if (!bar.includes('data-m="add"') || bar.includes('Переместить') || !bar.includes('selcnt')) throw new Error('selbar'); S.selMode = false; S.sel.clear(); G.render();
+    G.ACT.statGo({ dataset: { k: 'genres', v: 'RPG' } }); if (S.tab !== 'library' || S.set.f.genres[0] !== 'RPG') throw new Error('statGo'); G.ACT.statGo({ dataset: { k: 'done' } }); if (S.set.f.done !== 'yes' || S.set.f.genres.length) throw new Error('statGo done'); Object.assign(S.set.f, { done: '', genres: [] });
+    const lst = S.inbox.lists[0]; S.inboxList = lst.id; S.tab = 'inbox'; const its = [{ id: 'sel1', listId: lst.id, text: 'Sel one', done: false, gameId: '', created: 1 }, { id: 'sel2', listId: lst.id, text: 'Sel two', done: false, gameId: '', created: 2 }]; S.inbox.items.push(...its); G.render();
+    G.toggleInSel('sel1', true); G.toggleInSel('sel2', true); if (S.inSel.size !== 2 || !document.querySelector('#selbar').innerHTML.includes('data-m="plat"')) throw new Error('inbox select');
+    W.__chooseHook = async () => 'yes'; await G.ACT.inAct({ dataset: { m: 'done' } }); delete W.__chooseHook; if (its[0].markDone !== true || its[1].markDone !== true || S.inSelMode) throw new Error('inbox bulk done');
+    const pp = await G.ACT.inAct({ dataset: { m: 'all' } }); S.inSel.clear(); S.inSelMode = false;
+    S.retGame = { id: S.games[0].id, tab: 'library' }; S.tab = 'search'; G.ACT.retGame(); if (S.tab !== 'library' || !S.sheet) throw new Error('retGame'); G.closeSheet();
+    S.inboxList = null; S.tab = 'library'; G.render();
   });
   await step('export/import', async () => { const d = { app: 'game-catalog', games: S.games, collections: S.collections, props: [], covers: {} }; const before = S.games.length; const n = await G.importData(JSON.parse(JSON.stringify(d)), 'merge'); if (S.games.length !== before) throw new Error('dup ' + S.games.length + ' vs ' + before); });
 })();

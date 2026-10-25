@@ -30,7 +30,7 @@ x=f(); x.sort='series'; eq(L.sortGames(g.slice(),x).map(z=>z.name),['B','C','A']
   eq(p('Cyberpunk 2077'),{text:'Cyberpunk 2077',year:0,hours:0},'no bare year'); eq(p('Doom (2016)'),{text:'Doom',year:2016,hours:0},'paren year'); eq(p('   '),null,'empty'); eq(p('- Half-Life 2 ; 2004'),{text:'Half-Life 2',year:2004,hours:0},'semicolon'); }
 
 { const x=f(); x.collections=[L.DONE_ID]; const g3=[{name:'A',done:true,genres:[],platforms:[],collections:[],props:{}},{name:'B',done:false,genres:[],platforms:[],collections:['k'],props:{}}];
-  eq(L.filterGames(g3,x).map(z=>z.name),['A'],'virtual Пройдено'); x.collections=[L.DONE_ID,'k']; x.collMode='and'; eq(L.filterGames(g3,x).map(z=>z.name),[],'Пройдено AND k'); x.collMode='or'; eq(L.filterGames(g3,x).map(z=>z.name),['A','B'],'Пройдено OR k');
+  eq(L.filterGames(g3,x).map(z=>z.name),['A'],'virtual Завершено'); x.collections=[L.DONE_ID,'k']; x.collMode='and'; eq(L.filterGames(g3,x).map(z=>z.name),[],'Завершено AND k'); x.collMode='or'; eq(L.filterGames(g3,x).map(z=>z.name),['A','B'],'Завершено OR k');
   eq([1,2,5,11,21,22,111].map(L.gWord),['1 игра','2 игры','5 игр','11 игр','21 игра','22 игры','111 игр'],'gWord'); }
 
 { eq(L.parseLine("id 4545 | Assassin's Creed IV (2013 | PC, PS3) – 23 ч"), { text: "Assassin's Creed IV", year: 2013, hours: 23, x: { gid: '4545', platforms: ['PC', 'PS3'] } }, 'parseLine id + платформы + время');
@@ -41,3 +41,5 @@ x=f(); x.sort='series'; eq(L.sortGames(g.slice(),x).map(z=>z.name),['B','C','A']
     eq([rows.length, rows[0].text, rows[0].year, rows[0].hours, rows[0].x.gid, rows[0].x.platforms, rows[0].x.mainPlatform, rows[0].x.colls, rows[0].x.done, rows[0].x.igdbId], [1, 'Game; "X"', 2020, 12, 'a1', ['PC', 'PS4'], 'PC', ['Кол'], true, 5], 'выгрузка и обратный разбор ' + fmt);
   }
   eq(L.parseInboxText('Zelda | 2017\nMario (2020)').map(x => [x.text, x.year]), [['Zelda', 2017], ['Mario', 2020]], 'обычные строки без заголовков'); }
+
+{ eq(L.parseLine('Final Fantasy II (1988) (1988 | Game Boy Advance, iOS, PSP)'), { text: 'Final Fantasy II', year: 1988, hours: 0, x: { gid: '', platforms: ['Game Boy Advance', 'iOS', 'PSP'] } }, 'год в названии не дублируется'); }

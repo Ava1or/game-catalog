@@ -113,7 +113,7 @@ h3{margin:16px 2px 8px;font-size:16px}
 .it.done .tx{color:var(--mut)}.it .okc{color:var(--green);font-weight:700}
 .it .ia{display:flex;gap:2px}.it .ia button{padding:8px;font-size:17px}
 
-/* отметка «Пройдено», вертикальные скриншоты, десктоп */
+/* отметка «Завершено», вертикальные скриншоты, десктоп */
 .dn{position:absolute;right:5px;top:5px;color:#fff;width:22px;height:22px;line-height:22px;text-align:center;border-radius:11px;background:var(--green);font-size:13px;box-shadow:0 1px 4px #0008}
 .shotv{display:flex;flex-direction:column;gap:10px}
 .shotv img{width:100%;border-radius:10px;background:var(--ph);cursor:pointer}
@@ -170,7 +170,7 @@ button.tag{cursor:pointer;font-family:inherit}
 /* цифра масштаба: чёрно-белая, без акцентного цвета */
 .ib .cnt.bw{background:var(--hl);color:var(--tx);border:1px solid var(--bd2);line-height:16px}
 
-/* кнопки-фильтры: «Пройдено» и «новая коллекция» */
+/* кнопки-фильтры: «Завершено» и «новая коллекция» */
 .p.done{color:var(--green);border-color:var(--green);background:transparent}
 .p.done.on{background:var(--green);color:#fff}
 .p.done.on b{color:#fff}
@@ -198,7 +198,7 @@ button.tag{cursor:pointer;font-family:inherit}
 .lrow .nm{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lrow .ct{color:var(--mut);font-size:12px;margin-top:2px}
 
-/* плитки коллекций и серий: крупные обложки, обычный шрифт, мелкая строка «количество / % пройдено» */
+/* плитки коллекций и серий: крупные обложки, обычный шрифт, мелкая строка «количество / % завершено» */
 .mos i{top:0;height:100%;border-radius:5px}
 .tile .nm{font-weight:400;font-size:13px;line-height:16px;padding:6px 8px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tile .ct,.lrow .ct{display:flex;justify-content:space-between;gap:8px;color:var(--mut);font-size:11px}
@@ -282,7 +282,7 @@ button.tag{cursor:pointer;font-family:inherit}
 .grid.z5 .qa,.grid.z6 .qa{width:21px;height:21px}
 .grid.z5 .qa svg,.grid.z6 .qa svg{width:12px;height:12px}
 
-/* коллекции и серии: цветной прогресс «Пройдено» */
+/* коллекции и серии: цветной прогресс «Завершено» */
 .tile .ct{padding-bottom:3px}
 .tile .pb{height:3px;margin:0 8px 7px}
 .lrow .pb{height:4px;margin-top:4px}
@@ -313,7 +313,7 @@ button.tag{cursor:pointer;font-family:inherit}
 .card.isdone .cv{box-shadow:inset 0 0 0 2px rgba(74,222,128,.55)}
 .grid.z5 .strip,.grid.z6 .strip{font-size:8px;padding:1px 3px;line-height:11px}
 .grid.z5 .strip .sp,.grid.z6 .strip .sp{font-size:7px}
-/* пройденные игры в списке: едва заметный зелёный фон и полоска слева */
+/* завершённые игры в списке: едва заметный зелёный фон и полоска слева */
 tr.isdone td{background-image:linear-gradient(rgba(74,222,128,.10),rgba(74,222,128,.10))}
 tr.isdone td:first-child{box-shadow:inset 3px 0 0 rgba(74,222,128,.7)}
 
@@ -339,3 +339,41 @@ tr.isdone td:first-child{box-shadow:inset 3px 0 0 rgba(74,222,128,.7)}
 .inl2 input{padding:4px 6px}
 .srcrow{margin:6px 0}
 .srcb.srcsw,.ib.srcsw{min-width:0}
+
+/* карточка игры: поля тёмные, название по нажатию и целиком, обложка крупнее */
+.cmp input,.cmp textarea{background:var(--hl);color:var(--tx);border:1px solid var(--bd2);border-radius:10px;padding:7px 9px;font:inherit;box-sizing:border-box}
+.cmp input[type=date]{color-scheme:dark}
+:root[data-theme="light"] .cmp input[type=date]{color-scheme:light}
+.hero2 .cv{width:132px;flex:0 0 132px;position:relative;cursor:pointer}
+.cgear{position:absolute;right:5px;top:5px;width:30px;height:30px;border-radius:15px;background:rgba(0,0,0,.6);color:#fff;display:flex;align-items:center;justify-content:center;padding:0;border:0}
+.cgear .ic{width:17px;height:17px}
+.namebox{display:flex;gap:8px;align-items:flex-start;cursor:pointer}
+.nm2{flex:1;min-width:0;font-size:15px;font-weight:600;line-height:1.25;overflow-wrap:anywhere;white-space:normal}
+.nm2.ph{color:var(--mut);font-weight:400}
+.namebox .pen{color:var(--acc);flex:0 0 auto;padding-top:2px}
+.mnb{margin-left:auto;min-width:36px;height:30px;font-size:18px;line-height:1}
+.srcrow2{width:100%}
+.donecard{display:flex;flex-direction:column;gap:3px;background:var(--hl);border:1px solid var(--bd2);border-radius:14px;padding:10px 14px;cursor:pointer;margin-top:10px}
+.donecard .dc1{display:flex;align-items:center;gap:6px;color:var(--mut);font-size:15px}
+.donecard .dc1 .ic{width:19px;height:19px}
+.donecard .dc2{display:flex;align-items:center;gap:8px;font-size:19px;font-weight:600}
+.donecard.on{background:rgba(74,222,128,.13);border-color:rgba(74,222,128,.6)}
+.donecard.on .dc1{color:#4ade80}
+.dpick{position:relative;color:#f08a4b;display:inline-flex;padding:2px}
+.dpick input{position:absolute;inset:0;opacity:0;width:100%;height:100%;padding:0;border:0}
+/* просмотр обложки: кнопки снизу */
+.lbbar{position:absolute;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom));display:flex;flex-wrap:wrap;gap:6px;justify-content:center;padding:0 12px}
+/* строки списка: выбранные заметно подсвечены */
+tr.sel td{background-image:linear-gradient(rgba(79,140,255,.36),rgba(79,140,255,.36))!important}
+tr.sel td:first-child{box-shadow:inset 4px 0 0 #4f8cff}
+.card.sel .cv{box-shadow:inset 0 0 0 3px #4f8cff}
+/* панель выбора: компактная, значки */
+.selbar{flex-wrap:nowrap;justify-content:space-between;align-items:center;gap:4px;padding:6px 8px}
+.selbar .selcnt{min-width:30px;text-align:center;font-size:16px}
+.selbar .ib .lbl{display:none}
+/* разбор: выбранные строки */
+.it.isel{background:rgba(79,140,255,.18);border-radius:10px;box-shadow:inset 3px 0 0 #4f8cff}
+.ichk{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border:2px solid var(--mut);border-radius:6px;margin-right:6px;font-size:13px;color:#fff;vertical-align:-4px}
+.it.isel .ichk{background:#4f8cff;border-color:#4f8cff}
+/* статистика: строки-ссылки */
+.st-row.link,.stc.link{cursor:pointer}

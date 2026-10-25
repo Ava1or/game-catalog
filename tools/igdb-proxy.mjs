@@ -3,7 +3,7 @@
 //   IGDB_CLIENT_ID=... IGDB_CLIENT_SECRET=... ALLOWED_ORIGIN=https://ИМЯ.github.io node tools/igdb-proxy.mjs
 // В настройках приложения укажите адрес прокси: http://localhost:8787
 // ALLOWED_ORIGIN - только адрес сайта без пути и без «/» в конце, строчными буквами (так браузер шлёт заголовок Origin).
-import http from 'https://ava1or.github.io';
+import http from 'node:http';
 
 const ID = process.env.IGDB_CLIENT_ID, SECRET = process.env.IGDB_CLIENT_SECRET, PORT = +process.env.PORT || 8787;
 const ORIGINS = (process.env.ALLOWED_ORIGIN || '').split(',').map(s => s.trim().replace(/\/+$/, '').toLowerCase()).filter(Boolean);

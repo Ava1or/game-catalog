@@ -43,3 +43,14 @@ x=f(); x.sort='series'; eq(L.sortGames(g.slice(),x).map(z=>z.name),['B','C','A']
   eq(L.parseInboxText('Zelda | 2017\nMario (2020)').map(x => [x.text, x.year]), [['Zelda', 2017], ['Mario', 2020]], 'обычные строки без заголовков'); }
 
 { eq(L.parseLine('Final Fantasy II (1988) (1988 | Game Boy Advance, iOS, PSP)'), { text: 'Final Fantasy II', year: 1988, hours: 0, x: { gid: '', platforms: ['Game Boy Advance', 'iOS', 'PSP'] } }, 'год в названии не дублируется'); }
+
+// игры без основной платформы и фильтр по дате добавления
+{
+  const T = d => new Date(d + 'T12:00:00').getTime();
+  const gg = [{ name: 'A', platforms: ['PC', 'PS4'], added: T('2026-10-01'), genres: [], collections: [], props: {} }, { name: 'B', platforms: ['PC'], added: T('2026-10-20'), genres: [], collections: [], props: {} }, { name: 'C', platforms: ['PC', 'PS4'], mainPlatform: 'PS4', genres: [], collections: [], props: {} }];
+  let y = JSON.parse(JSON.stringify(L.DEFAULTS.f)); y.mainPlats = [L.NO_MAIN]; eq(L.filterGames(gg, y).map(z => z.name), ['A'], 'без платформы');
+  y = JSON.parse(JSON.stringify(L.DEFAULTS.f)); y.addedFrom = '2026-10-10'; eq(L.filterGames(gg, y).map(z => z.name), ['B'], 'добавлена с');
+  y = JSON.parse(JSON.stringify(L.DEFAULTS.f)); y.addedTo = '2026-10-05'; eq(L.filterGames(gg, y).map(z => z.name), ['A'], 'добавлена по');
+  y = JSON.parse(JSON.stringify(L.DEFAULTS.f)); y.addedFrom = '2026-09-01'; y.addedTo = '2026-10-31'; eq(L.filterGames(gg, y).map(z => z.name), ['A', 'B'], 'добавлена в период');
+  eq(L.DEFAULTS.cols.added, 0, 'колонка даты добавления по умолчанию выключена');
+}

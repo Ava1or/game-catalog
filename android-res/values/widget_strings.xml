@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_plus">+</string>
+    <string name="widget_lens">&#128269;</string>
+    <string name="widget_add_game">Добавить игру</string>
+    <string name="widget_find_game">Найти игру…</string>
+    <string name="widget_button_label">Добавить игру (кнопка)</string>
+    <string name="widget_input_label">Добавить игру (поиск)</string>
+    <string name="widget_button_desc">Кнопка: открывает поиск игры для быстрого добавления</string>
+    <string name="widget_input_desc">Поле ввода: открывает поиск игры с клавиатурой</string>
+</resources>

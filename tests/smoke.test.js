@@ -123,7 +123,9 @@ const L = require('../www/app.js');
     const before = S.games.length;
     await G.addItems('l2', ['Zork | 5ч | 2000', 'Fallout: New Vegas', 'Totally Unknown Title 999']);
     const orig = global.confirmBoxHook; S.set.igdbSecret = ''; // только каталог
-    const pr = G.autoResolve('l2'); await pr;
+    let warned = ''; global.__confirmHook = async txt => { warned = txt; return true; };
+    const pr = G.autoResolve('l2'); await pr; delete global.__confirmHook;
+    if (!/не указана платформа/.test(warned)) throw new Error('нет предупреждения об играх без платформы: ' + warned);
     const it = S.inbox.items.filter(i => i.listId === 'l2'); const z = it.find(i => i.text === 'Zork');
     if (!z || !z.done) throw new Error('zork not matched: ' + JSON.stringify(it));
     const unk = it.find(i => i.text.startsWith('Totally')); if (!unk || unk.done || !unk.failed) throw new Error('unknown should fail');
@@ -309,5 +311,35 @@ const L = require('../www/app.js');
     if (!S.trash.some(x => x.id === 'mqb')) throw new Error('trash ' + S.trash.length);
     S.sel = new Set(['mqa']); S.selMode = true; S.tab = 'library'; G.render(); G.renderKeep(); S.selMode = false; S.sel.clear(); G.render();
   });
+  await step('общие списки платформ и жанров: короткие названия и объединение', async () => {
+    if (G.canonPlat('PlayStation 4', true) !== 'PS4' || G.canonPlat('Playstation 4', true) !== 'PS4' || G.canonPlat('PS4', true) !== 'PS4') throw new Error('canon PS4');
+    const a = { id: 'pd1', name: 'Dict Game', platforms: ['PlayStation 4', 'PS4', 'Game Boy Advance'], genres: ['Role-playing (RPG)', 'RPG2'], mainPlatform: 'Playstation 4', collections: [], props: {}, done: false, hasCover: false, series: '' }; S.games.push(a);
+    await G.canonAll(); if (JSON.stringify(a.platforms) !== JSON.stringify(['PS4', 'Game Boy Advance']) || a.mainPlatform !== 'PS4') throw new Error('canonAll ' + JSON.stringify(a.platforms) + a.mainPlatform);
+    let n = await G.dictRename('plat', 'Game Boy Advance', 'GBA'); if (n < 1 || !a.platforms.includes('GBA') || G.canonPlat('Game Boy Advance') !== 'GBA') throw new Error('rename ' + n);
+    n = await G.dictMerge('genre', 'RPG2', 'Role-playing (RPG)'); if (a.genres.length !== 1 || G.canonGenre('RPG2') !== 'Role-playing (RPG)') throw new Error('genre merge ' + JSON.stringify(a.genres));
+    S.set.f.platforms = ['PlayStation 4']; await G.canonAll(); if (S.set.f.platforms[0] !== 'PS4') throw new Error('filters canon'); S.set.f.platforms = [];
+    G.openDict('plat'); G.openDict('genre'); G.closeSheet();
+    const W = global.window || global; W.__promptHook = async () => 'ps 4'; W.__chooseHook = async () => 'x'; delete W.__promptHook; delete W.__chooseHook;
+    S.games = S.games.filter(g => g.id !== 'pd1');
+  });
   await step('export/import', async () => { const d = { app: 'game-catalog', games: S.games, collections: S.collections, props: [], covers: {} }; const before = S.games.length; const n = await G.importData(JSON.parse(JSON.stringify(d)), 'merge'); if (S.games.length !== before) throw new Error('dup ' + S.games.length + ' vs ' + before); });
+  await step('без платформы: красная метка, фильтр, ширина колонок, дата добавления, без вопроса о платформе', async () => {
+    S.games = S.games.filter(g => !g.id.startsWith('np_'));
+    const mk = (id, name, extra) => Object.assign({ id, name, year: 2001, rating: 0, time: 0, genres: [], platforms: ['PC', 'PS4'], series: 'Очень длинное название серии игр', collections: [], props: {}, done: false, hasCover: false, shotCount: 0, mainPlatform: '', igdbId: 0, rawgId: 0, added: Date.UTC(2026, 9, 20) }, extra);
+    S.games.push(mk('np_a', 'NoPlat A'), mk('np_b', 'NoPlat B', { mainPlatform: 'PC' }));
+    S.set.cols.added = 1; S.set.colW = { series: 90 };
+    const html = G.listHtml(S.games.filter(g => g.id.startsWith('np_')));
+    if (!/tr data-gid="np_a" class="[^"]*noplat/.test(html) || /tr data-gid="np_b" class="[^"]*noplat/.test(html)) throw new Error('метка noplat в списке');
+    if (!html.includes('class="npb sm"') || !html.includes('data-rz="series"') || !html.includes('width:90px') || !html.includes('Добавлена') || !html.includes('20.10.2026')) throw new Error('список: ! / ширина / дата добавления');
+    if (!G.cardHtml(S.games.find(g => g.id === 'np_a')).includes('noplat') || G.cardHtml(S.games.find(g => g.id === 'np_b')).includes('noplat')) throw new Error('метка noplat на плитке');
+    if (!G.noPlatSect().includes('Без платформы')) throw new Error('красный фильтр');
+    S.set.cols.added = 0; S.set.colW = {};
+    // платформу при добавлении не спрашиваем: без выбора у игры с несколькими платформами основной нет, заданная заранее ставится
+    let asked = false; global.__chooseHook = async () => { asked = true; return null; }; global.__promptHook = async () => { asked = true; return null; };
+    const g1 = await G.addFromIgdb('igdb:150', [], {}); if (!g1 || asked) throw new Error('спросили платформу или не добавили');
+    const g2 = await G.addFromIgdb('igdb:151', [], { platform: 'Switch' }); if (!g2 || g2.mainPlatform !== 'Switch' || !g2.platforms.includes('Switch')) throw new Error('заранее выбранная платформа ' + (g2 && g2.mainPlatform));
+    if (!g1.added || !g2.added) throw new Error('дата добавления не записана');
+    delete global.__chooseHook; delete global.__promptHook;
+    S.games = S.games.filter(g => !g.id.startsWith('np_') && g.id !== g1.id && g.id !== g2.id);
+  });
 })();

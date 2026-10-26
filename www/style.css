@@ -389,3 +389,58 @@ tr.sel td:first-child{box-shadow:inset 4px 0 0 #4f8cff}
 .mgn{flex:1;min-width:0;font-weight:600;overflow-wrap:anywhere}
 .mgc{background:var(--acc);color:#fff;border-radius:10px;padding:1px 8px;font-size:12px}
 .mgs{flex-basis:100%}
+
+/* карточка игры: ⋮ всегда справа вверху, название в две строки, компактное «Завершено» */
+.hr{position:relative}
+.mnb{position:absolute;top:0;right:0;margin:0}
+.srcrow2{padding-right:46px;min-height:34px}
+.nm2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;white-space:normal;cursor:pointer}
+.namebox{cursor:default}
+.namebox .pen{background:none;border:0;padding:2px;color:var(--acc);flex:0 0 auto;line-height:0}
+.ic-edit,.pencil{color:var(--acc)}
+.donecard{flex-direction:row;align-items:center;justify-content:space-between;padding:6px 12px;margin-top:8px;border-radius:12px}
+.donecard .dc1{font-size:14px}
+.donecard .dc1 .ic{width:17px;height:17px}
+.donecard .dc2{font-size:14px}
+/* просмотр обложки: крупные кнопки */
+.lbbar .btn.big{padding:12px 18px;font-size:15px;border-radius:12px;display:inline-flex;align-items:center;gap:8px}
+.lbbar .btn.big .ic{width:19px;height:19px}
+/* последняя открытая игра: едва заметная подсветка */
+.card.last{background:rgba(255,255,255,.045);border-radius:12px}
+.card.last .cv{box-shadow:0 0 0 1px rgba(255,255,255,.22)}
+.card.last.isdone .cv{box-shadow:inset 0 0 0 2px rgba(74,222,128,.55),0 0 0 1px rgba(255,255,255,.22)}
+tr.last td{background-image:linear-gradient(rgba(255,255,255,.055),rgba(255,255,255,.055))}
+tr.isdone.last td{background-image:linear-gradient(rgba(255,255,255,.055),rgba(255,255,255,.055)),linear-gradient(rgba(74,222,128,.10),rgba(74,222,128,.10))}
+
+/* ===== Объединение: узкая подпись строки, закреплённый «Результат», изменяемая ширина ===== */
+.mgt th,.mgt td{position:relative}
+.mgt th.mgl{position:static;min-width:0;width:40px;max-width:52px;padding:3px;font-size:9px;line-height:11px;letter-spacing:0;text-transform:none;font-weight:500;color:var(--mut)}
+.mgt th.mgl .btn.sm{padding:1px 5px;font-size:11px;margin-top:2px}
+.mgt th.mgres,.mgt td.mgres{position:sticky;left:0;z-index:3;cursor:pointer;background:linear-gradient(rgba(74,222,128,.14),rgba(74,222,128,.14)),var(--bg2);box-shadow:2px 0 0 var(--bd2)}
+.mgt th.mgres{z-index:4;cursor:default}
+.mgk{display:block;font-size:9px;line-height:11px;color:var(--mut)}
+.rz{position:absolute;right:-2px;top:0;bottom:0;width:14px;cursor:col-resize;touch-action:none;z-index:6}
+.rz::after{content:'';position:absolute;right:6px;top:22%;bottom:22%;width:2px;border-radius:1px;background:var(--bd2)}
+.wrap th{position:sticky}
+.wrap td.sc,.wrap .scd{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ===== Игры без основной платформы: бледно-красный фон и красный «!» ===== */
+.npb{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:8px;background:#e5484d;color:#fff;font-size:11px;font-weight:700;line-height:1;margin-right:5px;flex:none;vertical-align:1px}
+.card .cv .npb{position:absolute;left:5px;top:5px;width:20px;height:20px;border-radius:10px;font-size:13px;margin:0;z-index:2}
+.grid.z4 .cv .npb{width:16px;height:16px;font-size:10px;left:4px;top:4px}
+.grid.z5 .cv .npb,.grid.z6 .cv .npb{width:12px;height:12px;font-size:8px;left:3px;top:3px}
+.card.noplat .cv{box-shadow:inset 0 0 0 2px rgba(229,72,77,.5)}
+.card.noplat .cv::after{content:'';position:absolute;inset:0;background:rgba(229,72,77,.15);pointer-events:none;border-radius:inherit}
+.wrap tr.noplat td,.wrap tr.noplat td.pc{background:linear-gradient(rgba(229,72,77,.13),rgba(229,72,77,.13)),var(--bg2)}
+.p.red,.chip.red{color:#ff6b6b;border-color:#e5484d}
+.p.red.on,.chip.red{background:rgba(229,72,77,.18)}
+.p.red.on{color:#ff8a8a}
+h3.red{color:#ff6b6b}
+
+/* ===== Карточка игры: ссылки и дата добавления ===== */
+.linkchips{display:flex;gap:8px;align-items:center}
+.ib.lnk{min-width:40px;height:32px;padding:0 8px}
+.ib.lnk svg{width:22px;height:22px}
+.addedAt{margin:14px 2px 2px;font-size:11px;color:var(--mut);text-align:center}
+.mgp th.mgl{width:120px;max-width:140px;font-size:11px;padding:5px 6px}
+.mgp td{max-width:none}

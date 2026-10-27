@@ -72,7 +72,7 @@ jobs:
           # иконка приложения: обычные png вместо адаптивной иконки по умолчанию
           cp -r android-res/. android/app/src/main/res/
           rm -rf android/app/src/main/res/mipmap-anydpi-v26
-          # приём текста из «Поделиться», виджеты быстрого добавления
+          # приём текста из «Поделиться» других приложений
           cp android-src/*.java android/app/src/main/java/com/example/gamecatalog/
           python3 tools/patch_manifest.py
           npx cap sync android

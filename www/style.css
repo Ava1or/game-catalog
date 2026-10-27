@@ -1,5 +1,5 @@
 :root,:root[data-theme="dark"]{--bg:#0b0b0d;--bg2:#121216;--card:#17171b;--line:#232329;--tx:#ececef;--mut:#8b8b94;--acc:#ff7a1a;--blue:#3fb7f0;--green:#2e9e5b;--r:14px;--tabs:#0f0f12;--pill:#10161b;--pillbd:#243642;--pillon:#0f3a52;--tagbd:#1f5a7a;--accbg:#1b130d;--accbd:#7a4220;--accon:#3a2210;--tag2:#2a2a30;--tag2tx:#ccc;--hl:#1f1f25;--bd2:#3a3a42;--ph:#1b1b20;--mosbg:#131316;--sheet:#141418;--modal:#1a1a1f;--toast:#2b2b33;--toasttx:#fff;--banner:#2a1c10;--banred:#2a1010;--redbd:#a33}
-:root[data-theme="light"]{--bg:#f2f3f6;--bg2:#ffffff;--card:#ffffff;--line:#dcdde4;--tx:#1b1b20;--mut:#6a6a75;--blue:#0a78ad;--green:#23864b;--tabs:#ffffff;--pill:#eef7fc;--pillbd:#b6dcef;--pillon:#d4ecf8;--tagbd:#a5d3ea;--accbg:#fff2e8;--accbd:#f0b78a;--accon:#ffe1c9;--tag2:#e7e8ee;--tag2tx:#4a4a52;--hl:#eceef3;--bd2:#c6c8d1;--ph:#e1e3ea;--mosbg:#e9ebf0;--sheet:#ffffff;--modal:#ffffff;--toast:#2b2b33;--toasttx:#fff;--banner:#fff1df;--banred:#ffe9e9;--redbd:#d66}
+:root[data-theme="light"]{--bg:#f2f3f6;--bg2:#ffffff;--card:#ffffff;--line:#dcdde4;--tx:#1b1b20;--mut:#5a5a66;--blue:#076089;--green:#23864b;--tabs:#ffffff;--pill:#eef7fc;--pillbd:#b6dcef;--pillon:#d4ecf8;--tagbd:#a5d3ea;--accbg:#fff2e8;--accbd:#f0b78a;--accon:#ffe1c9;--tag2:#e7e8ee;--tag2tx:#4a4a52;--hl:#eceef3;--bd2:#c6c8d1;--ph:#e1e3ea;--mosbg:#e9ebf0;--sheet:#ffffff;--modal:#ffffff;--toast:#2b2b33;--toasttx:#fff;--banner:#fff1df;--banred:#ffe9e9;--redbd:#d66}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,Roboto,Arial,sans-serif;font-size:15px}
 button,input,select,textarea{font:inherit;color:inherit}
@@ -164,7 +164,8 @@ button,[data-act],.opt,.acts span,.p,.chip,.btn,.ib,.tile,.card,.lcard,.it .tx,.
 .wrap.d2 td{padding:5px 8px;font-size:13px}.wrap.d2 .thumb{width:34px;height:46px}.wrap.d2 .n{font-size:13px}.wrap.d2 .sub{font-size:10px;max-height:12px;overflow:hidden}
 .wrap.d2 td.nmc{max-width:200px}
 button.tag{cursor:pointer;font-family:inherit}
-.card,.wrap tbody tr{content-visibility:auto;contain-intrinsic-size:auto 190px}
+.card{content-visibility:auto;contain-intrinsic-size:auto 190px}
+.wrap tbody tr,.tl{content-visibility:auto;contain-intrinsic-size:auto 34px}
 .dot{display:inline-block;width:8px;height:8px;border-radius:4px;margin-right:6px}
 
 /* цифра масштаба: чёрно-белая, без акцентного цвета */
@@ -215,7 +216,7 @@ button.tag{cursor:pointer;font-family:inherit}
 #view.fx{display:flex;flex-direction:column;overflow:hidden;padding-bottom:0}
 #view.fx>*{width:100%}
 #view.fx>.top{flex:0 0 auto;background:var(--bg);position:relative;z-index:5}
-#view.fx>.scrl{flex:1 1 auto;min-height:0;overflow:auto;padding-bottom:90px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+#view.fx>.scrl{flex:1 1 auto;min-height:0;overflow:auto;padding-bottom:120px;scroll-padding-bottom:90px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 .actv{max-height:76px;overflow-y:auto}
 
 /* шапка таблицы: всегда маленькая и закреплена сверху, не зависит от масштаба списка */
@@ -444,3 +445,64 @@ h3.red{color:#ff6b6b}
 .addedAt{margin:14px 2px 2px;font-size:11px;color:var(--mut);text-align:center}
 .mgp th.mgl{width:120px;max-width:140px;font-size:11px;padding:5px 6px}
 .mgp td{max-width:none}
+
+/* ===== Карточка: имя целиком, «Завершено» компактно с ссылками справа, теги как в поиске ===== */
+.nm2{display:block;-webkit-line-clamp:unset;overflow:visible;white-space:normal;overflow-wrap:anywhere}
+.donerow{display:flex;align-items:center;gap:12px;margin-top:8px}
+.donerow .donecard{flex:0 0 auto;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:2px;margin-top:0;padding:6px 12px;border-radius:12px}
+.donerow .donecard .dc2{font-size:13px;gap:6px}
+.donerow .linkchips{gap:10px}
+.brk{flex-basis:100%;height:0}
+.tag.mp{background:var(--accbg);color:var(--acc);border-color:var(--accbd)}
+span.tag{cursor:default}
+.cmp .chips{gap:4px;margin-bottom:6px}
+
+/* ===== Список: название обрезается, строки одной высоты (масштаб 3) ===== */
+.wrap.d3 .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wrap.d3 td.nmc{white-space:nowrap}
+
+/* ===== Плитки: платформа и время крупнее ===== */
+.strip{font-size:12px;line-height:15px}
+.strip .sp{font-size:11px}
+.grid.z5 .strip,.grid.z6 .strip{font-size:9px;line-height:12px}
+.grid.z5 .strip .sp,.grid.z6 .strip .sp{font-size:8px}
+
+/* ===== Игры серий (не основной список), группы, текстовый вид ===== */
+.card.extra .cv,.card.extra .t,.card.extra .m{opacity:.6}
+.wrap tr.extra td{opacity:.62}
+.xs{color:#f5c451;margin-right:4px;font-size:12px}
+.card .cv .xb{position:absolute;left:5px;top:5px;z-index:2;color:#f5c451;font-size:16px;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,.8)}
+.card .cv .npb + .xb{left:30px}
+.gh{font-weight:700;color:var(--acc);font-size:14px;padding:10px 4px 4px}
+.gh b{font-weight:400;font-size:11px;color:var(--mut);margin-left:8px}
+.gh.l2{color:#f5c451;font-size:15px;border-top:1px solid var(--line);margin-top:6px}
+.grid .gh{grid-column:1/-1}
+tr.gh td{padding:10px 8px 4px;font-weight:700;color:var(--acc);background:var(--bg)}
+tr.gh.l2 td{color:#f5c451}
+.tlist{padding:4px 2px 8px}
+.tl{display:flex;align-items:baseline;white-space:nowrap;padding:5px 4px;font-size:14px;line-height:19px;border-bottom:1px solid var(--line);cursor:pointer}
+.tl .tn{overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:0}
+.tl .ti,.tl .tt{flex:0 0 auto;color:var(--mut)}
+.tl .tk{flex:0 0 18px;color:var(--green);font-weight:700}
+.tl .tm{flex:0 0 12px;color:#f5c451;font-weight:700}
+.tl .tsel{flex:0 0 22px}
+.tl.extra{opacity:.62}
+.tl.isdone .tn{color:var(--mut)}
+.tl.sel{background:rgba(255,122,26,.14)}
+.tl.last{background:rgba(255,255,255,.05)}
+
+/* ===== Плитки одной высоты (список не дёргается при подгрузке обложек), «что играть», копия ===== */
+.grid .card .t{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.7em;line-height:1.35}
+.grid .card .m{height:1.4em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.nxt{display:flex;gap:12px;align-items:flex-start;margin:8px 0}
+.nxc{flex:0 0 96px;aspect-ratio:3/4;border-radius:10px;background:var(--ph) center/cover no-repeat}
+.nxn{font-size:17px;font-weight:700;line-height:1.25;margin-bottom:4px;overflow-wrap:anywhere}
+.nxi .sub{margin-top:2px}
+.banner.bk{margin-bottom:8px}
+
+/* текст в окнах можно выделять и копировать */
+.modal,.sheet,.sub,.nm{-webkit-user-select:text;user-select:text}
+/* меньше движения по системной настройке */
+@media (prefers-reduced-motion:reduce){.sheet,.lb,.modal{animation:none!important}*{transition-duration:.01ms!important}}
+/* подсветка под мышью (на телефоне не действует) */
+@media (hover:hover){.card:hover .cv{box-shadow:0 0 0 2px var(--acc)}.tile:hover{outline:2px solid var(--acc)}.wrap tbody tr:hover td{background:var(--hl,rgba(255,255,255,.05))}.tl:hover{background:rgba(255,255,255,.05)}}

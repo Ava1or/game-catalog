@@ -54,3 +54,54 @@ x=f(); x.sort='series'; eq(L.sortGames(g.slice(),x).map(z=>z.name),['B','C','A']
   y = JSON.parse(JSON.stringify(L.DEFAULTS.f)); y.addedFrom = '2026-09-01'; y.addedTo = '2026-10-31'; eq(L.filterGames(gg, y).map(z => z.name), ['A', 'B'], 'добавлена в период');
   eq(L.DEFAULTS.cols.added, 0, 'колонка даты добавления по умолчанию выключена');
 }
+
+// сортировка: числа в названиях по значению, пустые серии в конце, равные значения по названию
+{
+  const mk = (name, series, year) => ({ name, series, year, platforms: [], genres: [], collections: [], props: {} });
+  const f = JSON.parse(JSON.stringify(L.DEFAULTS.f));
+  f.sort = 'name'; f.dir = 'asc'; eq(L.sortGames([mk('Game 10'), mk('Game 2'), mk('Alpha')], f).map(g => g.name), ['Alpha', 'Game 2', 'Game 10'], 'сортировка по названию с числами');
+  f.sort = 'series'; eq(L.sortGames([mk('B', ''), mk('A', 'Zed'), mk('C', 'Abc')], f).map(g => g.name), ['C', 'A', 'B'], 'пустые серии в конце');
+  f.sort = 'year'; f.dir = 'desc'; eq(L.sortGames([mk('B', '', 2000), mk('A', '', 2000), mk('C', '', 2010)], f).map(g => g.name), ['C', 'A', 'B'], 'год по убыванию, при равенстве по названию');
+}
+
+// «+ игры серий», группировка и единая последовательность для плитки, списка и текста
+{
+  const mk = (id, name, year, series, o) => Object.assign({ id, name, year, series, platforms: ['PC'], genres: ['RPG'], collections: [], props: {}, done: false }, o);
+  const all = [mk('a', 'Rage 2', 2019, 'Rage'), mk('b', 'Rage', 2010, 'Rage'), mk('c', 'Silent Hill 2', 2001, 'Silent Hill'), mk('d', 'Silent Hill 3', 2003, 'Silent Hill'), mk('e', 'Sakuna', 2020, ''), mk('f', 'Другая', 2003, 'Другая')];
+  const main = all.filter(g => g.id === 'a' || g.id === 'e' || g.id === 'c');
+  eq(L.withSeries(all, main).map(g => g.id), ['b', 'd'], 'игры серий: без повторов и без игр без серии');
+  eq(L.withSeries(all, [all[4]]), [], 'игра без серии не тянет за собой ничего');
+  eq(L.groupGames(all, 'year', 'asc').map(g => g.key), ['2001', '2003', '2010', '2019', '2020'], 'группы по году по возрастанию');
+  eq(L.groupGames(all, 'year', 'desc').map(g => g.key)[0], '2020', 'группы по году по убыванию');
+  eq(L.groupGames([mk('x', 'A', 0, ''), mk('y', 'B', 1999, '')], 'year', 'asc').map(g => g.key), ['1999', 'Без года'], 'без года в конце');
+  eq(L.groupGames([mk('x', 'A', 1, '', { done: true }), mk('y', 'B', 1, '')], 'done', 'asc').map(g => g.key), ['Не завершено', 'Завершено'], 'сначала не завершённые');
+  const r = L.buildEntries([{ title: 'Основной список', items: main }, { title: '★ Из серий', items: [all[1], all[3]] }], 'year', 'asc', g => g.id === 'b' || g.id === 'd');
+  eq(r.entries.filter(e => e.t === 'g').map(e => e.g.id + (e.x ? '*' : '')), ['c', 'a', 'e', 'd*', 'b*'], 'основной список, потом игры серий со звёздочкой');
+  eq(r.entries.filter(e => e.t === 'h' && e.lvl === 2).length, 2, 'заголовки разделов');
+  eq(r.games.length, 5, 'плоский список игр для выбора');
+  eq(L.buildEntries([{ items: all }], '', 'asc').entries.every(e => e.t === 'g'), true, 'без группировки заголовков нет');
+}
+
+// время прохождения «до N часов» и часы в статистике
+{
+  const mk = (id, name, time, o) => Object.assign({ id, name, time, platforms: ['PS5'], mainPlatform: 'PS5', genres: [], collections: [], props: {}, done: false, series: '' }, o);
+  const gg = [mk('a', 'A', 8), mk('b', 'B', 12), mk('c', 'C', 0), mk('d', 'D', 5, { done: true, doneDate: '2025-03-01' }), mk('e', 'E', 20, { done: true, doneDate: '2026-01-05', mainPlatform: '', platforms: ['PC', 'PS4'] })];
+  const f = JSON.parse(JSON.stringify(L.DEFAULTS.f)); f.maxTime = 10; eq(L.filterGames(gg, f).map(g => g.id), ['a', 'd'], 'время до 10 ч: без неизвестного времени');
+  f.done = 'no'; eq(L.filterGames(gg, f).map(g => g.id), ['a'], 'непройденные до 10 ч');
+  const h = L.statsHours(gg);
+  eq(h.left, { n: 3, h: 20 }, 'осталось пройти'); eq(h.noTime, 1, 'игр без времени');
+  eq(h.byYear, [['2026', 20], ['2025', 5]], 'часы по годам завершения');
+  eq(h.leftPlat, [['PS5', 20]], 'осталось по платформам'); eq(h.donePlat.map(e => e[0]), [L.NO_MAIN, 'PS5'], 'пройдено по платформам, без платформы отдельно');
+  eq(h.longest.map(g => g.id), ['e', 'b', 'a', 'd'], 'самые долгие игры');
+}
+
+// импорт: небезопасные id (попадают в data-* атрибуты) заменяются, ссылки между записями сохраняются
+{ const bad = 'x" onfocus="alert(1)';
+  const d = L.sanitizeImport({ collections: [{ id: bad, name: 'C' }], props: [{ id: 'p1', name: 'P' }], games: [{ id: 'g<1>', name: 'G', collections: [bad], props: { p1: 'v' } }], covers: { 'g<1>': 'data:' }, inbox: { lists: [{ id: 'l 1', colls: [bad] }], items: [{ id: 'i1', listId: 'l 1', gameId: 'g<1>' }] } });
+  const ok = id => /^[A-Za-z0-9_-]+$/.test(id);
+  eq(ok(d.collections[0].id) && ok(d.games[0].id) && ok(d.inbox.lists[0].id), true, 'import ids safe');
+  eq(d.games[0].collections[0], d.collections[0].id, 'import coll link kept');
+  eq(Object.keys(d.covers)[0], d.games[0].id, 'import cover key remapped');
+  eq(d.inbox.items[0].listId, d.inbox.lists[0].id, 'import inbox link kept');
+  eq(d.inbox.items[0].gameId, d.games[0].id, 'import inbox game link kept');
+  eq(d.props[0].id, 'p1', 'safe ids untouched'); }

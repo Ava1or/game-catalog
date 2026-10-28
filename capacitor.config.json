@@ -3,6 +3,11 @@
   "appName": "Каталог игр",
   "webDir": "www",
   "plugins": {
-    "CapacitorHttp": { "enabled": true }
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  },
+  "server": {
+    "cleartext": true
   }
 }

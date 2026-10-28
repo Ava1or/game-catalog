@@ -506,3 +506,27 @@ tr.gh.l2 td{color:#f5c451}
 @media (prefers-reduced-motion:reduce){.sheet,.lb,.modal{animation:none!important}*{transition-duration:.01ms!important}}
 /* подсветка под мышью (на телефоне не действует) */
 @media (hover:hover){.card:hover .cv{box-shadow:0 0 0 2px var(--acc)}.tile:hover{outline:2px solid var(--acc)}.wrap tbody tr:hover td{background:var(--hl,rgba(255,255,255,.05))}.tl:hover{background:rgba(255,255,255,.05)}}
+
+/* группы в настройках */
+details.grp{background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:12px;overflow:hidden}
+details.grp>summary{list-style:none;cursor:pointer;padding:14px 14px;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:space-between;-webkit-user-select:none;user-select:none}
+details.grp>summary::-webkit-details-marker{display:none}
+details.grp>summary::after{content:"›";font-size:20px;color:var(--mut);transition:transform .15s}
+details.grp[open]>summary::after{transform:rotate(90deg)}
+details.grp[open]>summary{border-bottom:1px solid var(--line)}
+details.grp>.sec{background:transparent;border-radius:0;margin:0;border-bottom:1px solid var(--line)}
+details.grp>.sec:last-child{border-bottom:0}
+details.grp>.sec>h3:first-child{font-size:13px;color:var(--mut)}
+a.btn{text-decoration:none;display:inline-flex;align-items:center}
+/* инструкция */
+.guide{font-size:14px;line-height:1.55}
+.guide h3{margin:18px 0 6px;font-size:16px;color:var(--acc)}
+.guide h4{margin:12px 0 4px;font-size:14px}
+.guide ol,.guide ul{padding-left:22px;margin:6px 0}
+.guide li{margin:5px 0}
+.guide code,.guide kbd{background:var(--bg2);border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-family:ui-monospace,Consolas,monospace;font-size:13px;word-break:break-all}
+.guide .note{background:var(--accbg,rgba(255,122,26,.12));border-left:3px solid var(--acc);border-radius:8px;padding:8px 12px;margin:10px 0}
+.guide .warn{background:rgba(229,72,77,.12);border-left:3px solid #e5484d;border-radius:8px;padding:8px 12px;margin:10px 0}
+.guide table{border-collapse:collapse;width:100%;margin:8px 0}
+.guide td,.guide th{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+.guide th{background:var(--bg2)}

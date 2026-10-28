@@ -4,7 +4,7 @@ global.indexedDB = { open() { const r = {}; setTimeout(() => { r.result = {
   objectStoreNames: { contains: () => false },
   createObjectStore(n) { stores[n] = new Map(); },
   transaction(names) { const t = {}; t.objectStore = n => { const st = stores[n]; const mk = res => { const q = {}; setTimeout(() => { q.result = res(); t.oncomplete && t.oncomplete(); }); return q; };
-    return { getAll: () => mk(() => [...st.values()]), get: k => mk(() => st.get(k)), put: v => mk(() => { st.set(v.id !== undefined ? v.id : v.key, v); }), delete: k => mk(() => { st.delete(k); }), clear: () => mk(() => st.clear()) }; }; return t; } };
+    return { getAll: () => mk(() => [...st.values()]), get: k => mk(() => st.get(k)), put: v => mk(() => { st.set(v.id !== undefined ? v.id : v.key, v); }), delete: k => mk(() => { st.delete(k); }), clear: () => mk(() => st.clear()), getAllKeys: () => mk(() => [...st.keys()]), openCursor: () => { const q = {}, ents = [...st.entries()]; let i = 0; const step = () => setTimeout(() => { if (i < ents.length) { const [k, v] = ents[i++]; q.result = { key: k, value: v, continue: step }; } else q.result = null; q.onsuccess && q.onsuccess(); if (!q.result) t.oncomplete && t.oncomplete(); }); step(); return q; } }; }; return t; } };
   r.onupgradeneeded && r.onupgradeneeded(); r.onsuccess && r.onsuccess(); }); return r; } };
 const els = {};
 const mkEl = (key) => { const e = { _k: key, innerHTML: '', value: '', style: {}, dataset: {}, classList: { add() {}, remove() {}, toggle() {} }, children: [], firstChild: {},
@@ -26,7 +26,9 @@ const igdbData = (ep, body) => {
   if (/where id = \d+/.test(body)) return [FNV];
   return Array.from({ length: 40 }, (_, i) => ({ id: 100 + i, name: 'Fallout ' + i, first_release_date: Date.UTC(2000, 0, 1) / 1000, total_rating: 80, platforms: [{ name: 'PlayStation 4' }], genres: [{ name: 'RPG' }], cover: { image_id: 'x' + i } }));
 };
-global.fetch = async (u, o) => { const p = String(u); if (p.includes('images.igdb.com')) return { ok: false };
+const realFetch = global.fetch;
+global.FileReader = class { readAsDataURL(b) { b.arrayBuffer().then(ab => { this.result = 'data:' + (b.type || 'image/jpeg') + ';base64,' + Buffer.from(ab).toString('base64'); this.onload && this.onload(); }); } };
+global.fetch = async (u, o) => { const p = String(u); if (p.startsWith('http://127.0.0.1:')) { (global.__fl = global.__fl || []).push(p); return realFetch(u, o); } if (p.includes('images.igdb.com')) return { ok: false };
   if (p.includes('steamgriddb')) { if (p.includes('autocomplete')) return { ok: true, status: 200, json: async () => ({ success: true, data: [{ id: 7, name: 'Fallout NV' }] }) }; return { ok: true, status: 200, json: async () => ({ success: true, data: [{ url: 'https://cdn/x.png', thumb: 'https://cdn/t.png', score: 5, width: 600, height: 900 }] }) }; }
   if (p.includes('id.twitch.tv')) return { ok: true, status: 200, json: async () => ({ access_token: 'TOKEN', expires_in: 3600 }) };
   if (global.__BADKEY && p.includes('api.igdb.com')) return { ok: false, status: 401, text: async () => 'Unauthorized' };
@@ -367,5 +369,36 @@ const L = require('../www/app.js');
     const m = G.PRESETS.find(p => p.id === 'p_month'), ff = { addedFrom: '' }; m.make(ff); if (!/^\d{4}-\d{2}-\d{2}$/.test(ff.addedFrom)) throw new Error('набор «за месяц»');
     G.applyFilterSet({}); if (S.set.f.done !== '' || S.set.f.maxTime) throw new Error('сброс набора');
     Object.assign(S.set.f, f0);
+  });
+  await step('синхронизация с сервером: отправка, восстановление, правка, удаление', async () => {
+    const fs = require('fs'), os = require('os'), path = require('path');
+    const { createServer } = await import('../server/server.mjs');
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gcs2-')), www = path.join(tmp, 'www'); fs.mkdirSync(www);
+    const cfg = { port: 0, token: 'aaaaa-bbbbb', igdbClientId: '', igdbClientSecret: '' }, srv = createServer({ cfg, wwwDir: www, dataDir: path.join(tmp, 'd') });
+    await new Promise(r => srv.listen(0, '127.0.0.1', r));
+    const need = (c, m) => { if (!c) throw new Error(m); }, wipeLocal = async () => { for (const x of ['games', 'collections', 'props', 'covers', 'shots', 'inboxLists', 'inboxItems', 'tomb']) await G.DB.clearRaw(x); G.DB.tombs.clear(); S.games = []; S.collections = []; };
+    S.tab = 'library'; S.sheet = null;
+    S.set.sync = { url: 'http://127.0.0.1:' + srv.address().port, token: 'aaaaa-bbbbb', auto: false, off: 0, last: 0, msg: '', err: '', igdb: false };
+    const n = (await G.DB.all('games')).length, id0 = S.games[0].id; need(n > 1, 'в базе должно быть несколько игр');
+    S.games[0].hasCover = true; await G.DB.put('games', S.games[0]); await G.DB.put('covers', { id: id0, blob: new Blob(['IMG'], { type: 'image/jpeg' }) });
+    await G.DB.put('shots', { id: id0, list: [{ n: 'sh1', src: 'u', blob: new Blob(['SHOT'], { type: 'image/jpeg' }) }] });
+    need(await G.syncNow(true), 'первая синхронизация: ' + S.set.sync.err);
+    need(Object.keys(srv.db.items.games).length === n && srv.db.items.covers[id0] && srv.db.items.shots[id0].ready, 'на сервере должны оказаться игры, обложка и скриншот: ' + JSON.stringify({ games: Object.keys(srv.db.items.games).length, n, id0, inDb: !!(await G.DB.get('games', id0)), ids: S.games.map(x => x.id).join(','), cov: Object.keys(srv.db.items.covers), sh: srv.db.items.shots, err: S.set.sync.err }));
+    await wipeLocal(); need(await G.syncNow(true), 'восстановление: ' + S.set.sync.err);
+    need(S.games.length === n, 'после восстановления игр ' + S.games.length + ' из ' + n);
+    const c = await G.DB.get('covers', id0), sh = await G.DB.get('shots', id0);
+    need(c && c.blob.size === 3 && sh && sh.list.length === 1 && sh.list[0].blob.size === 4, 'обложка и скриншот должны вернуться');
+    const g = S.games.find(x => x.id === id0); g.name = 'Переименована'; await G.DB.put('games', g); need(await G.syncNow(true), 'правка');
+    need(srv.db.items.games[id0].name === 'Переименована', 'правка должна дойти до сервера');
+    await G.reloadData(); const victim = S.games.find(x => x.id !== id0).id; S.games = S.games.filter(x => x.id !== victim); await G.DB.del('games', victim); need(await G.syncNow(true), 'удаление');
+    need(!srv.db.items.games[victim] && srv.db.tombs.games[victim], 'удаление должно дойти до сервера');
+    await wipeLocal(); need(await G.syncNow(true), 'повторное восстановление');
+    need(S.games.length === n - 1 && !S.games.some(x => x.id === victim) && S.games.find(x => x.id === id0).name === 'Переименована', 'удалённая игра не должна вернуться, правка должна сохраниться');
+    // ничего не менялось: фоновая сверка пропускается, ручная всё равно выполняется
+    await G.syncNow(true); G.SY.dirty = false; const before = S.set.sync.last; await new Promise(r => setTimeout(r, 5));
+    need(await G.syncNow(true) && S.set.sync.last > before, 'ручная синхронизация должна выполняться всегда');
+    global.__fl.length = 0; G.SY.dirty = false; need(await G.syncNow(false), 'фоновая сверка'); need(!global.__fl.some(x => x.includes('/manifest')), 'без изменений полная сверка не нужна');
+    await G.DB.put('games', S.games[0]); global.__fl.length = 0; need(await G.syncNow(false), 'сверка после правки'); need(global.__fl.some(x => x.includes('/manifest')), 'после правки сверка должна выполниться');
+    srv.close(); srv.closeAllConnections && srv.closeAllConnections();
   });
 })();

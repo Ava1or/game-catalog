@@ -17,3 +17,11 @@ if 'android.intent.action.SEND' not in s:
         print('::error::В манифесте не найден тег activity: изменился шаблон Capacitor'); sys.exit(1)
     s = s.replace('</activity>', share, 1)
     open(p, 'w', encoding='utf-8').write(s)
+
+# обмен со своим сервером в домашней сети идёт по http (адрес вида http://192.168.0.15:8787)
+s = open(p, encoding='utf-8').read()
+if 'usesCleartextTraffic' not in s:
+    if '<application' not in s:
+        print('::error::В манифесте не найден тег application'); sys.exit(1)
+    s = s.replace('<application', '<application android:usesCleartextTraffic="true"', 1)
+    open(p, 'w', encoding='utf-8').write(s)

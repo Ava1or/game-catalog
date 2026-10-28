@@ -1,6 +1,6 @@
 // Офлайн-кэш оболочки приложения (данные игр хранятся в IndexedDB, не здесь)
 const CACHE = 'gc-__BUILD__';
-const FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
+const FILES = ['./', 'index.html', 'style.css', 'app.js', 'guide.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
 });

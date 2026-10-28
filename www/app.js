@@ -17,7 +17,7 @@ const plug = n => window.Capacitor && window.Capacitor.Plugins && window.Capacit
 const COLS = [['cover', 'Обложка'], ['genres', 'Жанры'], ['mainPlatform', 'Основная платформа'], ['platforms', 'Платформы'], ['done', 'Завершено'], ['doneDate', 'Дата прохождения'], ['year', 'Год'], ['rating', 'Рейтинг'], ['time', 'Время'], ['series', 'Серия'], ['colls', 'Коллекции'], ['added', 'Дата добавления']];
 const SORTS = [['name', 'Название'], ['year', 'Год'], ['rating', 'Рейтинг'], ['time', 'Время прохождения'], ['series', 'Серия'], ['mainPlatform', 'Основная платформа'], ['added', 'Дата добавления'], ['done', 'Завершено'], ['doneDate', 'Дата прохождения']];
 const DEFAULTS = {
-  platDict: {}, genreDict: {}, rawgKey: '', mainSrc: 'igdb', rawgQuota: { left: 20000, renew: '' }, rawgWarn: 0, igdbId: '', igdbSecret: '', igdbToken: '', igdbExp: 0, igdbProxy: '', exp: { fmt: 'csv', keys: ['name', 'year', 'platforms', 'mainPlatform', 'time', 'done'] }, sgdbKey: '', pin: true, propCols: {}, theme: 'dark', zoom: {}, usage: { m: '', igdb: 0, sgdb: 0, hltb: 0 }, hltbCache: {}, view: 'grid', group: '', groupDir: 'asc', tcols: { year: 1, platforms: 1, time: 1, done: 1, main: 1 }, colW: {}, mgW: {}, pageSize: 40, vmode: { coll: 'tiles', series: 'tiles', search: 'tiles' },
+  platDict: {}, genreDict: {}, rawgKey: '', mainSrc: 'igdb', rawgQuota: { left: 20000, renew: '' }, rawgWarn: 0, igdbId: '', igdbSecret: '', igdbToken: '', igdbExp: 0, igdbProxy: '', sync: { url: '', token: '', auto: true, off: 0, last: 0, msg: '', err: '', igdb: false }, exp: { fmt: 'csv', keys: ['name', 'year', 'platforms', 'mainPlatform', 'time', 'done'] }, sgdbKey: '', pin: true, propCols: {}, theme: 'dark', zoom: {}, usage: { m: '', igdb: 0, sgdb: 0, hltb: 0 }, hltbCache: {}, view: 'grid', group: '', groupDir: 'asc', tcols: { year: 1, platforms: 1, time: 1, done: 1, main: 1 }, colW: {}, mgW: {}, pageSize: 40, vmode: { coll: 'tiles', series: 'tiles', search: 'tiles' },
   cols: { cover: 1, genres: 1, mainPlatform: 1, platforms: 0, done: 1, doneDate: 1, year: 1, rating: 1, time: 1, series: 1, colls: 1, added: 0 },
   f: { q: '', years: [], genres: [], platforms: [], series: [], collections: [], collMode: 'or', props: [], mainPlats: [], addedFrom: '', addedTo: '', seriesMode: '', maxTime: 0, done: '', minRating: 0, sort: 'name', dir: 'asc' }
 };
@@ -231,17 +231,22 @@ if (typeof document === 'undefined') { // для проверки логики �
 }
 
 /* ====================== Хранилище (IndexedDB) ====================== */
+// хранилища, которые синхронизируются со своим сервером; у каждой записи поле mod (время последней правки, мс)
+const SYNC_ARR = ['games', 'collections', 'props', 'inboxLists', 'inboxItems', 'covers', 'shots'], SYNC = new Set(SYNC_ARR);
+let clockOff = 0; // разница часов этого устройства и сервера, чтобы «позднее» значило одно и то же на всех устройствах
+const nowMs = () => Date.now() + clockOff;
+const syncDirty = () => { SY.dirty = true; syncSoon(); };
 const DB = {
-  db: null,
+  db: null, tombs: new Map(), // tombs: «хранилище:id» -> время удаления (чтобы удаление дошло до других устройств)
   open() {
     return new Promise((res, rej) => {
-      const r = indexedDB.open('gamecatalog', 4);
+      const r = indexedDB.open('gamecatalog', 5);
       r.onupgradeneeded = () => {
         const d = r.result;
-        ['games', 'collections', 'props', 'covers', 'shots', 'inboxLists', 'inboxItems', 'trash'].forEach(n => { if (!d.objectStoreNames.contains(n)) d.createObjectStore(n, { keyPath: 'id' }); });
+        ['games', 'collections', 'props', 'covers', 'shots', 'inboxLists', 'inboxItems', 'trash', 'tomb'].forEach(n => { if (!d.objectStoreNames.contains(n)) d.createObjectStore(n, { keyPath: 'id' }); });
         if (!d.objectStoreNames.contains('settings')) d.createObjectStore('settings', { keyPath: 'key' });
       };
-      r.onsuccess = () => { this.db = r.result; res(); };
+      r.onsuccess = () => { this.db = r.result; this.all('tomb').then(a => { this.tombs = new Map(a.map(x => [x.id, x.t])); res(); }, () => res()); };
       r.onerror = () => rej(r.error);
     });
   },
@@ -253,14 +258,53 @@ const DB = {
   },
   all(s) { return this.tx(s, 'readonly', o => o.getAll()); },
   get(s, k) { return this.tx(s, 'readonly', o => o.get(k)); },
-  put(s, v) { return this.tx(s, 'readwrite', o => o.put(v)); },
-  putMany(s, arr) { return arr.length ? this.tx(s, 'readwrite', o => { arr.forEach(v => o.put(v)); }) : Promise.resolve(); }, // одна транзакция вместо сотен
-  del(s, k) { return this.tx(s, 'readwrite', o => o.delete(k)); },
-  clear(s) { return this.tx(s, 'readwrite', o => o.clear()); }
+  // «сырые» операции: без отметки времени и без записи об удалении (ими пользуется сама синхронизация)
+  putRaw(s, v) { return this.tx(s, 'readwrite', o => o.put(v)); },
+  putManyRaw(s, arr) { return arr.length ? this.tx(s, 'readwrite', o => { arr.forEach(v => o.put(v)); }) : Promise.resolve(); }, // одна транзакция вместо сотен
+  delRaw(s, k) { return this.tx(s, 'readwrite', o => o.delete(k)); },
+  clearRaw(s) { return this.tx(s, 'readwrite', o => o.clear()); },
+  // обычные операции программы: ставят mod, а удаление запоминают
+  stamp(s, arr) {
+    const t = nowMs(); arr.forEach(v => { v.mod = t; });
+    const back = arr.filter(v => this.tombs.has(s + ':' + v.id)); if (!back.length) return null;
+    back.forEach(v => this.tombs.delete(s + ':' + v.id));
+    return this.tx('tomb', 'readwrite', o => { back.forEach(v => o.delete(s + ':' + v.id)); });
+  },
+  put(s, v) {
+    if (!SYNC.has(s)) return this.putRaw(s, v);
+    const p = this.stamp(s, [v]); syncDirty();
+    return p ? p.then(() => this.putRaw(s, v)) : this.putRaw(s, v);
+  },
+  putMany(s, arr) {
+    if (!arr.length) return Promise.resolve();
+    if (!SYNC.has(s)) return this.putManyRaw(s, arr);
+    const p = this.stamp(s, arr); syncDirty();
+    return p ? p.then(() => this.putManyRaw(s, arr)) : this.putManyRaw(s, arr);
+  },
+  async del(s, k) {
+    if (SYNC.has(s)) { const t = nowMs(); this.tombs.set(s + ':' + k, t); await this.putRaw('tomb', { id: s + ':' + k, s, rid: k, t }); syncDirty(); }
+    return this.delRaw(s, k);
+  },
+  async clear(s) {
+    if (SYNC.has(s)) {
+      const keys = await this.tx(s, 'readonly', o => o.getAllKeys()), t = nowMs(), recs = keys.map(k => ({ id: s + ':' + k, s, rid: k, t }));
+      recs.forEach(r => this.tombs.set(r.id, t)); await this.putManyRaw('tomb', recs); syncDirty();
+    }
+    return this.clearRaw(s);
+  },
+  // id -> mod для всех записей хранилища, не читая картинки целиком
+  mods(s) {
+    return new Promise((res, rej) => {
+      const out = {}, rq = this.db.transaction(s, 'readonly').objectStore(s).openCursor();
+      rq.onsuccess = () => { const c = rq.result; if (c) { out[c.key] = c.value.mod || 1; c.continue(); } else res(out); };
+      rq.onerror = () => rej(rq.error);
+    });
+  }
 };
 
 /* ====================== Состояние ====================== */
 const S = {
+  gopen: { data: true }, localServer: '',
   games: [], collections: [], props: [], set: clone(DEFAULTS), lists: {},
   trash: [], shotUrls: [], igdbShots: [], cFind: '', sFind: '', block: null, inbox: { lists: [], items: [] }, inboxList: null, pending: null, showDone: true,
   tab: 'library', selMode: false, sel: new Set(), shown: [],
@@ -285,13 +329,16 @@ const gamesIn = id => S.games.filter(g => (g.collections || []).includes(id));
 async function saveGame(g) { g.updated = Date.now(); await DB.put('games', g); }
 async function saveGames(list) { const t = Date.now(); list.forEach(g => { g.updated = t; }); await DB.putMany('games', list); }
 
-async function loadAll() {
-  await DB.open();
+async function reloadData() { // перечитать игры, коллекции и разбор из базы (после синхронизации)
   S.games = (await DB.all('games')).map(g => Object.assign({ genres: [], platforms: [], collections: [], props: {}, series: '', time: 0, rating: 0, year: 0, done: false, hasCover: false, shotCount: 0, mainPlatform: '', igdbId: 0, rawgId: 0 }, g));
-  { const old = S.games.filter(g => 'description' in g); old.forEach(g => { delete g.description; }); DB.putMany('games', old); } // описание удалено из программы целиком
   S.collections = await DB.all('collections');
   S.props = await DB.all('props');
   S.inbox = { lists: await DB.all('inboxLists'), items: await DB.all('inboxItems') };
+}
+async function loadAll() {
+  await DB.open();
+  await reloadData();
+  { const old = S.games.filter(g => 'description' in g); old.forEach(g => { delete g.description; }); DB.putMany('games', old); } // описание удалено из программы целиком
   S.trash = await DB.all('trash');
   for (const r of S.trash.filter(x => Date.now() - x.t > 30 * 864e5)) await DB.del('trash', r.id); // корзина хранит 30 дней
   S.trash = S.trash.filter(x => Date.now() - x.t <= 30 * 864e5);
@@ -301,6 +348,7 @@ async function loadAll() {
     S.set.cols = Object.assign(clone(DEFAULTS.cols), st.value.cols || {});
     S.set.f = Object.assign(clone(DEFAULTS.f), st.value.f || {});
   }
+  S.set.sync = Object.assign(clone(DEFAULTS.sync), S.set.sync); clockOff = S.set.sync.off || 0;
   S.set.zoom = S.set.zoom || {}; S.set.hltbCache = S.set.hltbCache || {};
   S.set.f = Object.assign(clone(DEFAULTS.f), S.set.f);
   S.set.cols = Object.assign({}, DEFAULTS.cols, S.set.cols);
@@ -580,12 +628,14 @@ const parseRid = rid => { const a = String(rid).split(':'); return { src: a[0] =
 const gameByRid = rid => { const { src, id } = parseRid(rid); return S.games.find(g => g[src + 'Id'] === id); };
 const srcsOf = g => ['igdb', 'rawg'].filter(k => g[k + 'Id']);
 const otherSrc = src => src === 'igdb' ? 'rawg' : 'igdb';
-const hasKeys = () => !!(S.set.igdbProxy || (S.set.igdbId && S.set.igdbSecret));
+const srvIgdb = () => !!(S.set.sync && S.set.sync.igdb && syncOn()); // ключи IGDB могут лежать на вашем сервере
+const hasKeys = () => !!(S.set.igdbProxy || (S.set.igdbId && S.set.igdbSecret) || srvIgdb());
+const proxyBase = () => S.set.igdbProxy ? S.set.igdbProxy.replace(/\/+$/, '') : srvIgdb() ? syncUrl() + '/igdb' : '';
 const IGDB_API = 'https://api.igdb.com/v4', IGDB_IMG = 'https://images.igdb.com/igdb/image/upload/';
 let igdbQ = Promise.resolve();
 const igdbGate = () => { const prev = igdbQ; igdbQ = prev.then(() => new Promise(r => setTimeout(r, window.__gateMs !== undefined ? window.__gateMs : 270))); return prev; }; // не чаще 4 запросов в секунду
 async function igdbToken() {
-  if (S.set.igdbProxy) return ''; // через свой прокси: ключи и токен хранятся там
+  if (proxyBase()) return ''; // через свой прокси: ключи и токен хранятся там
   if (S.set.igdbToken && S.set.igdbExp > Date.now() + 6e4) return S.set.igdbToken;
   let r; try { r = await fetch('https://id.twitch.tv/oauth2/token?client_id=' + encodeURIComponent(S.set.igdbId) + '&client_secret=' + encodeURIComponent(S.set.igdbSecret) + '&grant_type=client_credentials', { method: 'POST' }); } catch (e) { throw new Error('Нет связи с Twitch (проверьте интернет; в браузере запрос может блокироваться, используйте приложение Android)'); }
   if (!r.ok) { setBlock('key', 'Ключи IGDB не приняты. Проверьте Client ID и Client Secret в настройках: поиск и загрузка из IGDB заблокированы.', 'igdb'); throw new Error(S.block.text); }
@@ -598,7 +648,7 @@ async function igdb(endpoint, body) {
   let r, attempt = 0, fresh = false;
   for (;;) {
     const tk = await igdbToken(); await igdbGate();
-    try { r = await fetch((S.set.igdbProxy ? S.set.igdbProxy.replace(/\/+$/, '') : IGDB_API) + endpoint, { method: 'POST', headers: S.set.igdbProxy ? { 'Content-Type': 'text/plain' } : { 'Client-ID': S.set.igdbId, Authorization: 'Bearer ' + tk, 'Content-Type': 'text/plain', Accept: 'application/json' }, body }); } catch (e) { throw new Error('Нет связи с IGDB (проверьте интернет; в браузере запросы могут блокироваться, используйте приложение Android)'); }
+    try { r = await fetch((proxyBase() || IGDB_API) + endpoint, { method: 'POST', headers: proxyBase() ? (S.set.igdbProxy ? { 'Content-Type': 'text/plain' } : { 'Content-Type': 'text/plain', 'X-Token': S.set.sync.token }) : { 'Client-ID': S.set.igdbId, Authorization: 'Bearer ' + tk, 'Content-Type': 'text/plain', Accept: 'application/json' }, body }); } catch (e) { throw new Error('Нет связи с IGDB (проверьте интернет; в браузере запросы могут блокироваться, используйте приложение Android)'); }
     bump('igdb'); // считаем только запросы, дошедшие до сервера
     if (r.status === 401 && !fresh) { fresh = true; S.set.igdbToken = ''; continue; } // токен мог устареть
     if (r.status === 429 && attempt++ < 2) { await new Promise(x => setTimeout(x, 1500)); continue; }
@@ -2091,24 +2141,180 @@ async function openSearchFilters() {
     + '<button class="btn acc" style="width:100%;margin-top:14px" data-act="closeSheet">Готово</button>');
 }
 
+/* ====================== Синхронизация со своим сервером ====================== */
+// Схема: у каждой записи есть время правки (mod), у удалённых записей время удаления. Устройство присылает серверу список
+// «id -> время», сервер отвечает, что забрать, что отправить и что удалить; побеждает более поздняя правка записи целиком.
+const SY = { busy: false, again: false, timer: null, last: 0, dirty: true };
+async function pool(items, n, fn) { let i = 0; await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => { while (i < items.length) await fn(items[i++]); })); } // несколько запросов одновременно, но не больше n
+const syncOn = () => !!(S.set.sync && S.set.sync.url && S.set.sync.token);
+const syncUrl = () => S.set.sync.url.replace(/\/+$/, '');
+const normUrl = u => { u = String(u || '').trim().replace(/\s+/g, ''); if (!u) return ''; if (!/^https?:\/\//i.test(u)) u = 'http://' + u; return u.replace(/\/+$/, ''); };
+async function srv(path, body, ms) {
+  const ac = typeof AbortController !== 'undefined' ? new AbortController() : null, tm = setTimeout(() => ac && ac.abort(), ms || 90000); let r;
+  try { r = await fetch(syncUrl() + '/api/' + path, { method: 'POST', signal: ac ? ac.signal : undefined, headers: { 'Content-Type': 'application/json', 'X-Token': S.set.sync.token }, body: JSON.stringify(body || {}) }); }
+  catch (e) { throw new Error(e && e.name === 'AbortError' ? 'Сервер не ответил вовремя' : 'Нет связи с сервером: проверьте адрес, что сервер запущен и что устройства в одной сети Wi-Fi'); }
+  finally { clearTimeout(tm); }
+  if (r.status === 401) throw new Error('Неверный код доступа');
+  if (r.status === 429) throw new Error('Слишком много неверных попыток, подождите несколько минут');
+  if (!r.ok) throw new Error('Сервер ответил ошибкой ' + r.status);
+  return r.json();
+}
+function syncStatus(t) { const e = $('#syncSt'); if (e) e.innerHTML = t; }
+function syncStatusHtml() {
+  const y = S.set.sync; if (!syncOn()) return 'Не настроено';
+  if (y.err) return '<span style="color:#e5484d">⚠ ' + esc(y.err) + '</span>' + (y.last ? '<br>Последняя удачная: ' + new Date(y.last).toLocaleString('ru-RU') : '');
+  return y.last ? '✓ ' + new Date(y.last).toLocaleString('ru-RU') + (y.msg ? '<br>' + esc(y.msg) : '') : 'Ещё не синхронизировалось';
+}
+function syncSoon(ms) {
+  if (!syncOn() || !S.set.sync.auto) return;
+  clearTimeout(SY.timer); SY.timer = setTimeout(() => syncNow(false), ms || 8000);
+}
+function mergeDict(loc, rem) { // объединение общих списков: ничего не теряем ни с одной стороны
+  let ch = false; Object.keys(rem || {}).forEach(k => {
+    const r = rem[k] || {}, l = loc[k];
+    if (!l) { loc[k] = { long: r.long || '', aliases: (r.aliases || []).slice() }; ch = true; return; }
+    if (!l.long && r.long) { l.long = r.long; ch = true; }
+    (r.aliases || []).forEach(a => { l.aliases = l.aliases || []; if (!l.aliases.includes(a)) { l.aliases.push(a); ch = true; } });
+  });
+  return ch;
+}
+async function syncApply(s, recs) { // принять записи с сервера
+  const out = [];
+  for (const r of recs) {
+    if (s === 'covers') { if (!r.data) continue; out.push({ id: r.id, mod: r.mod, blob: dataUrlToBlob(r.data) }); if (coverCache.has(r.id)) { URL.revokeObjectURL(coverCache.get(r.id)); coverCache.delete(r.id); } }
+    else if (s === 'shots') {
+      const loc = await DB.get('shots', r.id), have = new Map(((loc && loc.list) || []).map(x => [x.n, x.blob])), got = new Map();
+      await pool((r.list || []).filter(x => !have.get(x.n)), 3, async x => { const d = await srv('shotblob', { gid: r.id, n: x.n }); if (d && d.data) got.set(x.n, dataUrlToBlob(d.data)); });
+      const list = (r.list || []).map(x => ({ n: x.n, src: x.src || '', blob: have.get(x.n) || got.get(x.n) })).filter(x => x.blob);
+      out.push({ id: r.id, mod: r.mod, list });
+    } else out.push(r);
+  }
+  await DB.putManyRaw(s, out);
+  const gone = out.filter(r => DB.tombs.has(s + ':' + r.id)); gone.forEach(r => DB.tombs.delete(s + ':' + r.id));
+  if (gone.length) await DB.tx('tomb', 'readwrite', o => { gone.forEach(r => o.delete(s + ':' + r.id)); });
+  return out.length;
+}
+async function syncNow(manual) {
+  if (!syncOn()) { if (manual) toast('Укажите адрес сервера и код доступа'); return false; }
+  if (SY.busy) { SY.again = true; return false; }
+  SY.busy = true; SY.last = Date.now(); syncStatus('Синхронизация…');
+  const y = S.set.sync, st = { pull: 0, push: 0, del: 0 }, SKIP = { skip: 1 }; let changed = false, ok = false, skipped = false, hrev = -1;
+  try {
+    const t0 = Date.now(), h = await srv('hello', {}, 15000), t1 = Date.now();
+    if (!h || h.app !== 'game-catalog-server') throw new Error('По этому адресу работает не сервер каталога игр');
+    clockOff = Math.round(h.now - (t0 + t1) / 2); y.off = clockOff; y.igdb = !!h.igdb;
+    hrev = h.rev === undefined ? -1 : h.rev;
+    if (!manual && !SY.dirty && h.rev !== undefined && h.rev === y.rev) { y.err = ''; y.last = Date.now(); ok = true; skipped = true; throw SKIP; } // ничего не менялось: полную сверку не делаем
+    SY.dirty = false;
+    const items = {}, tombs = {};
+    for (const s of SYNC_ARR) { items[s] = await DB.mods(s); tombs[s] = {}; }
+    DB.tombs.forEach((t, k) => { const i = k.indexOf(':'), s = k.slice(0, i); if (tombs[s]) tombs[s][k.slice(i + 1)] = t; });
+    const plan = await srv('manifest', { items, tombs });
+    // 1) удаления, сделанные на других устройствах
+    for (const s of SYNC_ARR) {
+      const d = (plan.del || {})[s] || {}, ids = Object.keys(d); if (!ids.length) continue;
+      for (const id of ids) { await DB.delRaw(s, id); DB.tombs.set(s + ':' + id, d[id]); await DB.putRaw('tomb', { id: s + ':' + id, s, rid: id, t: d[id] }); if (s === 'covers' && coverCache.has(id)) { URL.revokeObjectURL(coverCache.get(id)); coverCache.delete(id); } }
+      st.del += ids.length; changed = true;
+    }
+    // 2) новое и изменённое на сервере
+    const CH = { covers: 12, shots: 40 };
+    for (const s of SYNC_ARR) {
+      const ids = (plan.pull || {})[s] || [], n = CH[s] || 200;
+      for (let i = 0; i < ids.length; i += n) { const r = await srv('get', { store: s, ids: ids.slice(i, i + n) }); st.pull += await syncApply(s, r.recs || []); changed = true; }
+    }
+    // 3) новое и изменённое здесь
+    for (const s of SYNC_ARR) {
+      const ids = (plan.push || {})[s] || []; if (!ids.length) continue;
+      if (s === 'covers') {
+        let batch = [], size = 0;
+        const flush = async () => { if (batch.length) { await srv('put', { store: s, recs: batch }); st.push += batch.length; batch = []; size = 0; } };
+        for (const id of ids) { const r = await DB.get('covers', id); if (!r || !r.blob) continue; const data = await blobToDataUrl(r.blob); batch.push({ id, mod: r.mod || 1, data }); size += data.length; if (size > 1.5e6) await flush(); }
+        await flush();
+      } else if (s === 'shots') {
+        for (let i = 0; i < ids.length; i += 40) {
+          const recs = [], loc = new Map();
+          for (const id of ids.slice(i, i + 40)) { const r = await DB.get('shots', id); if (!r) continue; loc.set(id, r); recs.push({ id, mod: r.mod || 1, list: (r.list || []).map(x => ({ n: x.n, src: x.src || '' })) }); }
+          const res = await srv('put', { store: s, recs }); st.push += recs.length;
+          const up = []; for (const gid of Object.keys(res.need || {})) for (const n of res.need[gid]) { const it = ((loc.get(gid) || {}).list || []).find(x => x.n === n); if (it && it.blob) up.push({ gid, n, blob: it.blob }); }
+          await pool(up, 3, async u => { await srv('shotblob_put', { gid: u.gid, n: u.n, data: await blobToDataUrl(u.blob) }); });
+        }
+      } else {
+        for (let i = 0; i < ids.length; i += 200) {
+          const recs = []; for (const id of ids.slice(i, i + 200)) { const r = await DB.get(s, id); if (r) { r.mod = r.mod || 1; recs.push(r); } }
+          await srv('put', { store: s, recs }); st.push += recs.length;
+        }
+      }
+    }
+    // 4) общие списки платформ и жанров
+    const dr = await srv('dicts', { plat: S.set.platDict, genre: S.set.genreDict });
+    if (mergeDict(S.set.platDict, dr.plat) | mergeDict(S.set.genreDict, dr.genre)) { S._pi = S._gi = null; changed = true; }
+    y.err = ''; y.last = Date.now();
+    y.msg = st.pull || st.push || st.del ? 'Получено: ' + st.pull + ', отправлено: ' + st.push + (st.del ? ', удалено: ' + st.del : '') : 'Всё актуально';
+    y.rev = st.push || st.del ? -1 : hrev; // после своих отправок на сервере появились новые изменения: следующий обмен проверит всё
+    ok = true;
+  } catch (e) { if (e !== SKIP) { y.err = e.message || String(e); SY.dirty = true; } }
+  SY.busy = false; if (!skipped) saveSet();
+  if (changed) { try { await reloadData(); await canonAll(); } catch (e) { /* ignore */ } if (!S.sheet && S.tab !== 'settings') renderKeep(); }
+  if (!skipped) syncStatus(syncStatusHtml());
+  if (manual) toast(ok ? 'Синхронизация: ' + y.msg : y.err);
+  if (SY.again) { SY.again = false; syncSoon(1500); }
+  return ok;
+}
+async function detectLocalServer() { // приложение открыто с самого сервера: адрес подставляем сами
+  try {
+    if (isNative() || !/^https?:$/.test(location.protocol)) return;
+    const r = await fetch('/api/hello', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); if (!r.ok) return;
+    const h = await r.json(); if (!h || h.app !== 'game-catalog-server') return;
+    S.localServer = location.origin;
+    if (!S.set.sync.url) { S.set.sync.url = location.origin; saveSet(); if (S.tab === 'settings') render(); }
+  } catch (e) { /* не наш сервер, это нормально */ }
+}
+async function openGuide() {
+  let html = '';
+  try { const r = await fetch('guide.html'); if (r.ok) html = await r.text(); } catch (e) { /* ignore */ }
+  openSheet('<div class="hdr2"><h2>Свой сервер: инструкция</h2></div><div class="guide">' + (html || '<p class="sub">Не удалось загрузить инструкцию.</p>') + '</div><button class="btn acc" style="width:100%;margin-top:14px" data-act="closeSheet">Закрыть</button>');
+}
+
 /* ====================== Настройки ====================== */
+function syncHtml() {
+  const y = S.set.sync, host = typeof location !== 'undefined' && /github\.io$/i.test(location.hostname);
+  return '<div class="sec"><p class="sub">Обмен данными между телефоном и компьютерами через вашу домашнюю сеть. Нужен компьютер с Windows, на котором запускается маленький сервер. Всё подробно, по шагам, в инструкции.</p>'
+    + '<div class="toolbar"><button class="btn acc" data-act="guideOpen">📖 Инструкция по настройке</button>' + (host ? '<a class="btn" href="game-catalog-server.zip" download>⬇ Скачать архив сервера</a>' : '') + '</div></div>'
+    + '<div class="sec"><h3 style="margin-top:0">Подключение</h3>' + (S.localServer ? '<p class="sub">Это приложение открыто с вашего сервера, адрес подставлен сам.</p>' : '')
+    + '<label class="field"><span>Адрес сервера</span><input id="syUrl" inputmode="url" autocapitalize="off" autocomplete="off" placeholder="http://192.168.0.15:8787" value="' + esc(y.url) + '"></label>'
+    + '<label class="field"><span>Код доступа</span><input id="syTok" type="password" autocomplete="off" autocapitalize="off" placeholder="XXXXX-XXXXX" value="' + esc(y.token) + '"></label>'
+    + '<div class="chips"><button class="p' + (y.auto ? ' on' : '') + '" data-act="syncAuto">' + (y.auto ? '✓ Синхронизировать автоматически' : 'Только вручную') + '</button></div>'
+    + '<div class="toolbar"><button class="btn" data-act="syncSave">Сохранить и проверить связь</button><button class="btn acc" data-act="syncRun">Синхронизировать сейчас</button></div>'
+    + '<div id="syncSt" class="sub" style="margin-top:8px">' + syncStatusHtml() + '</div>'
+    + '<p class="sub">Приложение хранит всё на самом устройстве и работает без сервера; сервер нужен только в момент обмена. Если одну игру правили на двух устройствах до обмена, остаётся более поздняя правка.</p>'
+    + (y.url ? '<div class="toolbar"><button class="btn red" data-act="syncOff">Отключить сервер</button></div>' : '') + '</div>';
+}
 function viewSettings() {
   const propRows = S.props.map(p => '<div class="row"><span>' + esc(p.name) + ' <span class="sub">(' + ({ text: 'текст', number: 'число', date: 'дата' }[p.type]) + ')</span></span><button class="btn red" data-act="propDel" data-id="' + p.id + '">✕</button></div>').join('');
+  const grp = (id, title, inner) => '<details class="grp" data-g="' + id + '"' + (S.gopen[id] ? ' open' : '') + '><summary>' + title + '</summary>' + inner + '</details>';
+  const A = [
+    '<div class="sec"><h3 style="margin-top:0">Оформление</h3><div class="chips">' + [['dark', 'Тёмная'], ['light', 'Светлая'], ['auto', 'Как в системе']].map(x => '<button class="p' + (S.set.theme === x[0] ? ' on' : '') + '" data-act="setTheme" data-v="' + x[0] + '">' + x[1] + '</button>').join('') + '</div></div>',
+    '<div class="sec"><h3 style="margin-top:0">Основной поиск</h3><div class="chips">' + ['igdb', 'rawg'].map(k => '<button class="p' + (S.set.mainSrc === k ? ' on' : '') + '" data-act="setMainSrc" data-v="' + k + '" style="border-color:' + PROV[k].color + '">' + (S.set.mainSrc === k ? '✓ ' : '') + PROV[k].name + '</button>').join('') + '</div><p class="sub">Поиск, быстрое добавление и разбор идут через основной источник. Другой источник включается кнопкой в окне поиска, но при следующем открытии поиска он снова возвращается на основной.</p></div>',
+    '<div class="sec"><h3 style="margin-top:0">Ключи IGDB</h3>' + blockBanner(false, 'igdb') + '<label class="field"><span>Client ID</span><input id="idIn" value="' + esc(S.set.igdbId) + '" placeholder="Client ID" autocomplete="off"></label><label class="field"><span>Client Secret</span><input id="secIn" type="password" value="' + esc(S.set.igdbSecret) + '" placeholder="Client Secret" autocomplete="off"></label><label class="field"><span>Адрес своего прокси (для браузера, необязательно)</span><input id="proxyIn" value="' + esc(S.set.igdbProxy) + '" placeholder="http://localhost:8787" autocomplete="off"></label><div class="toolbar"><button class="btn acc" data-act="saveKey">Сохранить и проверить</button></div>' + usageHtml() + '<p class="sub">Если указан адрес прокси, ключи IGDB в приложении не нужны (они хранятся в прокси, см. tools/igdb-proxy.mjs). Бесплатно: зарегистрируйте приложение на dev.twitch.tv/console/apps (Twitch может потребовать включить двухфакторную защиту), создайте Client Secret и скопируйте оба значения. Документация: api-docs.igdb.com.</p></div>',
+    '<div class="sec"><h3 style="margin-top:0">Ключ RAWG</h3>' + blockBanner(false, 'rawg') + '<label class="field"><input id="rawgIn" value="' + esc(S.set.rawgKey) + '" placeholder="вставьте ключ RAWG" autocomplete="off"></label><div class="toolbar"><button class="btn acc" data-act="saveRawg">Сохранить и проверить</button></div>' + rawgUsageHtml() + '<p class="sub">Бесплатный ключ: rawg.io/apidocs (регистрация, «Get API Key»).</p></div>',
+    '<div class="sec"><h3 style="margin-top:0">SteamGridDB (обложки)</h3><div class="chips"><button class="p' + (S.set.sgdbOn ? ' on' : '') + '" data-act="toggleSgdb">' + (S.set.sgdbOn ? '✓ Включено' : 'Выключено') + '</button></div><label class="field"><input id="sgdbIn" value="' + esc(S.set.sgdbKey) + '" placeholder="ключ SteamGridDB"></label><div class="toolbar"><button class="btn acc" data-act="saveSgdb">Сохранить ключ</button></div><p class="sub">Запросов в этом месяце: <b>' + usageCount('sgdb') + '</b>. Пока выключено, в карточке игры вместо кнопок только маленькая кнопка с подсказкой. Если включено и у игры нет обложки в источнике, она подгружается отсюда сама. Лимит SteamGridDB: 120 запросов в минуту, приложение держит паузы между запросами и при ответе 429 останавливается на время, которое просит сервер. Ключ: steamgriddb.com, профиль, настройки, API.</p></div>',
+    '<div class="sec"><h3 style="margin-top:0">Время прохождения</h3><p class="sub">В карточке игры кнопки HowLongToBeat и Cubiq.ru сразу открывают страницу сайта с игрой (в приложении Android внутри приложения, в браузере в новой вкладке). Время впишите в карточку вручную.</p></div>',
+    '<div class="sec"><h3 style="margin-top:0">Общие списки</h3><p class="sub">Платформы и жанры: короткие и длинные названия, объединение одинаковых, написанных по-разному.</p><div class="toolbar"><button class="btn" data-act="dictOpen" data-kind="plat">Платформы (' + Object.keys(S.set.platDict || {}).length + ')</button><button class="btn" data-act="dictOpen" data-kind="genre">Жанры (' + Object.keys(S.set.genreDict || {}).length + ')</button></div></div>',
+    '<div class="sec"><h3 style="margin-top:0">Объединение карточек</h3><p class="sub">Одна и та же игра на разных платформах, добавленная несколькими карточками: сравните их, выберите основную, перенесите данные и объедините. Перед объединением показывается, какая карточка получится.</p><div class="toolbar"><button class="btn acc" data-act="mgTool">Открыть инструмент объединения</button></div></div>',
+    '<div class="sec"><h3 style="margin-top:0">Скриншоты в базе</h3><div id="shStats" class="sub">считаем…</div><div class="toolbar"><button class="btn" data-act="shMgr">Выбрать игры…</button><button class="btn red" data-act="shDelAll">Удалить все</button></div></div>',
+    '<div class="sec"><h3 style="margin-top:0">Данные</h3><p class="sub">Игр: ' + S.games.length + ' · коллекций: ' + S.collections.length + ' · скриншотов: ' + S.games.reduce((a, g) => a + (g.shotCount || 0), 0) + '<br>Занято на устройстве: <b id="stEst">считаем…</b>. ' + (S.set.lastExport ? 'Последняя копия: ' + new Date(S.set.lastExport).toLocaleDateString('ru-RU') + '. ' : 'Копии ещё не было. ') + 'Данные хранятся только на этом устройстве. Делайте резервную копию и переносите её между телефоном и компьютером файлом.</p><div class="row"><span>Напоминать о копии</span><button class="btn" data-act="backupFreq">' + ({ 0: 'Не напоминать', 7: 'Раз в неделю', 14: 'Раз в 2 недели', 30: 'Раз в месяц' }[S.set.backupDays == null ? 7 : S.set.backupDays] || 'Раз в неделю') + '</button></div><div class="toolbar"><button class="btn acc" data-act="export">Экспорт в файл</button><button class="btn" data-act="import">Импорт из файла</button><button class="btn" data-act="fixDupes">Проверить дубли</button><button class="btn" data-act="openStats">Статистика</button></div><input type="file" id="impFile" accept=".json,.zip,application/json,application/zip" class="hidden"></div>',
+    '<div class="sec"><h3 style="margin-top:0">Корзина</h3>' + (S.trash.length ? S.trash.slice().sort((a, b) => b.t - a.t).slice(0, 30).map(r => '<div class="row"><span>' + esc(r.game.name) + ' <span class="sub">' + new Date(r.t).toLocaleDateString('ru-RU') + '</span></span><button class="btn" data-act="trashRestore" data-id="' + r.id + '">Вернуть</button></div>').join('') + '<div class="toolbar"><button class="btn red" data-act="trashClear">Очистить корзину</button></div>' : '<p class="sub">Удалённые игры хранятся 30 дней, их можно вернуть.</p>') + '</div>',
+    '<div class="sec"><h3 style="margin-top:0">Свои свойства</h3>' + (propRows || '<p class="sub">Свойства других типов (текст, число, дата) для игр. Для «галочек» используйте коллекции.</p>') + '<div class="toolbar"><button class="btn" data-act="propAdd">＋ Добавить свойство</button></div></div>',
+    (installEvt ? '<div class="sec"><button class="btn acc" data-act="install">Установить приложение</button></div>' : ''),
+    '<div class="sec"><button class="btn red" data-act="wipe">Удалить все данные</button></div>'
+  ];
   return '<div class="hdr2"><h2>Настройки</h2></div>'
-    + '<div class="sec"><h3 style="margin-top:0">Оформление</h3><div class="chips">' + [['dark', 'Тёмная'], ['light', 'Светлая'], ['auto', 'Как в системе']].map(x => '<button class="p' + (S.set.theme === x[0] ? ' on' : '') + '" data-act="setTheme" data-v="' + x[0] + '">' + x[1] + '</button>').join('') + '</div></div>'
-    + '<div class="sec"><h3 style="margin-top:0">Основной поиск</h3><div class="chips">' + ['igdb', 'rawg'].map(k => '<button class="p' + (S.set.mainSrc === k ? ' on' : '') + '" data-act="setMainSrc" data-v="' + k + '" style="border-color:' + PROV[k].color + '">' + (S.set.mainSrc === k ? '✓ ' : '') + PROV[k].name + '</button>').join('') + '</div><p class="sub">Поиск, быстрое добавление и разбор идут через основной источник. Другой источник включается кнопкой в окне поиска, но при следующем открытии поиска он снова возвращается на основной.</p></div>'
-    + '<div class="sec"><h3 style="margin-top:0">Ключи IGDB</h3>' + blockBanner(false, 'igdb') + '<label class="field"><span>Client ID</span><input id="idIn" value="' + esc(S.set.igdbId) + '" placeholder="Client ID" autocomplete="off"></label><label class="field"><span>Client Secret</span><input id="secIn" type="password" value="' + esc(S.set.igdbSecret) + '" placeholder="Client Secret" autocomplete="off"></label><label class="field"><span>Адрес своего прокси (для браузера, необязательно)</span><input id="proxyIn" value="' + esc(S.set.igdbProxy) + '" placeholder="http://localhost:8787" autocomplete="off"></label><div class="toolbar"><button class="btn acc" data-act="saveKey">Сохранить и проверить</button></div>' + usageHtml() + '<p class="sub">Если указан адрес прокси, ключи IGDB в приложении не нужны (они хранятся в прокси, см. tools/igdb-proxy.mjs). Бесплатно: зарегистрируйте приложение на dev.twitch.tv/console/apps (Twitch может потребовать включить двухфакторную защиту), создайте Client Secret и скопируйте оба значения. Документация: api-docs.igdb.com.</p></div>'
-    + '<div class="sec"><h3 style="margin-top:0">Ключ RAWG</h3>' + blockBanner(false, 'rawg') + '<label class="field"><input id="rawgIn" value="' + esc(S.set.rawgKey) + '" placeholder="вставьте ключ RAWG" autocomplete="off"></label><div class="toolbar"><button class="btn acc" data-act="saveRawg">Сохранить и проверить</button></div>' + rawgUsageHtml() + '<p class="sub">Бесплатный ключ: rawg.io/apidocs (регистрация, «Get API Key»).</p></div>'
-    + '<div class="sec"><h3 style="margin-top:0">SteamGridDB (обложки)</h3><div class="chips"><button class="p' + (S.set.sgdbOn ? ' on' : '') + '" data-act="toggleSgdb">' + (S.set.sgdbOn ? '✓ Включено' : 'Выключено') + '</button></div><label class="field"><input id="sgdbIn" value="' + esc(S.set.sgdbKey) + '" placeholder="ключ SteamGridDB"></label><div class="toolbar"><button class="btn acc" data-act="saveSgdb">Сохранить ключ</button></div><p class="sub">Запросов в этом месяце: <b>' + usageCount('sgdb') + '</b>. Пока выключено, в карточке игры вместо кнопок только маленькая кнопка с подсказкой. Если включено и у игры нет обложки в источнике, она подгружается отсюда сама. Лимит SteamGridDB: 120 запросов в минуту, приложение держит паузы между запросами и при ответе 429 останавливается на время, которое просит сервер. Ключ: steamgriddb.com, профиль, настройки, API.</p></div>'
-    + '<div class="sec"><h3 style="margin-top:0">Время прохождения</h3><p class="sub">В карточке игры кнопки HowLongToBeat и Cubiq.ru сразу открывают страницу сайта с игрой (в приложении Android внутри приложения, в браузере в новой вкладке). Время впишите в карточку вручную.</p></div>'
-    + '<div class="sec"><h3 style="margin-top:0">Общие списки</h3><p class="sub">Платформы и жанры: короткие и длинные названия, объединение одинаковых, написанных по-разному.</p><div class="toolbar"><button class="btn" data-act="dictOpen" data-kind="plat">Платформы (' + Object.keys(S.set.platDict || {}).length + ')</button><button class="btn" data-act="dictOpen" data-kind="genre">Жанры (' + Object.keys(S.set.genreDict || {}).length + ')</button></div></div>'
-    + '<div class="sec"><h3 style="margin-top:0">Объединение карточек</h3><p class="sub">Одна и та же игра на разных платформах, добавленная несколькими карточками: сравните их, выберите основную, перенесите данные и объедините. Перед объединением показывается, какая карточка получится.</p><div class="toolbar"><button class="btn acc" data-act="mgTool">Открыть инструмент объединения</button></div></div>'
-    + '<div class="sec"><h3 style="margin-top:0">Скриншоты в базе</h3><div id="shStats" class="sub">считаем…</div><div class="toolbar"><button class="btn" data-act="shMgr">Выбрать игры…</button><button class="btn red" data-act="shDelAll">Удалить все</button></div></div>'
-    + '<div class="sec"><h3 style="margin-top:0">Данные</h3><p class="sub">Игр: ' + S.games.length + ' · коллекций: ' + S.collections.length + ' · скриншотов: ' + S.games.reduce((a, g) => a + (g.shotCount || 0), 0) + '<br>Занято на устройстве: <b id="stEst">считаем…</b>. ' + (S.set.lastExport ? 'Последняя копия: ' + new Date(S.set.lastExport).toLocaleDateString('ru-RU') + '. ' : 'Копии ещё не было. ') + 'Данные хранятся только на этом устройстве. Делайте резервную копию и переносите её между телефоном и компьютером файлом.</p><div class="row"><span>Напоминать о копии</span><button class="btn" data-act="backupFreq">' + ({ 0: 'Не напоминать', 7: 'Раз в неделю', 14: 'Раз в 2 недели', 30: 'Раз в месяц' }[S.set.backupDays == null ? 7 : S.set.backupDays] || 'Раз в неделю') + '</button></div><div class="toolbar"><button class="btn acc" data-act="export">Экспорт в файл</button><button class="btn" data-act="import">Импорт из файла</button><button class="btn" data-act="fixDupes">Проверить дубли</button><button class="btn" data-act="openStats">Статистика</button></div><input type="file" id="impFile" accept=".json,.zip,application/json,application/zip" class="hidden"></div>'
-    + '<div class="sec"><h3 style="margin-top:0">Корзина</h3>' + (S.trash.length ? S.trash.slice().sort((a, b) => b.t - a.t).slice(0, 30).map(r => '<div class="row"><span>' + esc(r.game.name) + ' <span class="sub">' + new Date(r.t).toLocaleDateString('ru-RU') + '</span></span><button class="btn" data-act="trashRestore" data-id="' + r.id + '">Вернуть</button></div>').join('') + '<div class="toolbar"><button class="btn red" data-act="trashClear">Очистить корзину</button></div>' : '<p class="sub">Удалённые игры хранятся 30 дней, их можно вернуть.</p>') + '</div>'
-    + '<div class="sec"><h3 style="margin-top:0">Свои свойства</h3>' + (propRows || '<p class="sub">Свойства других типов (текст, число, дата) для игр. Для «галочек» используйте коллекции.</p>') + '<div class="toolbar"><button class="btn" data-act="propAdd">＋ Добавить свойство</button></div></div>'
-    + (installEvt ? '<div class="sec"><button class="btn acc" data-act="install">Установить приложение</button></div>' : '')
-    + '<div class="sec"><button class="btn red" data-act="wipe">Удалить все данные</button></div>';
+    + grp('sync', '🔄 Синхронизация и свой сервер', syncHtml())
+    + grp('data', '💾 Данные и копии', A[9] + A[10])
+    + grp('src', '🔎 Источники и ключи', A[1] + A[2] + A[3] + A[4] + A[5])
+    + grp('view', '🎨 Вид', A[0] + A[12])
+    + grp('tools', '🧰 Инструменты', A[6] + A[7] + A[8] + A[11])
+    + grp('danger', '⚠ Опасная зона', A[13]);
 }
 function dl(name, data) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(data instanceof Blob ? data : new Blob([data], { type: 'application/json' })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(a.href); }, 1000);
@@ -2686,7 +2892,22 @@ const ACT = {
   propAdd: async () => { const n = await promptBox('Название свойства'); if (!n) return; if (S.props.some(p => normName(p.name) === normName(n))) return toast('Свойство с таким названием уже есть'); const t = await choose({ title: 'Тип значения', items: [{ id: 'text', label: 'Текст' }, { id: 'number', label: 'Число' }, { id: 'date', label: 'Дата' }] }); if (!t) return; const p = { id: uid(), name: n, type: t }; S.props.push(p); await DB.put('props', p); render(); },
   propDel: async t => { if (!await confirmBox('Удалить свойство и его значения у всех игр?', 'Удалить')) return; const id = t.dataset.id; S.props = S.props.filter(p => p.id !== id); await DB.del('props', id); for (const g of S.games) if (g.props && id in g.props) { delete g.props[id]; await saveGame(g); } S.set.f.props = S.set.f.props.filter(x => x !== id); saveSet(); render(); },
   install: async () => { if (installEvt) { installEvt.prompt(); installEvt = null; render(); } },
-  wipe: async () => { if (!await confirmBox('Удалить ВСЕ игры, коллекции и свойства на этом устройстве?', 'Удалить всё')) return; for (const s of ['games', 'collections', 'props', 'covers', 'shots', 'inboxLists', 'inboxItems', 'trash']) await DB.clear(s); S.trash = []; coverCache.clear(); S.games = []; S.collections = []; S.props = []; S.inbox = { lists: [], items: [] }; S.inboxList = null; S.set.f = clone(DEFAULTS.f); saveSet(); render(); toast('Данные удалены'); }
+  guideOpen: () => openGuide(),
+  syncAuto: () => { S.set.sync.auto = !S.set.sync.auto; saveSet(); render(); if (S.set.sync.auto) syncSoon(500); },
+  syncSave: async () => {
+    const y = S.set.sync; y.url = normUrl(($('#syUrl') || {}).value); y.token = (($('#syTok') || {}).value || '').trim();
+    saveSet(); if (!syncOn()) { toast('Укажите адрес и код доступа'); render(); return; }
+    try { const r = await srv('check', {}, 15000); y.err = ''; y.igdb = !!r.igdb; saveSet(); toast('Связь есть ✓' + (r.games !== undefined ? ' На сервере игр: ' + r.games : '')); }
+    catch (e) { y.err = e.message; saveSet(); toast(e.message); }
+    render();
+  },
+  syncRun: async () => {
+    const y = S.set.sync, u = $('#syUrl'), k = $('#syTok'); if (u) y.url = normUrl(u.value); if (k) y.token = k.value.trim(); saveSet();
+    await syncNow(true);
+  },
+  syncOff: async () => { if (!await confirmBox('Отключить сервер? Данные на устройстве останутся.', 'Отключить')) return; S.set.sync.url = ''; S.set.sync.token = ''; S.set.sync.err = ''; saveSet(); render(); },
+  wipe: async () => { if (!await confirmBox('Удалить ВСЕ игры, коллекции и свойства на этом устройстве?' + (syncOn() ? ' Копия на вашем сервере останется, при следующей синхронизации данные вернутся.' : ''), 'Удалить всё')) return; for (const s of ['games', 'collections', 'props', 'covers', 'shots', 'inboxLists', 'inboxItems', 'trash', 'tomb']) await DB.clearRaw(s); DB.tombs.clear(); // «на этом устройстве»: на сервер удаление не передаётся, при следующей синхронизации данные вернутся с сервера
+     S.trash = []; coverCache.clear(); S.games = []; S.collections = []; S.props = []; S.inbox = { lists: [], items: [] }; S.inboxList = null; S.set.f = clone(DEFAULTS.f); saveSet(); render(); toast('Данные удалены'); }
 };
 document.addEventListener('click', e => {
   if (S.selMode && S.tab === 'library') { const r = e.target.closest('tr[data-gid]'); if (r && !e.target.closest('a')) { if (lp.fired) { lp.fired = false; return; } toggleSel(r.dataset.gid); return; } } // в режиме выбора строка отмечается нажатием в любом месте
@@ -2778,10 +2999,14 @@ function applyTheme() {
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
   const m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', dark ? '#0b0b0d' : '#f2f3f6');
 }
-window.__GC = { nextPool, PRESETS, applyFilterSet, withSeries, buildEntries, groupGames, textHtml, listHtml, cardHtml, noPlatSect, openYoutube, canonPlat, canonGenre, canonAll, dictMerge, dictRename, dictRewrite, openDict, mergeGroups, openMergeCompare, applyMerge, mgBase, renderKeep, toggleInSel, handleShared, applyExtra, addParsed, openExport, exportText, copyText, gameLine, zipBuild, zipRead, shotStats, delShots, rawgQuotaTick, refreshOne, rawg, requirePlatform, effItem, applyDefaults, linkItem, pickPlatform, itemOpts, viewInbox, mainOf, NO_MAIN, askMainPlatform, quickTap, bulkMore, openAddCollSheet, openLb, libToolsHtml: () => { renderLibHead(); return $('#libTools').innerHTML; }, filterGames, getShots, putShots, collTilesHtml, seriesTilesHtml, viewCollections, viewSeries, DONE_ID, autoResolve, viewStats, restoreGames, removeGame, canonSeries, findDupes, mergeAllDupes, collectSheet, persistDraft, closeSheet, S, ACT, bump, igdb, hltbFind, sgdbAuto, openSgdb, applyTheme, colsFor, usageHtml, serMenu, viewInbox, addItems, linkItem, createList, pendingItem, render, runSearch, addFromIgdb, importData, openIgdbSheet, openGameSheet, openFilters, openCols, selectionAction, loadAll, renderSearchBody };
+window.__GC = { syncNow, SY, DB, reloadData, nextPool, PRESETS, applyFilterSet, withSeries, buildEntries, groupGames, textHtml, listHtml, cardHtml, noPlatSect, openYoutube, canonPlat, canonGenre, canonAll, dictMerge, dictRename, dictRewrite, openDict, mergeGroups, openMergeCompare, applyMerge, mgBase, renderKeep, toggleInSel, handleShared, applyExtra, addParsed, openExport, exportText, copyText, gameLine, zipBuild, zipRead, shotStats, delShots, rawgQuotaTick, refreshOne, rawg, requirePlatform, effItem, applyDefaults, linkItem, pickPlatform, itemOpts, viewInbox, mainOf, NO_MAIN, askMainPlatform, quickTap, bulkMore, openAddCollSheet, openLb, libToolsHtml: () => { renderLibHead(); return $('#libTools').innerHTML; }, filterGames, getShots, putShots, collTilesHtml, seriesTilesHtml, viewCollections, viewSeries, DONE_ID, autoResolve, viewStats, restoreGames, removeGame, canonSeries, findDupes, mergeAllDupes, collectSheet, persistDraft, closeSheet, S, ACT, bump, igdb, hltbFind, sgdbAuto, openSgdb, applyTheme, colsFor, usageHtml, serMenu, viewInbox, addItems, linkItem, createList, pendingItem, render, runSearch, addFromIgdb, importData, openIgdbSheet, openGameSheet, openFilters, openCols, selectionAction, loadAll, renderSearchBody };
 (async () => {
   try {
     await loadAll();
+    document.addEventListener('toggle', e => { const d = e.target; if (d && d.dataset && d.dataset.g) S.gopen[d.dataset.g] = d.open; }, true); // раскрытые группы настроек
+    detectLocalServer().then(() => syncSoon(1500));
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - SY.last > 30000) syncSoon(800); });
+    const syIv = setInterval(() => { if (!document.hidden && Date.now() - SY.last > 120000) syncSoon(100); }, 60000); if (syIv && syIv.unref) syIv.unref();
     applyTheme();
     if (window.matchMedia) { const mq = matchMedia('(prefers-color-scheme: light)'); if (mq.addEventListener) mq.addEventListener('change', () => { if (S.set.theme === 'auto') applyTheme(); }); }
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist();

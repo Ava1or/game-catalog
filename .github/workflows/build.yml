@@ -24,7 +24,7 @@ jobs:
         with:
           node-version: 20
       - name: Тесты
-        run: node --test tests/logic.test.js tests/smoke.test.js
+        run: node --test tests/logic.test.js tests/smoke.test.js tests/server.test.mjs
 
   web:
     name: Версия для браузера (GitHub Pages)
@@ -40,6 +40,7 @@ jobs:
           mkdir _site
           cp -r www/* _site/
           sed -i "s/__BUILD__/${GITHUB_RUN_NUMBER}/" _site/sw.js
+          python3 tools/build_server_pack.py _site
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

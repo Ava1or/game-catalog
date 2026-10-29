@@ -76,6 +76,8 @@ jobs:
           # приём текста из «Поделиться» других приложений
           cp android-src/*.java android/app/src/main/java/com/example/gamecatalog/
           python3 tools/patch_manifest.py
+          # архив сервера внутри приложения (Настройки → Синхронизация → «Скачать архив сервера»)
+          python3 tools/build_server_pack.py www
           npx cap sync android
       - name: Сборка
         working-directory: android

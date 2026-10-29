@@ -505,7 +505,7 @@ tr.gh.l2 td{color:#f5c451}
 /* меньше движения по системной настройке */
 @media (prefers-reduced-motion:reduce){.sheet,.lb,.modal{animation:none!important}*{transition-duration:.01ms!important}}
 /* подсветка под мышью (на телефоне не действует) */
-@media (hover:hover){.card:hover .cv{box-shadow:0 0 0 2px var(--acc)}.tile:hover{outline:2px solid var(--acc)}.wrap tbody tr:hover td{background:var(--hl,rgba(255,255,255,.05))}.tl:hover{background:rgba(255,255,255,.05)}}
+@media (hover:hover){.card:not(.sel):not(.last):hover .cv{box-shadow:0 0 0 2px var(--acc)}.tile:hover{outline:2px solid var(--acc)}.wrap tbody tr:hover td{background:var(--hl,rgba(255,255,255,.05))}.tl:hover{background:rgba(255,255,255,.05)}}
 
 /* группы в настройках */
 details.grp{background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:12px;overflow:hidden}
@@ -530,3 +530,59 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .guide table{border-collapse:collapse;width:100%;margin:8px 0}
 .guide td,.guide th{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
 .guide th{background:var(--bg2)}
+
+/* панель значков: всегда одна строка, при нехватке места прокручивается вбок */
+.tools{overflow-x:auto;scrollbar-width:none;padding:7px 6px 0 0;margin-top:-3px;-webkit-overflow-scrolling:touch}
+.tools::-webkit-scrollbar{display:none}
+.tools .ib{flex:0 0 auto}
+@media (max-width:420px){.tools .ib{min-width:40px;padding:0 8px}}
+
+/* последняя открытая игра: вся строка или плитка серая, заметно */
+.card.last{background:rgba(150,150,160,.32);border-radius:12px}
+.wrap tbody tr.last td,.wrap tbody tr.last td.pc,.wrap tbody tr.isdone.last td{background-image:linear-gradient(rgba(150,150,160,.34),rgba(150,150,160,.34))!important}
+.tl.last{background:rgba(150,150,160,.32)}
+
+/* выделение: везде синяя рамка */
+.card.sel .cv{outline:none!important;box-shadow:none!important}
+.card.sel .cv::before{content:'';position:absolute;inset:0;border:3px solid #4f8cff;border-radius:inherit;background:rgba(79,140,255,.18);pointer-events:none;z-index:4}
+.card.sel .chk{background:#4f8cff;border-color:#4f8cff;z-index:5}
+.wrap tbody tr.sel td,.wrap tbody tr.sel td.pc,.wrap tbody tr.sel.last td,.wrap tbody tr.isdone.sel td{background-image:linear-gradient(rgba(79,140,255,.38),rgba(79,140,255,.38))!important}
+.tl.sel{background:rgba(79,140,255,.28)}
+
+/* список, масштаб 3: название до трёх строк */
+.wrap.d3 .n{white-space:normal;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;line-height:1.25}
+.wrap.d3 td.nmc{white-space:normal;min-width:170px;max-width:260px}
+
+/* текстовый вид: метки отдельно, название своим цветом, пройденные чуть зеленоватые */
+.tl{display:flex;align-items:baseline;white-space:normal}
+.tl .mk{flex:0 0 auto;display:flex;align-items:baseline}
+.tl .tx{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+.tl .tn{color:var(--blue);overflow:visible;text-overflow:clip}
+.tl.isdone .tn{color:var(--blue)}
+.tl .ti,.tl .tt{color:var(--mut)}
+.tl.isdone{background:rgba(74,222,128,.08)}
+.tl.isdone.last{background:rgba(150,150,160,.32)}
+.tlist.sc{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tlist.sc .tl{width:max-content;min-width:100%;white-space:nowrap;content-visibility:visible}
+.tlist.sc .tx{flex:0 0 auto;overflow-wrap:normal}
+
+/* просмотр картинок: непрозрачный фон (быстрее) */
+.lb{background:#000}
+
+/* скриншоты: пока не загрузились, на месте заглушка, кнопка сохранения появляется после загрузки */
+.shw{position:relative;aspect-ratio:16/9;background:var(--ph);border-radius:10px;overflow:hidden}
+.shw img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.shw.ld{aspect-ratio:auto;overflow:visible}
+.shw.ld img{position:static;height:auto}
+.shw .shph,.shw .sher{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:10px;font-size:13px;color:var(--mut)}
+.shw .sher{display:none;z-index:2;background:var(--ph);cursor:pointer}
+.shw.er .sher{display:flex}
+.shw.ld .shph{display:none}
+.shw:not(.ld) .sv{display:none}
+
+/* «Что играть» */
+.nxcnt{float:right;font-size:13px;font-weight:400;color:var(--mut)}
+.nxt.inl{animation:nxl .2s ease-out}.nxt.inr{animation:nxr .2s ease-out}
+@keyframes nxl{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}
+@keyframes nxr{from{transform:translateX(-40px);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.nxt{animation:none!important}}

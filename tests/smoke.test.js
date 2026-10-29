@@ -161,7 +161,9 @@ const L = require('../www/app.js');
     S.tab = 'library'; S.set.f.collections = []; G.render();
     G.ACT.openColls(); G.ACT.collChip({ dataset: { id: G.DONE_ID } }); G.ACT.collMode({ dataset: { v: 'and' } }); if (S.set.f.collections[0] !== G.DONE_ID || S.set.f.collMode !== 'and') throw new Error('collChip/collMode');
     G.ACT.collMode({ dataset: { v: 'or' } });
-    const h = S.collections.length || true ? G.libToolsHtml() : ''; if (!h.includes('Коллекции')) throw new Error('no collections button'); if (!h.includes('cnt')) throw new Error('no counter on collections button');
+    const h = G.libToolsHtml(); if (h.includes('openColls')) throw new Error('кнопки «Коллекции» на панели быть не должно: коллекции есть в фильтрах'); if (!h.includes('cnt')) throw new Error('no counter on filters button');
+    { S.set.textWrap = 'wrap'; const a = G.textHtml(S.games.slice(0, 3).map(g => ({ t: 'g', g, x: false })), 3), b = (S.set.textWrap = 'scroll', G.textHtml(S.games.slice(0, 3).map(g => ({ t: 'g', g, x: false })), 3)); S.set.textWrap = 'wrap';
+      if (!a.includes('tlist wr') || !b.includes('tlist sc') || !a.includes('class="tx"><span class="tn">')) throw new Error('текстовый вид: режимы и разметка'); }
     G.ACT.openFilters(); G.ACT.collChip({ dataset: { id: 'c1' } }); G.ACT.rmF({ dataset: { k: 'collections', v: 'c1' } }); if (S.set.f.collections.includes('c1')) throw new Error('rmF collections');
     G.ACT.collClear(); if (S.set.f.collections.length) throw new Error('collClear');
     if (G.collTilesHtml().includes('⋮') || !G.collTilesHtml().includes('data-lpm="coll"') || !G.seriesTilesHtml().includes('data-lpm="ser"')) throw new Error('long tap markup');

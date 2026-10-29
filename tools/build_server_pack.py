@@ -30,6 +30,7 @@ for n in sorted(os.listdir(os.path.join(root, 'server'))):
     files.append((n, os.path.join(root, 'server', n)))
 for base, _, names in os.walk(os.path.join(root, 'www')):
     for n in sorted(names):
+        if n == 'game-catalog-server.zip': continue  # сам архив лежит в www только в сборке apk
         full = os.path.join(base, n); files.append(('www/' + os.path.relpath(full, os.path.join(root, 'www')).replace(os.sep, '/'), full))
 files.append(('ИНСТРУКЦИЯ.html', page.encode('utf-8')))
 

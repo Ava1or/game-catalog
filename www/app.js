@@ -1086,14 +1086,14 @@ function listHtml(items, total) {
 // третий вид: только текст, по строке на игру: «Название (год | платформы) – время»
 function textHtml(items, total) {
   const ents = normEnt(items), tc = textCols();
-  let h = '<div class="tlist">';
+  let h = '<div class="tlist ' + (S.set.textWrap === 'scroll' ? 'sc' : 'wr') + '">';
   ents.forEach(e => {
     if (e.t === 'h') { h += '<div class="gh l' + e.lvl + '">' + esc(e.text) + '<b>' + e.n + '</b></div>'; return; }
     const g = e.g, inP = [tc.year && g.year ? g.year : '', tc.platforms && (g.platforms || []).length ? g.platforms.map(shortPlat).join(', ') : ''].filter(Boolean).join(' | ');
+    const mk = (S.selMode ? '<span class="tsel">' + (S.sel.has(g.id) ? '☑' : '☐') + '</span>' : '') + (tc.done ? '<span class="tk">' + (g.done ? '✓' : '') + '</span>' : '') + (tc.main ? '<span class="tm">' + (e.x ? '*' : '') + '</span>' : '');
     h += '<div class="tl' + (e.x ? ' extra' : '') + (g.done ? ' isdone' : '') + (S.sel.has(g.id) ? ' sel' : '') + (g.id === S.lastGame ? ' last' : '') + '" data-gid="' + g.id + '" data-act="openGame">'
-      + (S.selMode ? '<span class="tsel">' + (S.sel.has(g.id) ? '☑' : '☐') + '</span>' : '')
-      + (tc.done ? '<span class="tk">' + (g.done ? '✓' : '') + '</span>' : '') + (tc.main ? '<span class="tm">' + (e.x ? '*' : '') + '</span>' : '')
-      + '<span class="tn">' + esc(g.name) + '</span>' + (inP ? '<span class="ti">&nbsp;(' + esc(inP) + ')</span>' : '') + (tc.time && g.time ? '<span class="tt">&nbsp;– ' + String(g.time).replace('.', ',') + ' ч</span>' : '') + '</div>';
+      + (mk ? '<span class="mk">' + mk + '</span>' : '')
+      + '<span class="tx"><span class="tn">' + esc(g.name) + '</span>' + (inP ? '<span class="ti">&nbsp;(' + esc(inP) + ')</span>' : '') + (tc.time && g.time ? '<span class="tt">&nbsp;– ' + String(g.time).replace('.', ',') + ' ч</span>' : '') + '</span></div>';
   });
   return h + '</div><div class="status">' + statusTxt(total || ents.filter(e => e.t === 'g').length) + '</div>';
 }
@@ -1105,7 +1105,7 @@ const ICONS = {
   filter: '<path d="M3 5h18l-7 8v6l-4-2v-4z"/>', grid: '<rect x="4" y="4" width="7" height="7"/><rect x="13" y="4" width="7" height="7"/><rect x="4" y="13" width="7" height="7"/><rect x="13" y="13" width="7" height="7"/>',
   pin: '<path d="M9 4h6l-1 5 3 3v2H7v-2l3-3z"/><path d="M12 14v6"/>',
   zoom: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4M11 8v6M8 11h6"/>',
-  list: '<path d="M4 6h16M4 12h16M4 18h16"/>', mark: '<path d="M6 4h12v16l-6-4-6 4z"/>', dice: '<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="15" r="1"/><circle cx="12" cy="12" r="1"/>', text: '<path d="M5 7h14M5 12h14M5 17h9"/>', group: '<path d="M4 5h16M7 9h13M7 13h13M4 18h16"/>', cols: '<rect x="4" y="4" width="16" height="16"/><path d="M9.5 4v16M14.5 4v16"/>', sel: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 12l3 3 5-6"/>', coll: '<path d="M3 7h6l2 2h10v10H3z"/>'
+  wrap: '<path d="M4 6h16M4 12h11a3 3 0 0 1 0 6h-3M12 18l2-2M12 18l2 2M4 18h4"/>', list: '<path d="M4 6h16M4 12h16M4 18h16"/>', mark: '<path d="M6 4h12v16l-6-4-6 4z"/>', dice: '<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="15" r="1"/><circle cx="12" cy="12" r="1"/>', text: '<path d="M5 7h14M5 12h14M5 17h9"/>', group: '<path d="M4 5h16M7 9h13M7 13h13M4 18h16"/>', cols: '<rect x="4" y="4" width="16" height="16"/><path d="M9.5 4v16M14.5 4v16"/>', sel: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 12l3 3 5-6"/>', coll: '<path d="M3 7h6l2 2h10v10H3z"/>'
 };
 const ZOOM_RANGE = { list: [1, 3], grid: [2, 6], search: [2, 6], coll: [1, 4], series: [1, 4] };
 const ZOOM_DEF = { list: [1, 1], grid: [3, 6], search: [3, 6], coll: [2, 4], series: [2, 4] };
@@ -1122,9 +1122,8 @@ const backupBanner = () => backupDue() ? '<div class="banner bk"><span>' + (S.se
 function renderLibHead() {
   const f = S.set.f;
   $('#libTools').innerHTML = ib('openFilters', 'filter', 'Фильтры', activeCount() > 0, activeCount() ? '<span class="cnt">' + activeCount() + '</span>' : '')
-    + ib('openColls', 'coll', 'Коллекции', f.collections.length > 0, f.collections.length ? '<span class="cnt">' + f.collections.length + '</span>' : '')
     + ib('toggleView', S.set.view === 'grid' ? 'list' : S.set.view === 'list' ? 'text' : 'grid', S.set.view === 'grid' ? 'Список' : S.set.view === 'list' ? 'Текст' : 'Сетка', false)
-    + (S.set.view === 'text' ? '' : zoomBtn(S.set.view === 'grid' ? 'grid' : 'list'))
+    + (S.set.view === 'text' ? ib('toggleWrap', 'wrap', S.set.textWrap === 'scroll' ? 'В несколько строк' : 'В одну строку с прокруткой', S.set.textWrap === 'scroll') : zoomBtn(S.set.view === 'grid' ? 'grid' : 'list'))
     + (S.set.view === 'grid' ? '' : ib('openCols', 'cols', 'Колонки', false))
     + ib('openGroup', 'group', 'Группировка', !!S.set.group) + ib('openSaved', 'mark', 'Наборы', false) + ib('pickNext', 'dice', 'Что играть', false)
   const chips = [];
@@ -1311,13 +1310,26 @@ function applyFilterSet(snap) { // подставляет набор фильт�
   S.set.f = base; saveSet(); libRefilter(); if (sheetEl) closeSheet(); const b = $('#libBody'); if (b) b.scrollTop = 0;
 }
 const nextPool = entries => entries.filter(e => e.t === 'g' && !e.x && !e.g.done).map(e => e.g); // из текущего списка: не пройденные и не из «игр серий»
-function showNext() {
+// «Что играть»: случайная игра из текущего списка. Свайп влево: следующий вариант, вправо: предыдущий; вверху счётчик «N из M»
+function showNext(dir) {
   const pool = nextPool(S.entries || []); if (!pool.length) return toast('В текущем списке нет непройденных игр: измените фильтры');
-  let rest = pool.filter(g => !S.nextSeen.has(g.id)); if (!rest.length) { S.nextSeen.clear(); rest = pool; }
-  const g = rest[Math.floor(Math.random() * rest.length)]; S.nextSeen.add(g.id);
-  const src = coverSrc(g), mp = mainOf(g), m = openModal(); modalCancel = () => closeModal();
-  m.innerHTML = '<h4>Что играть дальше</h4><div class="nxt"><div class="nxc' + (src ? '' : ' nocover') + '" data-cvid="' + g.id + '"' + (src ? ' style="background-image:url(\'' + bgu(src) + '\')"' : '') + '></div><div class="nxi"><div class="nxn">' + esc(g.name) + '</div><div class="sub">' + esc([g.year || '', mp ? shortPlat(mp) : '', g.time ? g.time + ' ч' : ''].filter(Boolean).join(' · ')) + '</div>' + (g.series ? '<div class="sub">Серия: ' + esc(g.series) + '</div>' : '') + (g.genres && g.genres.length ? '<div class="sub">' + esc(g.genres.slice(0, 3).join(', ')) + '</div>' : '') + '</div></div><p class="sub" style="margin:10px 0 0">Вариантов в текущем списке: ' + pool.length + '. Выбор случайный, с учётом фильтров; завершённые и игры из серий не берутся.</p><div class="acts"><span data-x="close">Закрыть</span><span data-x="again">Ещё вариант</span><span data-x="open">Открыть</span></div>';
-  m.onclick = e => { const x = e.target.closest('[data-x]'); if (!x) return; closeModal(); if (x.dataset.x === 'again') showNext(); else if (x.dataset.x === 'open') openGameSheet(g.id); };
+  const nx = S.nx || (S.nx = { hist: [], i: -1 });
+  if (dir === -1) { if (nx.i <= 0) return; nx.i--; }
+  else if (dir === 1 && nx.i + 1 < nx.hist.length) nx.i++;
+  else {
+    let rest = pool.filter(x => !nx.hist.includes(x.id));
+    if (!rest.length) { nx.hist = []; nx.i = -1; rest = pool; toast('Все варианты просмотрены, начинаем сначала'); }
+    nx.hist.push(rest[Math.floor(Math.random() * rest.length)].id); nx.i = nx.hist.length - 1;
+  }
+  const g = gameById(nx.hist[nx.i]);
+  if (!g) { nx.hist.splice(nx.i, 1); nx.i = nx.hist.length - 1; return showNext(1); } // игру успели удалить
+  const src = coverSrc(g), mp = mainOf(g), fresh = !(S.nxOpen && modalEl && modalEl.querySelector('.nxt')), m = fresh ? openModal() : modalEl.querySelector('.modal');
+  S.nxOpen = true; modalCancel = () => { S.nxOpen = false; closeModal(); }; m.style.touchAction = 'pan-y';
+  m.innerHTML = '<h4>Что играть дальше<span class="nxcnt">' + (nx.i + 1) + ' из ' + pool.length + '</span></h4><div class="nxt' + (dir ? (dir < 0 ? ' inr' : ' inl') : '') + '"><div class="nxc' + (src ? '' : ' nocover') + '" data-cvid="' + g.id + '"' + (src ? ' style="background-image:url(\'' + bgu(src) + '\')"' : '') + '></div><div class="nxi"><div class="nxn">' + esc(g.name) + '</div><div class="sub">' + esc([g.year || '', mp ? shortPlat(mp) : '', g.time ? g.time + ' ч' : ''].filter(Boolean).join(' · ')) + '</div>' + (g.series ? '<div class="sub">Серия: ' + esc(g.series) + '</div>' : '') + (g.genres && g.genres.length ? '<div class="sub">' + esc(g.genres.slice(0, 3).join(', ')) + '</div>' : '') + '</div></div>'
+    + '<p class="sub" style="margin:10px 0 0">Свайп влево: другая игра, вправо: предыдущая. Берутся только непройденные игры из текущего списка (не из серий).</p><div class="acts"><span data-x="close">Закрыть</span>' + (nx.i > 0 ? '<span data-x="prev">‹ Назад</span>' : '') + '<span data-x="again">Ещё вариант</span><span data-x="open">Открыть</span></div>';
+  m.onclick = e => { const x = e.target.closest('[data-x]'); if (!x) return; const a = x.dataset.x; if (a === 'again') return showNext(1); if (a === 'prev') return showNext(-1); S.nxOpen = false; closeModal(); if (a === 'open') openGameSheet(g.id); };
+  m.onpointerdown = e => { m._sx = e.clientX; m._sy = e.clientY; };
+  m.onpointerup = e => { const dx = e.clientX - m._sx, dy = e.clientY - m._sy; if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) showNext(dx < 0 ? 1 : -1); };
 }
 function seriesModeSect() {
   const m = S.set.f.seriesMode || '';
@@ -2131,7 +2143,7 @@ async function loadShots(rid, save) {
     if (src === 'rawg') { const r = await rawg('/games/' + id + '/screenshots', { page_size: 40 }); list = (r.results || []).map(x => ({ image: String(x.image).replace('/media/screenshots/', '/media/resize/640/-/screenshots/') })); }
     else { const r = await igdb('/screenshots', 'fields image_id; where game = ' + id + '; limit 40;'); list = r.map(x => ({ image: igdbImg(x.image_id, 'screenshot_big') })); }
     S.igdbShots = list.map(x => x.image);
-    box.innerHTML = list.length ? (save ? '<div class="toolbar"><button class="btn" data-act="shotSaveAll">Сохранить все в базу</button></div>' : '') + '<div class="shotv">' + list.map((x, i) => '<div class="shw"><img src="' + esc(src === 'rawg' ? x.image : sizeUrl(x.image, 'screenshot_med')) + '" data-act="shot" data-g="igdb" data-i="' + i + '" data-full="' + esc(x.image) + '" loading="lazy">' + (save ? '<button class="sv" data-act="shotSave" data-i="' + i + '">＋ Сохранить</button>' : '') + '</div>').join('') + '</div>' : '<div class="status">Скриншотов нет</div>';
+    box.innerHTML = list.length ? (save ? '<div class="toolbar"><button class="btn" data-act="shotSaveAll">Сохранить все в базу</button></div>' : '') + '<div class="shotv">' + list.map((x, i) => '<div class="shw"><span class="shph">Загрузка…</span><span class="sher" data-act="shotRetry">Не загрузилось. Нажмите, чтобы повторить</span><img src="' + esc(src === 'rawg' ? x.image : sizeUrl(x.image, 'screenshot_med')) + '" data-act="shot" data-g="igdb" data-i="' + i + '" data-full="' + esc(x.image) + '" loading="lazy">' + (save ? '<button class="sv" data-act="shotSave" data-i="' + i + '">＋ Сохранить</button>' : '') + '</div>').join('') + '</div>' : '<div class="status">Скриншотов нет</div>';
     if (save) drawShots();
   } catch (e) { box.innerHTML = '<div class="status">' + esc(e.message) + '</div>'; }
 }
@@ -2269,17 +2281,25 @@ async function detectLocalServer() { // приложение открыто с �
     if (!S.set.sync.url) { S.set.sync.url = location.origin; saveSet(); if (S.tab === 'settings') render(); }
   } catch (e) { /* не наш сервер, это нормально */ }
 }
+async function downloadServerZip() { // архив лежит внутри приложения (apk) и на странице приложения в интернете
+  const name = 'game-catalog-server.zip'; let b = null;
+  try { const r = await fetch(name, { cache: 'no-store' }); if (r.ok) { const x = await r.blob(), h = new Uint8Array(await x.slice(0, 2).arrayBuffer()); if (x.size > 5000 && h[0] === 0x50 && h[1] === 0x4b) b = x; } } catch (e) { /* нет архива */ }
+  if (!b) { toast('В этой версии архива нет: скачайте его на странице приложения в интернете'); return; }
+  const FS = plug('Filesystem'), SH = plug('Share');
+  if (isNative() && FS && SH) { try { const r = await FS.writeFile({ path: name, data: await blobToBase64(b), directory: 'CACHE' }); await SH.share({ title: 'Каталог игр: архив сервера', url: r.uri, dialogTitle: 'Отправить архив на компьютер' }); } catch (e) { toast('Не удалось поделиться: ' + (e.message || e)); } return; }
+  dl(name, b);
+}
 async function openGuide() {
   let html = '';
   try { const r = await fetch('guide.html'); if (r.ok) html = await r.text(); } catch (e) { /* ignore */ }
-  openSheet('<div class="hdr2"><h2>Свой сервер: инструкция</h2></div><div class="guide">' + (html || '<p class="sub">Не удалось загрузить инструкцию.</p>') + '</div><button class="btn acc" style="width:100%;margin-top:14px" data-act="closeSheet">Закрыть</button>');
+  openSheet('<div class="hdr2"><h2>Свой сервер: инструкция</h2></div><div class="toolbar"><button class="btn acc" data-act="srvZip">⬇ Скачать архив сервера</button></div><div class="guide">' + (html || '<p class="sub">Не удалось загрузить инструкцию.</p>') + '</div><button class="btn acc" style="width:100%;margin-top:14px" data-act="closeSheet">Закрыть</button>');
 }
 
 /* ====================== Настройки ====================== */
 function syncHtml() {
-  const y = S.set.sync, host = typeof location !== 'undefined' && /github\.io$/i.test(location.hostname);
+  const y = S.set.sync;
   return '<div class="sec"><p class="sub">Обмен данными между телефоном и компьютерами через вашу домашнюю сеть. Нужен компьютер с Windows, на котором запускается маленький сервер. Всё подробно, по шагам, в инструкции.</p>'
-    + '<div class="toolbar"><button class="btn acc" data-act="guideOpen">📖 Инструкция по настройке</button>' + (host ? '<a class="btn" href="game-catalog-server.zip" download>⬇ Скачать архив сервера</a>' : '') + '</div></div>'
+    + '<div class="toolbar"><button class="btn acc" data-act="guideOpen">📖 Инструкция по настройке</button>' + '<button class="btn" data-act="srvZip">⬇ Скачать архив сервера</button>' + '</div></div>'
     + '<div class="sec"><h3 style="margin-top:0">Подключение</h3>' + (S.localServer ? '<p class="sub">Это приложение открыто с вашего сервера, адрес подставлен сам.</p>' : '')
     + '<label class="field"><span>Адрес сервера</span><input id="syUrl" inputmode="url" autocapitalize="off" autocomplete="off" placeholder="http://192.168.0.15:8787" value="' + esc(y.url) + '"></label>'
     + '<label class="field"><span>Код доступа</span><input id="syTok" type="password" autocomplete="off" autocapitalize="off" placeholder="XXXXX-XXXXX" value="' + esc(y.token) + '"></label>'
@@ -2481,7 +2501,8 @@ async function lazyCovers() { // обложки, которые не удало�
 let lbEl = null, lbState = null;
 function closeLb() { if (lbEl) { lbEl.remove(); lbEl = null; lbState = null; } }
 const lbDist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-function lbApply() { const img = lbEl && $('img', lbEl); if (img && img.style && lbState) img.style.transform = 'translate(' + lbState.x + 'px,' + lbState.y + 'px) scale(' + lbState.s + ')'; }
+function lbApply() { const img = lbEl && $('img', lbEl); if (img && img.style && lbState) img.style.transform = 'translate3d(' + lbState.x + 'px,' + lbState.y + 'px,0) scale(' + lbState.s + ')'; }
+function lbApplyRaf() { const st = lbState; if (!st || st.raf) return; st.raf = requestAnimationFrame(() => { st.raf = 0; lbApply(); }); } // не чаще одного раза за кадр: жесты двумя пальцами идут плавно
 function lbAnim(ms) { const img = lbEl && $('img', lbEl); if (img && img.style) img.style.transition = ms ? 'transform ' + ms + 'ms ease' : 'none'; }
 function lbShow(i) {
   const st = lbState; if (!st || !lbEl) return; st.i = (i + st.list.length) % st.list.length; st.s = 1; st.x = 0; st.y = 0;
@@ -2511,26 +2532,27 @@ function openLb(list, i) {
   if (!list || !list.length) return; closeLb();
   const d = document.createElement('div'); d.className = 'lb';
   d.innerHTML = '<img alt="" draggable="false"><div class="lbc"></div><button class="lbx" data-lb="x" aria-label="Закрыть">✕</button>' + (list.length > 1 ? '<button class="lbn lbp" data-lb="p" aria-label="Назад">‹</button><button class="lbn lbf" data-lb="n" aria-label="Вперёд">›</button>' : '');
-  lbEl = d; const st = lbState = { list, i: 0, s: 1, x: 0, y: 0, pts: new Map(), moved: false, tap: 0, busy: false };
+  lbEl = d; const st = lbState = { list, i: 0, s: 1, x: 0, y: 0, pts: new Map(), moved: false, tap: 0, busy: false, W: 360, H: 640, raf: 0 };
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  const bound = () => { const w = (d.clientWidth || 360) * (st.s - 1) / 2, h = (d.clientHeight || 640) * (st.s - 1) / 2; st.x = clamp(st.x, -w, w); st.y = clamp(st.y, -h, h); };
+  // размеры окна запоминаем заранее: чтение размеров на каждом движении пальца тормозило
+  const bound = () => { const w = st.W * (st.s - 1) / 2, h = st.H * (st.s - 1) / 2; st.x = clamp(st.x, -w, w); st.y = clamp(st.y, -h, h); };
   d.onclick = e => {
     if (st.moved) return;
     const b = e.target.closest ? e.target.closest('[data-lb]') : null, k = b && b.dataset.lb;
     if (k === 'p') lbGo(-1); else if (k === 'n') lbGo(1); else if (k === 'x' || e.target === d) closeLb();
   };
   d.onpointerdown = e => {
-    if (e.target.closest && e.target.closest('[data-lb]')) return;
+    if (e.target.closest && e.target.closest('[data-lb]')) { st.moved = false; return; } // иначе после свайпа или увеличения кнопки «Закрыть», «‹», «›» не срабатывали
     st.pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); st.moved = false;
     if (st.pts.size === 2) { const [a, b] = Array.from(st.pts.values()); st.d0 = lbDist(a, b) || 1; st.s0 = st.s; }
     else { st.sx = e.clientX; st.sy = e.clientY; st.x0 = st.x; st.y0 = st.y; }
   };
   d.onpointermove = e => {
     if (!st.pts.has(e.pointerId) || st.busy) return; st.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (st.pts.size >= 2) { const [a, b] = Array.from(st.pts.values()); st.s = clamp(st.s0 * lbDist(a, b) / st.d0, 1, 5); st.moved = true; if (st.s === 1) { st.x = 0; st.y = 0; } bound(); lbApply(); return; }
+    if (st.pts.size >= 2) { const [a, b] = Array.from(st.pts.values()); st.s = clamp(st.s0 * lbDist(a, b) / st.d0, 1, 5); st.moved = true; if (st.s === 1) { st.x = 0; st.y = 0; } bound(); lbApplyRaf(); return; }
     const dx = e.clientX - st.sx, dy = e.clientY - st.sy; if (Math.abs(dx) + Math.abs(dy) > 8) st.moved = true;
     if (st.s > 1) { st.x = st.x0 + dx; st.y = st.y0 + dy; bound(); } else st.x = dx;
-    lbApply();
+    lbApplyRaf();
   };
   const up = e => {
     if (!st.pts.has(e.pointerId)) return; st.pts.delete(e.pointerId);
@@ -2540,8 +2562,8 @@ function openLb(list, i) {
     if (st.s === 1) { if (Math.abs(st.x) > 60 && st.list.length > 1) lbGo(st.x < 0 ? 1 : -1); else { lbAnim(150); st.x = 0; lbApply(); setTimeout(() => lbAnim(0), 160); } }
   };
   d.onpointerup = up; d.onpointercancel = up;
-  d.onwheel = e => { e.preventDefault(); st.s = clamp(st.s * (e.deltaY < 0 ? 1.18 : 0.85), 1, 5); if (st.s === 1) { st.x = 0; st.y = 0; } bound(); lbApply(); };
-  $('#layer').appendChild(d); lbShow(i || 0);
+  d.onwheel = e => { e.preventDefault(); st.s = clamp(st.s * (e.deltaY < 0 ? 1.18 : 0.85), 1, 5); if (st.s === 1) { st.x = 0; st.y = 0; } bound(); lbApplyRaf(); };
+  $('#layer').appendChild(d); st.W = d.clientWidth || 360; st.H = d.clientHeight || 640; lbShow(i || 0);
 }
 async function fillEstimate() {
   const el = $('#stEst'); if (!el) return;
@@ -2608,6 +2630,7 @@ const ACT = {
   serOpen: t => { if (lp.fired) { lp.fired = false; return; } Object.assign(S.set.f, { q: '', years: [], genres: [], platforms: [], series: [t.dataset.name], collections: [], props: [], mainPlats: [], addedFrom: '', addedTo: '', seriesMode: '', maxTime: 0, done: '', minRating: 0 }); saveSet(); S.tab = 'library'; render(); },
   serMenu: (t, e) => { e.stopPropagation(); serMenu(t.dataset.name); },
   collMode: t => { S.set.f.collMode = t.dataset.v; saveSet(); $$('[data-act="collMode"]').forEach(b => b.classList.toggle('on', b.dataset.v === t.dataset.v)); renderLibrary(); },
+  toggleWrap: () => { S.set.textWrap = S.set.textWrap === 'scroll' ? 'wrap' : 'scroll'; saveSet(); renderLibrary(); },
   toggleView: () => { S.set.view = S.set.view === 'grid' ? 'list' : S.set.view === 'list' ? 'text' : 'grid'; saveSet(); renderLibrary(); },
   openFilters: () => openFilters(), openCols: () => openCols(),
   colToggle: t => { const c = S.set.cols; c[t.dataset.k] = c[t.dataset.k] ? 0 : 1; saveSet(); openCols(); renderLibrary(); },
@@ -2719,7 +2742,7 @@ const ACT = {
     const sv = saved.find(x => 's:' + x.id === r); if (sv) applyFilterSet(sv.f);
   },
   clearMaxTime: () => { S.set.f.maxTime = 0; saveSet(); libRefilter(); if (sheetEl) openFilters(); },
-  pickNext: () => { S.nextSeen = new Set(); showNext(); },
+  pickNext: () => { S.nx = null; S.nxOpen = false; showNext(); },
   setSeriesMode: t => { S.set.f.seriesMode = t.dataset.v || ''; saveSet(); libRefilter(); if (sheetEl) openFilters(); },
   tcolToggle: t => { const tc = S.set.tcols = textCols(); tc[t.dataset.k] = tc[t.dataset.k] ? 0 : 1; saveSet(); openCols(); renderLibrary(); },
   groupOff: () => { S.set.group = ''; saveSet(); renderLibrary(); },
@@ -2855,6 +2878,7 @@ const ACT = {
     e.stopPropagation(); const sh = S.sheet; if (!sh || !await confirmBox('Удалить скриншот из базы?', 'Удалить')) return;
     const gid = sh.draft.id, list = await getShots(gid); list.splice(+t.dataset.i, 1); await putShots(gid, list); drawShots();
   },
+  shotRetry: t => { const w = t.closest('.shw'), im = w && w.querySelector('img'); if (!im) return; w.classList.remove('er'); const u = im.getAttribute('src') || ''; im.setAttribute('src', u.replace(/([?&])r=\d+&?/, '$1').replace(/[?&]$/, '') + (u.includes('?') ? '&' : '?') + 'r=' + Date.now()); },
   shot: t => { const g = t.dataset.g, i = +t.dataset.i || 0; if (g === 'local') openLb(S.shotUrls, i); else if (g === 'igdb') openLb(S.igdbShots, i); else openLb([t.dataset.full], 0); },
   listOpen: t => { S.inboxList = t.dataset.id; render(); $('#view').scrollTop = 0; },
   listBack: () => { S.inboxList = null; render(); },
@@ -2893,6 +2917,7 @@ const ACT = {
   propDel: async t => { if (!await confirmBox('Удалить свойство и его значения у всех игр?', 'Удалить')) return; const id = t.dataset.id; S.props = S.props.filter(p => p.id !== id); await DB.del('props', id); for (const g of S.games) if (g.props && id in g.props) { delete g.props[id]; await saveGame(g); } S.set.f.props = S.set.f.props.filter(x => x !== id); saveSet(); render(); },
   install: async () => { if (installEvt) { installEvt.prompt(); installEvt = null; render(); } },
   guideOpen: () => openGuide(),
+  srvZip: () => downloadServerZip(),
   syncAuto: () => { S.set.sync.auto = !S.set.sync.auto; saveSet(); render(); if (S.set.sync.auto) syncSoon(500); },
   syncSave: async () => {
     const y = S.set.sync; y.url = normUrl(($('#syUrl') || {}).value); y.token = (($('#syTok') || {}).value || '').trim();
@@ -3003,6 +3028,9 @@ window.__GC = { syncNow, SY, DB, reloadData, nextPool, PRESETS, applyFilterSet, 
 (async () => {
   try {
     await loadAll();
+    document.addEventListener('load', e => { const i = e.target, w = i && i.tagName === 'IMG' && i.closest && i.closest('.shw'); if (w) { w.classList.add('ld'); w.classList.remove('er'); } }, true); // у картинок событие load не всплывает, ловим на этапе перехвата
+    document.addEventListener('error', e => { const i = e.target, w = i && i.tagName === 'IMG' && i.closest && i.closest('.shw'); if (w) w.classList.add('er'); }, true);
+    window.addEventListener('resize', () => { if (lbState && lbEl) { lbState.W = lbEl.clientWidth || 360; lbState.H = lbEl.clientHeight || 640; } });
     document.addEventListener('toggle', e => { const d = e.target; if (d && d.dataset && d.dataset.g) S.gopen[d.dataset.g] = d.open; }, true); // раскрытые группы настроек
     detectLocalServer().then(() => syncSoon(1500));
     document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - SY.last > 30000) syncSoon(800); });

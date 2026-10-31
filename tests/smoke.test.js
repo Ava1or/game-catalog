@@ -168,6 +168,8 @@ const L = require('../www/app.js');
     { S.set.group = 'year'; G.ACT.resetF(); if (S.set.group) throw new Error('«Сбросить» должен убирать и группировку');
       const tx = G.textHtml([{ t: 'g', g: Object.assign({}, S.games[0], { year: 2020, platforms: ['PlayStation 4'], time: 12 }), x: false }], 1);
       if (!tx.includes('class="ty">2020') || !tx.includes('class="tp">') || !tx.includes('class="tt">')) throw new Error('текстовый вид: год, платформы, время'); }
+    { const items = S.games.slice(0, 3).map(g => ({ t: 'g', g: Object.assign({}, g, { year: 2020, platforms: ['PlayStation 4'], time: 12.5 }), x: false })), lines = G.textLines(items).split('\n').filter(Boolean);
+      if (lines.length !== 3 || !/ \(2020 \| .+\)/.test(lines[0]) || !lines[0].includes('12,5 ч')) throw new Error('выгрузка текстового вида: ' + lines[0]); }
     G.ACT.openFilters(); G.ACT.collChip({ dataset: { id: 'c1' } }); G.ACT.rmF({ dataset: { k: 'collections', v: 'c1' } }); if (S.set.f.collections.includes('c1')) throw new Error('rmF collections');
     G.ACT.collClear(); if (S.set.f.collections.length) throw new Error('collClear');
     if (G.collTilesHtml().includes('⋮') || !G.collTilesHtml().includes('data-lpm="coll"') || !G.seriesTilesHtml().includes('data-lpm="ser"')) throw new Error('long tap markup');

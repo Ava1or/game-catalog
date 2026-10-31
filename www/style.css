@@ -594,3 +594,25 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .tl .tp{color:var(--mut)}
 .tl .tt{color:var(--ttm)}
 .tl.sel,.tl.isdone.sel,.tl.sel.last,.tl.isdone.sel.last{background:rgba(79,140,255,.30)}
+
+/* текстовый вид: текст выделяется мышью как обычный; кнопка выгрузки в файл */
+.tlist,.tlist .tl,.tlist .tl *{-webkit-user-select:text;user-select:text}
+.tlist .tl{cursor:default}
+.tbar{display:flex;justify-content:flex-end;padding:0 2px 6px}
+.tbar .p{padding:5px 12px;font-size:13px}
+/* «Что играть»: кнопки как переключатели скриншотов */
+.nxbar{display:flex;justify-content:center;gap:12px;margin-top:14px}
+.nxb{width:56px;height:48px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);color:var(--tx);font-size:26px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0}
+.nxb.acc{background:var(--acc);border-color:var(--acc);color:#fff}
+.nxb:disabled{opacity:.35}
+
+/* полосы прокрутки в цвет темы (веб-версия на компьютере); на телефоне полосы системные и тонкие */
+:root,:root[data-theme="dark"]{color-scheme:dark;--sbt:#3b3b46;--sbh:#5a5a69}
+:root[data-theme="light"]{color-scheme:light;--sbt:#c4c5cd;--sbh:#9b9ca8}
+*{scrollbar-width:thin;scrollbar-color:var(--sbt) transparent}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--sbt);border-radius:8px;border:2px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:var(--sbh);background-clip:content-box}
+::-webkit-scrollbar-corner{background:transparent}
+::-webkit-scrollbar-button{display:none}

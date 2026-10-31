@@ -1088,9 +1088,19 @@ function listHtml(items, total) {
   return h + '</tbody></table></div><div class="status">' + statusTxt(total || ents.filter(e => e.t === 'g').length) + '</div>';
 }
 // третий вид: только текст, по строке на игру: «Название (год | платформы) – время»
+// строки текстового вида одним текстом (для выгрузки в файл): те же колонки, что на экране
+function textLines(items) {
+  const tc = textCols(), lines = [];
+  normEnt(items).forEach(e => {
+    if (e.t === 'h') { lines.push('', e.text + ' (' + e.n + ')'); return; }
+    const g = e.g, yr = tc.year && g.year ? g.year : '', pl = tc.platforms && (g.platforms || []).length ? g.platforms.map(shortPlat).join(', ') : '';
+    lines.push((tc.done && g.done ? '✓ ' : '') + (tc.main && e.x ? '* ' : '') + g.name + (yr || pl ? ' (' + [yr, pl].filter(Boolean).join(' | ') + ')' : '') + (tc.time && g.time ? ' – ' + (LANG === 'en' ? String(g.time) : String(g.time).replace('.', ',')) + ' ч' : ''));
+  });
+  return lines.join('\n').replace(/^\n/, '') + '\n';
+}
 function textHtml(items, total) {
   const ents = normEnt(items), tc = textCols();
-  let h = '<div class="tlist ' + (S.set.textWrap === 'scroll' ? 'sc' : 'wr') + '">';
+  let h = '<div class="tbar"><button class="p" data-act="textFile">⬇ Выгрузить в файл</button></div><div class="tlist ' + (S.set.textWrap === 'scroll' ? 'sc' : 'wr') + '">';
   ents.forEach(e => {
     if (e.t === 'h') { h += '<div class="gh l' + e.lvl + '">' + esc(e.text) + '<b>' + e.n + '</b></div>'; return; }
     const g = e.g, yr = tc.year && g.year ? g.year : '', pl = tc.platforms && (g.platforms || []).length ? g.platforms.map(shortPlat).join(', ') : '';
@@ -1331,7 +1341,7 @@ function showNext(dir) {
   const src = coverSrc(g), mp = mainOf(g), fresh = !(S.nxOpen && modalEl && modalEl.querySelector('.nxt')), m = fresh ? openModal() : modalEl.querySelector('.modal');
   S.nxOpen = true; modalCancel = () => { S.nxOpen = false; closeModal(); }; m.style.touchAction = 'pan-y';
   m.innerHTML = '<h4>Что играть дальше<span class="nxcnt">' + (nx.i + 1) + ' из ' + pool.length + '</span></h4><div class="nxt' + (dir ? (dir < 0 ? ' inr' : ' inl') : '') + '"><div class="nxc' + (src ? '' : ' nocover') + '" data-cvid="' + g.id + '"' + (src ? ' style="background-image:url(\'' + bgu(src) + '\')"' : '') + '></div><div class="nxi"><div class="nxn">' + esc(g.name) + '</div><div class="sub">' + esc([g.year || '', mp ? shortPlat(mp) : '', g.time ? g.time + ' ч' : ''].filter(Boolean).join(' · ')) + '</div>' + (g.series ? '<div class="sub">Серия: ' + esc(g.series) + '</div>' : '') + (g.genres && g.genres.length ? '<div class="sub">' + esc(g.genres.slice(0, 3).join(', ')) + '</div>' : '') + '</div></div>'
-    + '<p class="sub" style="margin:10px 0 0">Свайп влево: другая игра, вправо: предыдущая. Берутся только непройденные игры из текущего списка (не из серий).</p><div class="acts"><span data-x="close">Закрыть</span>' + (nx.i > 0 ? '<span data-x="prev">‹ Назад</span>' : '') + '<span data-x="again">Ещё вариант</span><span data-x="open">Открыть</span></div>';
+    + '<p class="sub" style="margin:10px 0 0">Свайп влево: другая игра, вправо: предыдущая. Берутся только непройденные игры из текущего списка (не из серий).</p><div class="nxbar"><button class="nxb" data-x="close" title="Закрыть" aria-label="Закрыть">✕</button><button class="nxb" data-x="prev" title="Назад" aria-label="Назад"' + (nx.i > 0 ? '' : ' disabled') + '>‹</button><button class="nxb" data-x="again" title="Ещё вариант" aria-label="Ещё вариант">›</button><button class="nxb acc" data-x="open" title="Открыть" aria-label="Открыть">↗</button></div>';
   m.onclick = e => { const x = e.target.closest('[data-x]'); if (!x) return; const a = x.dataset.x; if (a === 'again') return showNext(1); if (a === 'prev') return showNext(-1); S.nxOpen = false; closeModal(); if (a === 'open') openGameSheet(g.id); };
   m.onpointerdown = e => { m._sx = e.clientX; m._sy = e.clientY; };
   m.onpointerup = e => { const dx = e.clientX - m._sx, dy = e.clientY - m._sy; if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) showNext(dx < 0 ? 1 : -1); };
@@ -2605,6 +2615,11 @@ const ACT = {
     if (isNative() && FS && SH) { try { const r = await FS.writeFile({ path: name, data: text, directory: 'CACHE', encoding: 'utf8' }); await SH.share({ title: 'Список игр', url: r.uri, dialogTitle: 'Сохранить список' }); } catch (er) { toast('Не удалось поделиться: ' + (er.message || er)); } return; }
     dl(name, new Blob([text], { type: csv ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8' }));
   },
+  textFile: async () => { // весь текущий список текстом в файл (на телефоне через «Поделиться»)
+    const text = textLines(S.entries || []), name = 'spisok-igr-' + new Date().toISOString().slice(0, 10) + '.txt', FS = plug('Filesystem'), SH = plug('Share');
+    if (isNative() && FS && SH) { try { const r = await FS.writeFile({ path: name, data: text, directory: 'CACHE', encoding: 'utf8' }); await SH.share({ title: 'Список игр', url: r.uri, dialogTitle: 'Сохранить список' }); } catch (er) { toast('Не удалось поделиться: ' + (er.message || er)); } return; }
+    dl(name, new Blob([text], { type: 'text/plain;charset=utf-8' }));
+  },
   shareGame: async () => {
     const d = S.sheet && S.sheet.draft; if (!d || !d.name) return toast('Сначала введите название');
     const text = gameLine(d), SH = plug('Share');
@@ -2645,7 +2660,7 @@ const ACT = {
   resetF: () => { const f = S.set.f; Object.assign(f, { q: '', years: [], genres: [], platforms: [], series: [], collections: [], props: [], mainPlats: [], addedFrom: '', addedTo: '', seriesMode: '', maxTime: 0, done: '', minRating: 0 }); const hadGroup = !!S.set.group; S.set.group = ''; saveSet(); const q = $('#q'); if (q) q.value = ''; if (hadGroup) renderLibrary(); else libRefilter(); if (sheetEl) openFilters(); }, // «Сбросить» убирает все плашки, в том числе группировку
   selToggle: () => { S.selMode = !S.selMode; S.sel.clear(); renderLibrary(); $('#fab').classList.toggle('hidden', S.selMode); },
   selAct: t => selectionAction(t.dataset.m),
-  openGame: (t) => { if (lp.fired) { lp.fired = false; return; } const id = t.dataset.gid; if (S.selMode) toggleSel(id); else openGameSheet(id); },
+  openGame: (t) => { if (!S.selMode && t.closest('.tlist') && typeof getSelection === 'function' && String(getSelection()).trim()) return; /* выделяли текст мышью: игру не открываем */ if (lp.fired) { lp.fired = false; return; } const id = t.dataset.gid; if (S.selMode) toggleSel(id); else openGameSheet(id); },
   openGameFromIgdb: t => { closeSheet(); openGameSheet(t.dataset.id); },
   pickCover: () => $('#coverFile').click(),
   shColl: t => { markDirty(); const d = S.sheet.draft, i = d.collections.indexOf(t.dataset.id); i < 0 ? d.collections.push(t.dataset.id) : d.collections.splice(i, 1); drawShColls(); },
@@ -2965,13 +2980,14 @@ function lpFire(c) {
   if (c.dataset.lpm === 'item') toggleInSel(c.dataset.iid, true); else if (c.dataset.lpm === 'coll') collMenu(c.dataset.id); else if (c.dataset.lpm === 'ser') serMenu(c.dataset.name); else toggleSel(c.dataset.gid, true);
 }
 document.addEventListener('pointerdown', e => {
-  lp.fired = false; clearTimeout(lp.t); const c = lpTarget(e.target); if (!c) return;
+  lp.fired = false; clearTimeout(lp.t); if (e.pointerType === 'mouse' && e.target.closest && e.target.closest('.tlist')) return; /* мышью в тексте выделяют, а не включают режим выбора */ const c = lpTarget(e.target); if (!c) return;
   lp.x = e.clientX; lp.y = e.clientY; lp.t = setTimeout(() => lpFire(c), 500);
 });
 document.addEventListener('pointermove', e => { if (Math.abs(e.clientX - lp.x) + Math.abs(e.clientY - lp.y) > 12) clearTimeout(lp.t); }, true);
 document.addEventListener('pointerup', () => { clearTimeout(lp.t); setTimeout(() => { lp.fired = false; }, 450); }, true);
 document.addEventListener('scroll', () => clearTimeout(lp.t), true);
 document.addEventListener('contextmenu', e => {
+  if (e.target.closest && e.target.closest('.tlist') && !S.selMode) return; // в тексте обычное контекстное меню (копировать)
   if (e.target.closest && e.target.closest('.card, .tile, .lrow, tr[data-gid]')) e.preventDefault();
   if (e.target.closest) lpFire(lpTarget(e.target));
 });
@@ -3030,7 +3046,7 @@ function applyTheme() {
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
   const m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', dark ? '#0b0b0d' : '#f2f3f6');
 }
-window.__GC = { syncNow, SY, DB, reloadData, nextPool, PRESETS, applyFilterSet, withSeries, buildEntries, groupGames, textHtml, listHtml, cardHtml, noPlatSect, openYoutube, canonPlat, canonGenre, canonAll, dictMerge, dictRename, dictRewrite, openDict, mergeGroups, openMergeCompare, applyMerge, mgBase, renderKeep, toggleInSel, handleShared, applyExtra, addParsed, openExport, exportText, copyText, gameLine, zipBuild, zipRead, shotStats, delShots, rawgQuotaTick, refreshOne, rawg, requirePlatform, effItem, applyDefaults, linkItem, pickPlatform, itemOpts, viewInbox, mainOf, NO_MAIN, askMainPlatform, quickTap, bulkMore, openAddCollSheet, openLb, libToolsHtml: () => { renderLibHead(); return $('#libTools').innerHTML; }, filterGames, getShots, putShots, collTilesHtml, seriesTilesHtml, viewCollections, viewSeries, DONE_ID, autoResolve, viewStats, restoreGames, removeGame, canonSeries, findDupes, mergeAllDupes, collectSheet, persistDraft, closeSheet, S, ACT, bump, igdb, hltbFind, sgdbAuto, openSgdb, applyTheme, colsFor, usageHtml, serMenu, viewInbox, addItems, linkItem, createList, pendingItem, render, runSearch, addFromIgdb, importData, openIgdbSheet, openGameSheet, openFilters, openCols, selectionAction, loadAll, renderSearchBody };
+window.__GC = { textLines, syncNow, SY, DB, reloadData, nextPool, PRESETS, applyFilterSet, withSeries, buildEntries, groupGames, textHtml, listHtml, cardHtml, noPlatSect, openYoutube, canonPlat, canonGenre, canonAll, dictMerge, dictRename, dictRewrite, openDict, mergeGroups, openMergeCompare, applyMerge, mgBase, renderKeep, toggleInSel, handleShared, applyExtra, addParsed, openExport, exportText, copyText, gameLine, zipBuild, zipRead, shotStats, delShots, rawgQuotaTick, refreshOne, rawg, requirePlatform, effItem, applyDefaults, linkItem, pickPlatform, itemOpts, viewInbox, mainOf, NO_MAIN, askMainPlatform, quickTap, bulkMore, openAddCollSheet, openLb, libToolsHtml: () => { renderLibHead(); return $('#libTools').innerHTML; }, filterGames, getShots, putShots, collTilesHtml, seriesTilesHtml, viewCollections, viewSeries, DONE_ID, autoResolve, viewStats, restoreGames, removeGame, canonSeries, findDupes, mergeAllDupes, collectSheet, persistDraft, closeSheet, S, ACT, bump, igdb, hltbFind, sgdbAuto, openSgdb, applyTheme, colsFor, usageHtml, serMenu, viewInbox, addItems, linkItem, createList, pendingItem, render, runSearch, addFromIgdb, importData, openIgdbSheet, openGameSheet, openFilters, openCols, selectionAction, loadAll, renderSearchBody };
 (async () => {
   try {
     await loadAll();

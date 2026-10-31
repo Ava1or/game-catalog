@@ -1,0 +1,126 @@
+<h3>What this is and why you need it</h3>
+<p>Right now the catalog is stored only on the device where you use it: your phone does not know what you added on the computer, and the other way round. To keep the data the same everywhere, a small program, the <b>server</b>, runs on a computer. It is just a “smart shared folder”: your phone and other computers come to it, leave their changes and pick up the others'.</p>
+<ul>
+<li>Everything works <b>only inside your home network</b> (over your Wi-Fi). Your data never goes out to the internet.</li>
+<li>Without internet and without the server the app keeps working; the exchange simply does not happen. As soon as the server is reachable, the data evens out by itself.</li>
+<li>The computer that runs the server must be turned on at the moment of the exchange.</li>
+</ul>
+<div class="note"><b>What you need:</b> a computer with Windows 10 or 11, home Wi-Fi (the phone and the computer connected to the same one), and about 20 minutes. You do not need to know much about computers: just repeat the steps in order.</div>
+
+<h3>Step 1. Download the archive and extract it</h3>
+<ol>
+<li>Get the archive <code>game-catalog-server-en.zip</code>. The easiest way: it is already <b>inside the app on your phone</b>. Tap the <b>“Download the server archive”</b> button (it is at the very top of this guide and in the sync settings). The “Share” menu opens: send the archive to your computer, for example through Google Drive, email or “Saved Messages” in Telegram, or with “Nearby Share”. On the computer, open the message you received and download the file; it usually lands in the “Downloads” folder. In a browser on a computer, the same button downloads the file right away.</li>
+<li>Right-click the file and choose “Properties”. If there is an “Unblock” checkbox at the bottom of the window, tick it and click “OK”. (If there is no such checkbox, that is fine.) This reduces Windows warnings later.</li>
+<li>Right-click the archive again and choose <b>“Extract All…”</b> (in Windows 11 it may be hidden under “Show more options”).</li>
+<li>In the window that opens, click “Browse…”, choose drive <code>C:</code> and create a new folder named <code>GameCatalog</code>. Click “Extract”.</li>
+<li>The folder <code>C:\GameCatalog</code> opens. It contains files with numbers at the beginning of their names: <b>“1. Install Node.js”</b>, <b>“2. Start server”</b> and others.</li>
+</ol>
+<div class="warn"><b>Important:</b> do not run files straight from the archive (by double-clicking the zip file). Always “Extract All” first. And do not delete the <code>GameCatalog</code> folder later: your data will be stored in it.</div>
+
+<h3>Step 2. Install Node.js (once)</h3>
+<p>Node.js is a free program the server needs in order to work. The easiest way to check whether it is installed is step 3: if it is not, the window will tell you. So you can go straight to step 3 and come back here if you see the message “Node.js was not found”.</p>
+<h4>Option A (easier)</h4>
+<ol>
+<li>In the <code>GameCatalog</code> folder, double-click the file <b>“1. Install Node.js”</b>.</li>
+<li>A black window opens and the installation runs. If Windows asks for permission, click “Yes”. Wait for the message that everything is ready and close the window.</li>
+</ol>
+<h4>Option B (if option A did not work)</h4>
+<ol>
+<li>Open the website <code>nodejs.org</code> in a browser.</li>
+<li>Click the big button labeled <b>LTS</b> (next to it it says “Recommended For Most Users”). The installer downloads.</li>
+<li>Run the downloaded file. In every window just click “Next” without changing anything, then “Install” and “Finish” at the end. If Windows asks for permission, click “Yes”.</li>
+</ol>
+<div class="note">After installing Node.js, close all black windows if any are open and go on to step 3.</div>
+
+<h3>Step 3. Start the server for the first time</h3>
+<ol>
+<li>Double-click the file <b>“2. Start server”</b>.</li>
+<li>If Windows shows a blue window “Windows protected your PC”, click <b>“More info”</b> and then <b>“Run anyway”</b>. The file is safe: it is an ordinary text script that you can open in Notepad and read.</li>
+<li>A black window appears with a frame “GAME CATALOG: your server”. Two important things are in it:
+<ul>
+<li>The <b>address</b>, similar to <code>http://192.168.0.15:8787</code>: where to connect from the phone;</li>
+<li>The <b>access code</b>, similar to <code>k4m9x-p7w2h</code>: a “password” you enter once in the app.</li>
+</ul></li>
+<li>If Windows shows the window “Windows Defender Firewall has blocked some features…”, tick <b>“Private networks”</b> (you do not need to tick “Public networks”) and click <b>“Allow access”</b>. This lets the phone reach the computer.</li>
+<li><b>Do not close this black window</b> while you use sync: if you close the window, the server stops. You can minimize it. (Step 7 explains how to make the server start by itself when the computer is turned on.)</li>
+</ol>
+<div class="note">If the firewall window did not appear and the phone cannot connect later, run the file <b>“3. Allow network access”</b>: <b>right-click</b> it and choose <b>“Run as administrator”</b>. Once is enough, you will not need it again.</div>
+<p>If you forgot the address or the code, double-click <b>“4. Show address and code”</b>: the window will show them again. The code is also written in the file <code>config.json</code> (you can open it with Notepad).</p>
+
+<h3>Step 4. Open the catalog on this computer</h3>
+<ol>
+<li>On the computer, open any browser (Chrome, Edge, Firefox) and type in the address bar: <code>http://localhost:8787</code>. Your catalog opens, but it is empty for now.</li>
+<li>If you already have data somewhere else (for example, in the version on another website or in another browser), first make a full backup there (Settings → “Data and backups” → export), and here, in the same section, import that file.</li>
+<li>Open <b>Settings → “Sync and own server”</b>. The server address is already filled in. Enter the <b>access code</b> from the black window and click <b>“Save and test the connection”</b>. “Connection OK ✓” should appear.</li>
+<li>Click <b>“Synchronize now”</b>. The data of this computer has been written to the server.</li>
+</ol>
+<div class="warn"><b>A common mistake:</b> do not enter your server address in the version of the app on an internet website (an address like <code>…github.io</code>). The browser forbids such pages to contact addresses like <code>http://192.168…</code>. On the computer use the address <code>http://localhost:8787</code>, on the phone use the Android app.</div>
+
+<h3>Step 5. Connect the phone</h3>
+<ol>
+<li>The phone must be connected to the <b>same Wi-Fi</b> as the computer (not to mobile internet and not to a “guest” network).</li>
+<li>Open the “Game Catalog” app on the phone → <b>Settings → “Sync and own server”</b>.</li>
+<li>In the “Server address” field enter the address from the black window, in full, with <code>http://</code> and <code>:8787</code> (for example, <code>http://192.168.0.15:8787</code>). Be careful with the dots and digits.</li>
+<li>In the “Access code” field enter the code from the black window.</li>
+<li>Tap <b>“Save and test the connection”</b>, then <b>“Synchronize now”</b>. After a few seconds the games from the computer appear on the phone. Covers and screenshots come along with the games; with a big database the first time can take a couple of minutes.</li>
+</ol>
+<div class="note">Tip: if you are not sure the address is right, open it in the phone's browser. The catalog page should open. If it did, the network is fine.</div>
+
+<h3>How it works from now on</h3>
+<ul>
+<li>“Synchronize automatically” is on by default: the exchange happens when the app starts, when you return to it, a few seconds after your changes, and every couple of minutes while the app is open. The “Synchronize now” button does it immediately.</li>
+<li>You add a game on the phone: it appears on the computer, and vice versa. Deletions, edits, collections, series, custom properties, the Inbox, covers, screenshots and the shared lists of platforms and genres: everything is transferred.</li>
+<li>If the same game was changed on two devices before an exchange, the <b>later edit</b> is kept (as a whole). So it is better for the devices to exchange often, and for their clocks to be right (the app aligns them with the server by itself).</li>
+<li>The “Delete all data” button in the “Danger zone” clears <b>only this device</b>. The copy on the server stays, and at the next sync everything comes back. This is handy if you need to “start over” on a device.</li>
+<li>Personal settings (filters, view, keys, zoom) stay separate on each device.</li>
+</ul>
+
+<h3>Step 6. Connect a second computer (optional)</h3>
+<p>On another computer on the same network, open the server address in a browser, for example <code>http://192.168.0.15:8787</code>. The same catalog opens. Go to “Settings → Sync and own server”, enter the access code and click “Save and test the connection”. The data is pulled in. As long as the server is on, everything works.</p>
+
+<h3>Step 7. Make the server start by itself</h3>
+<p>So that you do not have to start the server by hand every time, double-click the file <b>“5. Enable autostart”</b>. After that the server starts by itself when you sign in to Windows (in a minimized window). You can undo it with the file <b>“6. Disable autostart”</b>. If you move the <code>GameCatalog</code> folder, run “5. Enable autostart” again.</p>
+
+<h3>A permanent address</h3>
+<p>The computer's address on the network, like <code>192.168.0.15</code>, sometimes changes after the router restarts. If the app suddenly stops finding the server, open “4. Show address and code”, check whether the address changed and enter the new one in the app. To make the address never change, find “IP address reservation” (or “DHCP: static addresses”, “MAC binding”) in the router settings and fix the address for this computer. How to do it depends on the router model. You can find it on the internet by searching for “ip address reservation” and the router model.</p>
+
+<h3>Where the data is, how to make a backup</h3>
+<ul>
+<li>All the server's data is in the folder <code>GameCatalog\data</code>: the file <code>db.json</code> and the folder <code>blobs</code> (covers and screenshots).</li>
+<li><b>To make a backup</b>, copy the <code>data</code> folder to a flash drive or the cloud. Once a day the server itself puts a copy of <code>db.json</code> into <code>data\backup</code> (the last 14 are kept).</li>
+<li>Also make a backup inside the app (export to a file): it is an independent safety net.</li>
+</ul>
+
+<h3>IGDB keys on the server (optional)</h3>
+<p>The web version cannot contact IGDB directly. The server can do it for it. To enable this: stop the server (close the black window), open the file <code>config.json</code> in Notepad (right-click → “Open with” → “Notepad”), put your keys between the quotes in the lines <code>igdbClientId</code> and <code>igdbClientSecret</code>, save the file and start the server again. After the next sync, IGDB search works in the app on any device, and you do not need to enter the keys in the app itself.</p>
+
+<h3>How to update the app on the server</h3>
+<ol>
+<li>Close the black server window.</li>
+<li>Download and extract the new archive into any other folder.</li>
+<li>Copy the <code>www</code> folder and the file <code>server.mjs</code> from the new archive into <code>C:\GameCatalog</code>, replacing the old ones. <b>Do not touch the <code>data</code> folder and the file <code>config.json</code></b>: they hold your data and your access code.</li>
+<li>Start “2. Start server”. If the browser still shows the old version, press Ctrl+F5.</li>
+</ol>
+
+<h3>If something does not work</h3>
+<table>
+<tr><th>What you see</th><th>What to do</th></tr>
+<tr><td>“No connection to the server”</td><td>1) Is the server running? The black window must be open. 2) Are the phone and the computer on the same Wi-Fi? Turn off mobile data and VPN on the phone. 3) Is the address typed exactly, with <code>http://</code> and <code>:8787</code>? Compare with “4. Show address and code”. 4) Run “3. Allow network access” as administrator.</td></tr>
+<tr><td>The address opens on the computer but not on the phone</td><td>Almost always the firewall is to blame: do item 4 above. Also in Windows go to Settings → Network &amp; internet → Wi-Fi → your network and choose the network type <b>“Private”</b>, not “Public”.</td></tr>
+<tr><td>“Wrong access code”</td><td>Type the code without spaces, with the hyphen in the middle. “4. Show address and code” shows it.</td></tr>
+<tr><td>“Too many wrong attempts”</td><td>Wait 10 minutes or restart the server, then enter the correct code.</td></tr>
+<tr><td>“Port 8787 is already in use”</td><td>The server is already running in another window. Close the extra window. Or change the <code>port</code> number in <code>config.json</code> (then use the new number both in the address and in the firewall rule).</td></tr>
+<tr><td>The server window closed right away</td><td>Start “2. Start server” again and read the message: most often it is “Node.js was not found”, then do step 2.</td></tr>
+<tr><td>The antivirus complains</td><td>The server downloads nothing and sends nothing to the internet (except to IGDB, if you set the keys). If your antivirus has its own firewall, allow incoming connections for Node.js on the private network.</td></tr>
+<tr><td>New features are not visible after an update</td><td>Press Ctrl+F5 in the browser; on the phone update the app to the new version.</td></tr>
+</table>
+
+<h3>Security</h3>
+<ul>
+<li>The server is reachable only inside your home network. <b>Do not forward the port on the router to the internet</b> and do not use this scheme away from home: that needs a different setup (encryption).</li>
+<li>Data goes over the home network without encryption. That is normal for your own network, but do not connect the server on public networks (cafes, hotels).</li>
+<li>The access code works like a password: do not share it. To change the code, stop the server, delete the <code>"token"</code> line from <code>config.json</code> (or the whole file), and start the server: a new code appears. Then enter it on your devices.</li>
+</ul>
+
+<h3>How to remove everything</h3>
+<p>Run “6. Disable autostart”, close the black window and delete the <code>GameCatalog</code> folder. If you want to keep the data, copy the <code>data</code> folder first. In the app, tap “Disconnect the server” in the sync settings.</p>

@@ -164,6 +164,9 @@ const L = require('../www/app.js');
     const h = G.libToolsHtml(); if (h.includes('openColls')) throw new Error('кнопки «Коллекции» на панели быть не должно: коллекции есть в фильтрах'); if (!h.includes('cnt')) throw new Error('no counter on filters button');
     { S.set.textWrap = 'wrap'; const a = G.textHtml(S.games.slice(0, 3).map(g => ({ t: 'g', g, x: false })), 3), b = (S.set.textWrap = 'scroll', G.textHtml(S.games.slice(0, 3).map(g => ({ t: 'g', g, x: false })), 3)); S.set.textWrap = 'wrap';
       if (!a.includes('tlist wr') || !b.includes('tlist sc') || !a.includes('class="tx"><span class="tn">')) throw new Error('текстовый вид: режимы и разметка'); }
+    { S.set.group = 'year'; G.ACT.resetF(); if (S.set.group) throw new Error('«Сбросить» должен убирать и группировку');
+      const tx = G.textHtml([{ t: 'g', g: Object.assign({}, S.games[0], { year: 2020, platforms: ['PlayStation 4'], time: 12 }), x: false }], 1);
+      if (!tx.includes('class="ty">2020') || !tx.includes('class="tp">') || !tx.includes('class="tt">')) throw new Error('текстовый вид: год, платформы, время'); }
     G.ACT.openFilters(); G.ACT.collChip({ dataset: { id: 'c1' } }); G.ACT.rmF({ dataset: { k: 'collections', v: 'c1' } }); if (S.set.f.collections.includes('c1')) throw new Error('rmF collections');
     G.ACT.collClear(); if (S.set.f.collections.length) throw new Error('collClear');
     if (G.collTilesHtml().includes('⋮') || !G.collTilesHtml().includes('data-lpm="coll"') || !G.seriesTilesHtml().includes('data-lpm="ser"')) throw new Error('long tap markup');
@@ -352,7 +355,7 @@ const L = require('../www/app.js');
     const items = [{ t: 'h', text: '2003', n: 1, lvl: 1 }, { t: 'g', g: a, x: false }, { t: 'h', text: '★ Из серий', n: 1, lvl: 2 }, { t: 'g', g: b, x: true }];
     S.set.tcols = { year: 1, platforms: 1, time: 1, done: 1, main: 1 };
     const txt = G.textHtml(items, 1);
-    if (!txt.includes('Silent Hill 3') || !txt.includes('(2003 | PC, PS2)') || !txt.includes('– 9,5 ч') || !txt.includes('class="tl extra') || !txt.includes('<span class="tm">*</span>') || !txt.includes('class="gh l1"')) throw new Error('текстовый вид: ' + txt.slice(0, 400));
+    if (!txt.includes('Silent Hill 3') || !txt.includes('class="ty">2003') || !txt.includes('class="tp">PC, PS2') || !txt.includes('– 9,5 ч') || !txt.includes('class="tl extra') || !txt.includes('<span class="tm">*</span>') || !txt.includes('class="gh l1"')) throw new Error('текстовый вид: ' + txt.slice(0, 400));
     S.set.tcols = { year: 0, platforms: 0, time: 0, done: 0, main: 0 };
     const min = G.textHtml(items, 1); if (min.includes('(2003') || min.includes('– 9,5') || min.includes('class="tm"')) throw new Error('колонки текстового вида не выключаются');
     S.set.tcols = { year: 1, platforms: 1, time: 1, done: 1, main: 1 };

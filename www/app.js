@@ -24,11 +24,14 @@ const DEFAULTS = {
 
 /* ====================== Чистая логика ====================== */
 const DONE_ID = '__done'; // встроенная коллекция «Завершено»: игры с отметкой, хранится не в базе, а считается
-const RESERVED = ['все игры', 'завершено', 'пройдено'];
+const RESERVED = /*i18n:keep*/ ['все игры', 'завершено', 'пройдено', 'all games', 'completed', 'done'] /*i18n:end*/;
 const NO_MAIN = '__none'; // в фильтре: «основная платформа не выбрана»
 // основная платформа: выбранная вручную, а если платформа у игры одна, то она
 const mainOf = g => g.mainPlatform || ((g.platforms || []).length === 1 ? g.platforms[0] : '');
-const gWord = n => { const a = n % 100, b = n % 10; return n + ' ' + (a > 10 && a < 15 ? 'игр' : b === 1 ? 'игра' : b > 1 && b < 5 ? 'игры' : 'игр'); };
+const LANG = 'ru'; // в английской сборке (app.en.js) заменяется на 'en'
+const langPref = () => { try { return localStorage.getItem('gc_lang') || ''; } catch (e) { return ''; } };
+const LOC = LANG === 'en' ? 'en' : 'ru', LOC_DATE = LANG === 'en' ? 'en-GB' : 'ru-RU';
+const gWord = n => { if (LANG === 'en') return n + ' ' + (n === 1 ? 'game' : 'games'); const a = n % 100, b = n % 10; /*i18n:keep*/ return n + ' ' + (a > 10 && a < 15 ? 'игр' : b === 1 ? 'игра' : b > 1 && b < 5 ? 'игры' : 'игр'); /*i18n:end*/ };
 const isPartNo = w => /^\d+$/.test(w) || /^(i|ii|iii|iv|v|vi|vii|viii|ix|x|xi|xii)$/i.test(w);
 function cleanSeries(t) {
   let r = String(t).trim(), again = true;
@@ -120,7 +123,7 @@ function buildEntries(sections, group, dir, isExtra) {
   });
   return { entries, games };
 }
-const COLL_NUM = new Intl.Collator('ru', { numeric: true }), COLL_RU = new Intl.Collator('ru'); // один сортировщик на все сравнения (localeCompare создавал его каждый раз)
+const COLL_NUM = new Intl.Collator(LOC, { numeric: true }), COLL_RU = new Intl.Collator(LOC); // один сортировщик на все сравнения (localeCompare создавал его каждый раз)
 function sortGames(list, f) {
   const k = f.sort, d = f.dir === 'desc' ? -1 : 1;
   const isProp = k.startsWith('prop:');
@@ -189,7 +192,7 @@ function parseCsv(text, delim) {
   return rows;
 }
 const EXPORT_COLS = [['id', 'id'], ['name', 'Название'], ['year', 'Год'], ['platforms', 'Платформы'], ['mainPlatform', 'Основная платформа'], ['genres', 'Жанры'], ['time', 'Время (ч)'], ['rating', 'Рейтинг'], ['series', 'Серия'], ['collections', 'Коллекции'], ['done', 'Завершено'], ['doneDate', 'Дата прохождения'], ['igdbId', 'IGDB id'], ['rawgId', 'RAWG id']];
-const HEAD_NAMES = { id: ['id', 'код'], name: ['название', 'name', 'игра', 'title'], year: ['год', 'year'], platforms: ['платформы', 'платформа', 'platforms'], mainPlatform: ['основная платформа', 'main platform'], genres: ['жанры', 'жанр', 'genres'], time: ['время (ч)', 'время', 'часы', 'hours', 'time'], rating: ['рейтинг', 'rating'], series: ['серия', 'series'], collections: ['коллекции', 'collections'], done: ['завершено', 'пройдено', 'done'], doneDate: ['дата прохождения', 'done date'], igdbId: ['igdb id', 'igdbid'], rawgId: ['rawg id', 'rawgid'] };
+const HEAD_NAMES = /*i18n:keep*/ { id: ['id', 'код'], name: ['название', 'name', 'игра', 'title'], year: ['год', 'year'], platforms: ['платформы', 'платформа', 'platforms'], mainPlatform: ['основная платформа', 'main platform'], genres: ['жанры', 'жанр', 'genres'], time: ['time (h)', 'время (ч)', 'время', 'часы', 'hours', 'time'], rating: ['рейтинг', 'rating'], series: ['серия', 'series'], collections: ['коллекции', 'collections'], done: ['completed', 'завершено', 'пройдено', 'done'], doneDate: ['completion date', 'дата прохождения', 'done date'], igdbId: ['igdb id', 'igdbid'], rawgId: ['rawg id', 'rawgid'] } /*i18n:end*/;
 function exportValue(g, key, collName) {
   switch (key) {
     case 'id': return g.id; case 'name': return g.name; case 'year': return g.year || ''; case 'platforms': return (g.platforms || []).join(', ');
@@ -314,7 +317,7 @@ const coverCache = new Map();
 let installEvt = null;
 const saveSet = () => DB.put('settings', { key: 'main', value: S.set });
 const todayStr = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
-const fmtTs = t => t ? new Date(t).toLocaleDateString('ru-RU') : '';
+const fmtTs = t => t ? new Date(t).toLocaleDateString(LOC_DATE) : '';
 const fmtDate = t => t ? t.slice(8, 10) + '.' + t.slice(5, 7) + '.' + t.slice(0, 4) : '';
 const normName = t => String(t == null ? '' : t).replace(/\s+/g, ' ').trim().toLowerCase();
 function canonSeries(name) {
@@ -436,7 +439,7 @@ async function dictRename(kind, from, to) {
   d[to] = d[from]; d[to].aliases = Array.from(new Set((d[to].aliases || []).concat([from]))); delete d[from]; S._pi = S._gi = null; const n = await dictRewrite(kind, from, to); saveSet(); return n;
 }
 function openDict(kind) {
-  const d = dictOf(kind), names = Object.keys(d).sort((a, b) => dictCount(kind, b) - dictCount(kind, a) || a.localeCompare(b, 'ru')), plat = kind === 'plat';
+  const d = dictOf(kind), names = Object.keys(d).sort((a, b) => dictCount(kind, b) - dictCount(kind, a) || a.localeCompare(b, LOC)), plat = kind === 'plat';
   sheetKey = 'dict' + kind; openSheet('<div class="hdr2"><h2>' + (plat ? 'Общий список платформ' : 'Общий список жанров') + '</h2><button class="btn" data-act="dictAdd" data-kind="' + kind + '">＋ Добавить</button></div>'
     + '<p class="sub">' + (plat ? 'У платформы есть короткое название (оно используется везде) и длинное. Одинаковые платформы, написанные по-разному (например, PS4 и Playstation 4), объединяются.' : 'Одинаковые жанры, написанные по-разному, объединяются в один.') + ' Нажмите на строку: переименовать, объединить, удалить.</p>'
     + '<div class="mglist">' + (names.map(nm => '<div class="mgrow" data-act="dictRow" data-kind="' + kind + '" data-n="' + esc(nm) + '"><span class="mgn">' + esc(nm) + (plat && d[nm].long ? ' <span class="sub">' + esc(d[nm].long) + '</span>' : '') + '</span><span class="mgc">' + dictCount(kind, nm) + '</span></div>').join('') || '<p class="hint">Список пуст</p>') + '</div>');
@@ -981,15 +984,16 @@ function confirmBox(text, okText = 'Да') {
   });
 }
 function focusEnd(el) { if (!el) return; el.focus(); try { const n = el.value.length; el.setSelectionRange(n, n); } catch (e) { /* поле без выделения */ } } // курсор всегда в конце текста
-function promptBox(title, value = '', placeholder = '', num = '') { // num: 'int' (целое, год) или 'dec' (дробное): цифровая клавиатура, буквы ввести нельзя
+function promptBox(title, value = '', placeholder = '', num = '', rows = 0) { // num: 'int' (целое, год) или 'dec' (дробное): цифровая клавиатура, буквы ввести нельзя
   return new Promise(res => {
     const m = openModal(); m.innerHTML = '<h4>' + esc(title) + '</h4><label class="field"><input id="pbx" value="' + esc(value) + '" placeholder="' + esc(placeholder) + '"' + (num ? ' type="text" inputmode="' + (num === 'int' ? 'numeric' : 'decimal') + '" autocomplete="off" pattern="' + (num === 'int' ? '[0-9]*' : '[0-9]*[.]?[0-9]*') + '"' : '') + '></label><div class="acts"><span data-x="cancel">Отмена</span><span data-x="ok">OK</span></div>';
+    if (rows) { const f = m.querySelector('.field'); f.innerHTML = '<textarea id="pbx" rows="' + rows + '" placeholder="' + esc(placeholder) + '" enterkeyhint="done" style="min-height:0;resize:none"></textarea>'; $('#pbx', m).value = value; } // длинные названия видны целиком (4-5 строк)
     modalCancel = () => { closeModal(); res(null); };
     const inp = $('#pbx', m); setTimeout(() => focusEnd(inp), 50);
     const clean = () => { if (!num || !inp) return; let v = String(inp.value || ''); if (num === 'int') v = v.replace(/\D/g, '').slice(0, 4); else { v = v.replace(/,/g, '.').replace(/[^0-9.]/g, ''); const i = v.indexOf('.'); if (i >= 0) v = v.slice(0, i + 1) + v.slice(i + 1).replace(/\./g, ''); v = v.slice(0, 6); } if (v !== inp.value) inp.value = v; };
     if (num) { inp.oninput = clean; clean(); }
-    const done = () => { clean(); const v = inp.value.trim(); closeModal(); res(num ? v : (v || null)); };
-    inp.onkeydown = e => { if (e.key === 'Enter') done(); };
+    const done = () => { clean(); const v = inp.value.replace(/\s*\n\s*/g, ' ').trim(); closeModal(); res(num ? v : (v || null)); };
+    inp.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); done(); } };
     m.onclick = e => { const x = e.target.closest('[data-x]'); if (x) { x.dataset.x === 'ok' ? done() : (closeModal(), res(null)); } };
   });
 }
@@ -1089,11 +1093,12 @@ function textHtml(items, total) {
   let h = '<div class="tlist ' + (S.set.textWrap === 'scroll' ? 'sc' : 'wr') + '">';
   ents.forEach(e => {
     if (e.t === 'h') { h += '<div class="gh l' + e.lvl + '">' + esc(e.text) + '<b>' + e.n + '</b></div>'; return; }
-    const g = e.g, inP = [tc.year && g.year ? g.year : '', tc.platforms && (g.platforms || []).length ? g.platforms.map(shortPlat).join(', ') : ''].filter(Boolean).join(' | ');
+    const g = e.g, yr = tc.year && g.year ? g.year : '', pl = tc.platforms && (g.platforms || []).length ? g.platforms.map(shortPlat).join(', ') : '';
+    const inP = yr || pl ? '<span class="ti">&nbsp;(' + (yr ? '<span class="ty">' + yr + '</span>' : '') + (yr && pl ? ' | ' : '') + (pl ? '<span class="tp">' + esc(pl) + '</span>' : '') + ')</span>' : '';
     const mk = (S.selMode ? '<span class="tsel">' + (S.sel.has(g.id) ? '☑' : '☐') + '</span>' : '') + (tc.done ? '<span class="tk">' + (g.done ? '✓' : '') + '</span>' : '') + (tc.main ? '<span class="tm">' + (e.x ? '*' : '') + '</span>' : '');
     h += '<div class="tl' + (e.x ? ' extra' : '') + (g.done ? ' isdone' : '') + (S.sel.has(g.id) ? ' sel' : '') + (g.id === S.lastGame ? ' last' : '') + '" data-gid="' + g.id + '" data-act="openGame">'
       + (mk ? '<span class="mk">' + mk + '</span>' : '')
-      + '<span class="tx"><span class="tn">' + esc(g.name) + '</span>' + (inP ? '<span class="ti">&nbsp;(' + esc(inP) + ')</span>' : '') + (tc.time && g.time ? '<span class="tt">&nbsp;– ' + String(g.time).replace('.', ',') + ' ч</span>' : '') + '</span></div>';
+      + '<span class="tx"><span class="tn">' + esc(g.name) + '</span>' + inP + (tc.time && g.time ? '<span class="tt">&nbsp;– ' + (LANG === 'en' ? String(g.time) : String(g.time).replace('.', ',')) + ' ч</span>' : '') + '</span></div>';
   });
   return h + '</div><div class="status">' + statusTxt(total || ents.filter(e => e.t === 'g').length) + '</div>';
 }
@@ -1292,7 +1297,7 @@ function mainSect() {
     const mm = new Map(); S.games.forEach(g => { const v = fn(g) || NO_MAIN; mm.set(v, (mm.get(v) || 0) + 1); });
     if (mm.size < 2 && (!mm.size || mm.has(NO_MAIN))) return '';
     mm.delete(NO_MAIN); if (mm.size < 2) return ''; // «Без платформы» вынесено в отдельный красный фильтр
-    const keys = Array.from(mm.keys()).sort((a, b) => a.localeCompare(b, 'ru'));
+    const keys = Array.from(mm.keys()).sort((a, b) => a.localeCompare(b, LOC));
     return '<h3>' + title + '</h3><div class="chips">' + keys.map(v => '<button class="p' + (f[k].includes(v) ? ' on' : '') + '" data-act="fToggle" data-k="' + k + '" data-v="' + esc(v) + '">' + esc(v === NO_MAIN ? none : lab(v)) + '<b>' + mm.get(v) + '</b></button>').join('') + '</div>';
   };
   return one('mainPlats', 'Основная платформа', mainOf, shortPlat, 'Без платформы');
@@ -1343,7 +1348,7 @@ function noPlatSect() { // отдельный красный фильтр: иг�
 function openFilters() {
   const f = S.set.f;
   const sect = (title, k, m, sortFn) => {
-    const keys = Array.from(m.keys()).sort(sortFn || ((a, b) => String(a).localeCompare(String(b), 'ru')));
+    const keys = Array.from(m.keys()).sort(sortFn || ((a, b) => String(a).localeCompare(String(b), LOC)));
     return keys.length ? '<h3>' + title + '</h3><div class="chips">' + keys.map(v => '<button class="p' + (f[k].map(String).includes(String(v)) ? ' on' : '') + '" data-act="fToggle" data-k="' + k + '" data-v="' + esc(v) + '">' + esc(v) + '<b>' + m.get(v) + '</b></button>').join('') + '</div>' : '';
   };
   const propBtns = S.props.map(p => '<button class="p' + (f.props.includes(p.id) ? ' on' : '') + '" data-act="fToggle" data-k="props" data-v="' + p.id + '">' + esc(p.name) + '</button>').join('');
@@ -1400,7 +1405,7 @@ function drawShDone() {
   const d = S.sheet && S.sheet.draft; if (!d) return; const c = $('#shDone2'), dt = ($('#f_donedate') || {}).value || '';
   if (c && c.classList) c.classList.toggle('on', !!d.done);
   const l = $('#doneL'); if (l) l.innerHTML = I(d.done ? 'checkc' : 'circle') + ' <span>Завершено</span>';
-  const t = $('#doneTxt'); if (t) t.textContent = d.done && dt ? new Date(dt + 'T00:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+  const t = $('#doneTxt'); if (t) t.textContent = d.done && dt ? new Date(dt + 'T00:00:00').toLocaleDateString(LOC_DATE, { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 }
 function drawShHead() {
   const el = $('#shSrc'); if (!el || !S.sheet) return; const d = S.sheet.draft, srcs = srcsOf(d), inp = $('#f_platforms'), list = inp ? csv(inp.value) : d.platforms;
@@ -1538,7 +1543,7 @@ const mgScore = g => (g.igdbId || g.rawgId ? 4 : 0) + (g.hasCover ? 2 : 0) + ((g
 function mergeGroups(withYear) { // группы карточек с одинаковым названием (и годом), где карточек две и больше
   const m = new Map();
   S.games.forEach(g => { const k = normName(g.name) + (withYear ? '|' + (g.year || 0) : ''); if (!m.has(k)) m.set(k, []); m.get(k).push(g); });
-  return Array.from(m.values()).filter(a => a.length > 1).sort((a, b) => b.length - a.length || a[0].name.localeCompare(b[0].name, 'ru'));
+  return Array.from(m.values()).filter(a => a.length > 1).sort((a, b) => b.length - a.length || a[0].name.localeCompare(b[0].name, LOC));
 }
 function mgBase(main, cards) { // результат: данные основной карточки, коллекции собраны со всех
   const r = {}; MG_FIELDS.forEach(f => { r[f[0]] = mgGet(main, f[0]); });
@@ -1664,7 +1669,7 @@ async function bulkRefresh(games) {
 /* ====================== Коллекции ====================== */
 const PALETTE = [['', 'Без цвета'], ['#ff7a1a', 'Оранжевый'], ['#3fb7f0', 'Голубой'], ['#2e9e5b', 'Зелёный'], ['#e5484d', 'Красный'], ['#a259ff', 'Фиолетовый'], ['#f5c518', 'Жёлтый'], ['#ff5fa2', 'Розовый'], ['#8b8b94', 'Серый']];
 const okColor = c => /^#[0-9a-f]{6}$/i.test(c || '') ? c : '';
-const sortedColls = () => S.collections.slice().sort((a, b) => (a.order != null ? a.order : 1e9) - (b.order != null ? b.order : 1e9) || (a.created || 0) - (b.created || 0) || a.name.localeCompare(b.name, 'ru'));
+const sortedColls = () => S.collections.slice().sort((a, b) => (a.order != null ? a.order : 1e9) - (b.order != null ? b.order : 1e9) || (a.created || 0) - (b.created || 0) || a.name.localeCompare(b.name, LOC));
 const vmodeOf = k => (S.set.vmode && S.set.vmode[k]) === 'list' ? 'list' : 'tiles';
 const modeBtns = k => '<div class="tools" style="margin:0">' + ib('vmode', vmodeOf(k) === 'list' ? 'grid' : 'list', vmodeOf(k) === 'list' ? 'Плитка' : 'Список', false, '', ' data-k="' + k + '"') + (vmodeOf(k) === 'tiles' ? zoomBtn(k) : '') + '</div>';
 const boxHtml = (k, inner) => '<div id="tilesBox" class="' + (vmodeOf(k) === 'list' ? 'lrows' : 'tiles z' + colsFor(k)) + '" style="--cols:' + colsFor(k) + '">' + inner + '</div>';
@@ -1945,7 +1950,7 @@ function statsHours(G) {
   return {
     byYear: ent(sum(done, g => g.doneDate ? g.doneDate.slice(0, 4) : 'без даты')).sort((a, b) => String(b[0]).localeCompare(String(a[0]))),
     donePlat: ent(sum(done, plat)).sort((a, b) => b[1] - a[1]), leftPlat: ent(sum(undone, plat)).sort((a, b) => b[1] - a[1]),
-    longest: G.filter(g => g.time > 0).sort((a, b) => b.time - a.time || a.name.localeCompare(b.name, 'ru')).slice(0, 10),
+    longest: G.filter(g => g.time > 0).sort((a, b) => b.time - a.time || a.name.localeCompare(b.name, LOC)).slice(0, 10),
     left: { n: undone.length, h: r1(undone.reduce((t, g) => t + (g.time || 0), 0)) }, noTime: G.filter(g => !(g.time > 0)).length
   };
 }
@@ -1956,7 +1961,7 @@ function barList(title, entries, k) {
 function viewStats() {
   const G = S.games, done = G.filter(g => g.done), yr = String(new Date().getFullYear()), H = statsHours(G);
   const cnt = arr => { const m = new Map(); arr.forEach(x => { if (hasVal(x)) m.set(x, (m.get(x) || 0) + 1); }); return Array.from(m.entries()); };
-  const top = (e, n) => e.sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]), 'ru')).slice(0, n);
+  const top = (e, n) => e.sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]), LOC)).slice(0, n);
   const doneYear = done.filter(g => g.doneDate && g.doneDate.slice(0, 4) === yr).length;
   const hours = Math.round(done.reduce((t, g) => t + (g.time || 0), 0));
   const card = (n, l, k) => '<div class="stc' + (k ? ' link' : '') + '"' + (k ? ' data-act="statGo" data-k="' + k + '"' : '') + '><b>' + n + '</b><span>' + l + '</span></div>';
@@ -1976,7 +1981,7 @@ function viewStats() {
 function seriesGroups() { const m = new Map(); S.games.forEach(g => { const k = g.series || ''; if (!m.has(k)) m.set(k, []); m.get(k).push(g); }); return m; }
 function seriesTilesHtml() {
   const m = seriesGroups(), q = normName(S.sFind), none = m.get('') || [];
-  const names = Array.from(m.keys()).filter(n => n && (!q || normName(n).includes(q))).sort((a, b) => a.localeCompare(b, 'ru'));
+  const names = Array.from(m.keys()).filter(n => n && (!q || normName(n).includes(q))).sort((a, b) => a.localeCompare(b, LOC));
   const mk = (key, list, menu) => entryHtml('series', { act: 'serOpen', attr: 'name', key, name: key || 'Без серии', count: list.length, games: list, color: '', covers: list.filter(x => x.hasCover || x.coverUrl).slice(0, 4).map(coverSrc).filter(Boolean), lpm: 'ser' });
   return names.map(n => mk(n, m.get(n), true)).join('') + (none.length && (!q || 'без серии'.includes(q)) ? mk('', none, false) : '') || '<p class="hint">Ничего не найдено</p>';
 }
@@ -2174,8 +2179,8 @@ async function srv(path, body, ms) {
 function syncStatus(t) { const e = $('#syncSt'); if (e) e.innerHTML = t; }
 function syncStatusHtml() {
   const y = S.set.sync; if (!syncOn()) return 'Не настроено';
-  if (y.err) return '<span style="color:#e5484d">⚠ ' + esc(y.err) + '</span>' + (y.last ? '<br>Последняя удачная: ' + new Date(y.last).toLocaleString('ru-RU') : '');
-  return y.last ? '✓ ' + new Date(y.last).toLocaleString('ru-RU') + (y.msg ? '<br>' + esc(y.msg) : '') : 'Ещё не синхронизировалось';
+  if (y.err) return '<span style="color:#e5484d">⚠ ' + esc(y.err) + '</span>' + (y.last ? '<br>Последняя удачная: ' + new Date(y.last).toLocaleString(LOC_DATE) : '');
+  return y.last ? '✓ ' + new Date(y.last).toLocaleString(LOC_DATE) + (y.msg ? '<br>' + esc(y.msg) : '') : 'Ещё не синхронизировалось';
 }
 function syncSoon(ms) {
   if (!syncOn() || !S.set.sync.auto) return;
@@ -2282,7 +2287,7 @@ async function detectLocalServer() { // приложение открыто с �
   } catch (e) { /* не наш сервер, это нормально */ }
 }
 async function downloadServerZip() { // архив лежит внутри приложения (apk) и на странице приложения в интернете
-  const name = 'game-catalog-server.zip'; let b = null;
+  const name = LANG === 'en' ? 'game-catalog-server-en.zip' : 'game-catalog-server.zip'; let b = null;
   try { const r = await fetch(name, { cache: 'no-store' }); if (r.ok) { const x = await r.blob(), h = new Uint8Array(await x.slice(0, 2).arrayBuffer()); if (x.size > 5000 && h[0] === 0x50 && h[1] === 0x4b) b = x; } } catch (e) { /* нет архива */ }
   if (!b) { toast('В этой версии архива нет: скачайте его на странице приложения в интернете'); return; }
   const FS = plug('Filesystem'), SH = plug('Share');
@@ -2291,7 +2296,7 @@ async function downloadServerZip() { // архив лежит внутри пр�
 }
 async function openGuide() {
   let html = '';
-  try { const r = await fetch('guide.html'); if (r.ok) html = await r.text(); } catch (e) { /* ignore */ }
+  try { const r = await fetch(LANG === 'en' ? 'guide.en.html' : 'guide.html'); if (r.ok) html = await r.text(); } catch (e) { /* ignore */ }
   openSheet('<div class="hdr2"><h2>Свой сервер: инструкция</h2></div><div class="toolbar"><button class="btn acc" data-act="srvZip">⬇ Скачать архив сервера</button></div><div class="guide">' + (html || '<p class="sub">Не удалось загрузить инструкцию.</p>') + '</div><button class="btn acc" style="width:100%;margin-top:14px" data-act="closeSheet">Закрыть</button>');
 }
 
@@ -2313,7 +2318,7 @@ function viewSettings() {
   const propRows = S.props.map(p => '<div class="row"><span>' + esc(p.name) + ' <span class="sub">(' + ({ text: 'текст', number: 'число', date: 'дата' }[p.type]) + ')</span></span><button class="btn red" data-act="propDel" data-id="' + p.id + '">✕</button></div>').join('');
   const grp = (id, title, inner) => '<details class="grp" data-g="' + id + '"' + (S.gopen[id] ? ' open' : '') + '><summary>' + title + '</summary>' + inner + '</details>';
   const A = [
-    '<div class="sec"><h3 style="margin-top:0">Оформление</h3><div class="chips">' + [['dark', 'Тёмная'], ['light', 'Светлая'], ['auto', 'Как в системе']].map(x => '<button class="p' + (S.set.theme === x[0] ? ' on' : '') + '" data-act="setTheme" data-v="' + x[0] + '">' + x[1] + '</button>').join('') + '</div></div>',
+    '<div class="sec"><h3 style="margin-top:0">Оформление</h3><div class="chips">' + [['dark', 'Тёмная'], ['light', 'Светлая'], ['auto', 'Как в системе']].map(x => '<button class="p' + (S.set.theme === x[0] ? ' on' : '') + '" data-act="setTheme" data-v="' + x[0] + '">' + x[1] + '</button>').join('') + '</div><h3>Язык</h3><div class="chips">' + [['', 'Как в системе'], ['ru', 'Русский'], ['en', 'English']].map(x => '<button class="p' + (langPref() === x[0] ? ' on' : '') + '" data-act="setLang" data-v="' + x[0] + '">' + x[1] + '</button>').join('') + '</div></div>',
     '<div class="sec"><h3 style="margin-top:0">Основной поиск</h3><div class="chips">' + ['igdb', 'rawg'].map(k => '<button class="p' + (S.set.mainSrc === k ? ' on' : '') + '" data-act="setMainSrc" data-v="' + k + '" style="border-color:' + PROV[k].color + '">' + (S.set.mainSrc === k ? '✓ ' : '') + PROV[k].name + '</button>').join('') + '</div><p class="sub">Поиск, быстрое добавление и разбор идут через основной источник. Другой источник включается кнопкой в окне поиска, но при следующем открытии поиска он снова возвращается на основной.</p></div>',
     '<div class="sec"><h3 style="margin-top:0">Ключи IGDB</h3>' + blockBanner(false, 'igdb') + '<label class="field"><span>Client ID</span><input id="idIn" value="' + esc(S.set.igdbId) + '" placeholder="Client ID" autocomplete="off"></label><label class="field"><span>Client Secret</span><input id="secIn" type="password" value="' + esc(S.set.igdbSecret) + '" placeholder="Client Secret" autocomplete="off"></label><label class="field"><span>Адрес своего прокси (для браузера, необязательно)</span><input id="proxyIn" value="' + esc(S.set.igdbProxy) + '" placeholder="http://localhost:8787" autocomplete="off"></label><div class="toolbar"><button class="btn acc" data-act="saveKey">Сохранить и проверить</button></div>' + usageHtml() + '<p class="sub">Если указан адрес прокси, ключи IGDB в приложении не нужны (они хранятся в прокси, см. tools/igdb-proxy.mjs). Бесплатно: зарегистрируйте приложение на dev.twitch.tv/console/apps (Twitch может потребовать включить двухфакторную защиту), создайте Client Secret и скопируйте оба значения. Документация: api-docs.igdb.com.</p></div>',
     '<div class="sec"><h3 style="margin-top:0">Ключ RAWG</h3>' + blockBanner(false, 'rawg') + '<label class="field"><input id="rawgIn" value="' + esc(S.set.rawgKey) + '" placeholder="вставьте ключ RAWG" autocomplete="off"></label><div class="toolbar"><button class="btn acc" data-act="saveRawg">Сохранить и проверить</button></div>' + rawgUsageHtml() + '<p class="sub">Бесплатный ключ: rawg.io/apidocs (регистрация, «Get API Key»).</p></div>',
@@ -2322,8 +2327,8 @@ function viewSettings() {
     '<div class="sec"><h3 style="margin-top:0">Общие списки</h3><p class="sub">Платформы и жанры: короткие и длинные названия, объединение одинаковых, написанных по-разному.</p><div class="toolbar"><button class="btn" data-act="dictOpen" data-kind="plat">Платформы (' + Object.keys(S.set.platDict || {}).length + ')</button><button class="btn" data-act="dictOpen" data-kind="genre">Жанры (' + Object.keys(S.set.genreDict || {}).length + ')</button></div></div>',
     '<div class="sec"><h3 style="margin-top:0">Объединение карточек</h3><p class="sub">Одна и та же игра на разных платформах, добавленная несколькими карточками: сравните их, выберите основную, перенесите данные и объедините. Перед объединением показывается, какая карточка получится.</p><div class="toolbar"><button class="btn acc" data-act="mgTool">Открыть инструмент объединения</button></div></div>',
     '<div class="sec"><h3 style="margin-top:0">Скриншоты в базе</h3><div id="shStats" class="sub">считаем…</div><div class="toolbar"><button class="btn" data-act="shMgr">Выбрать игры…</button><button class="btn red" data-act="shDelAll">Удалить все</button></div></div>',
-    '<div class="sec"><h3 style="margin-top:0">Данные</h3><p class="sub">Игр: ' + S.games.length + ' · коллекций: ' + S.collections.length + ' · скриншотов: ' + S.games.reduce((a, g) => a + (g.shotCount || 0), 0) + '<br>Занято на устройстве: <b id="stEst">считаем…</b>. ' + (S.set.lastExport ? 'Последняя копия: ' + new Date(S.set.lastExport).toLocaleDateString('ru-RU') + '. ' : 'Копии ещё не было. ') + 'Данные хранятся только на этом устройстве. Делайте резервную копию и переносите её между телефоном и компьютером файлом.</p><div class="row"><span>Напоминать о копии</span><button class="btn" data-act="backupFreq">' + ({ 0: 'Не напоминать', 7: 'Раз в неделю', 14: 'Раз в 2 недели', 30: 'Раз в месяц' }[S.set.backupDays == null ? 7 : S.set.backupDays] || 'Раз в неделю') + '</button></div><div class="toolbar"><button class="btn acc" data-act="export">Экспорт в файл</button><button class="btn" data-act="import">Импорт из файла</button><button class="btn" data-act="fixDupes">Проверить дубли</button><button class="btn" data-act="openStats">Статистика</button></div><input type="file" id="impFile" accept=".json,.zip,application/json,application/zip" class="hidden"></div>',
-    '<div class="sec"><h3 style="margin-top:0">Корзина</h3>' + (S.trash.length ? S.trash.slice().sort((a, b) => b.t - a.t).slice(0, 30).map(r => '<div class="row"><span>' + esc(r.game.name) + ' <span class="sub">' + new Date(r.t).toLocaleDateString('ru-RU') + '</span></span><button class="btn" data-act="trashRestore" data-id="' + r.id + '">Вернуть</button></div>').join('') + '<div class="toolbar"><button class="btn red" data-act="trashClear">Очистить корзину</button></div>' : '<p class="sub">Удалённые игры хранятся 30 дней, их можно вернуть.</p>') + '</div>',
+    '<div class="sec"><h3 style="margin-top:0">Данные</h3><p class="sub">Игр: ' + S.games.length + ' · коллекций: ' + S.collections.length + ' · скриншотов: ' + S.games.reduce((a, g) => a + (g.shotCount || 0), 0) + '<br>Занято на устройстве: <b id="stEst">считаем…</b>. ' + (S.set.lastExport ? 'Последняя копия: ' + new Date(S.set.lastExport).toLocaleDateString(LOC_DATE) + '. ' : 'Копии ещё не было. ') + 'Данные хранятся только на этом устройстве. Делайте резервную копию и переносите её между телефоном и компьютером файлом.</p><div class="row"><span>Напоминать о копии</span><button class="btn" data-act="backupFreq">' + ({ 0: 'Не напоминать', 7: 'Раз в неделю', 14: 'Раз в 2 недели', 30: 'Раз в месяц' }[S.set.backupDays == null ? 7 : S.set.backupDays] || 'Раз в неделю') + '</button></div><div class="toolbar"><button class="btn acc" data-act="export">Экспорт в файл</button><button class="btn" data-act="import">Импорт из файла</button><button class="btn" data-act="fixDupes">Проверить дубли</button><button class="btn" data-act="openStats">Статистика</button></div><input type="file" id="impFile" accept=".json,.zip,application/json,application/zip" class="hidden"></div>',
+    '<div class="sec"><h3 style="margin-top:0">Корзина</h3>' + (S.trash.length ? S.trash.slice().sort((a, b) => b.t - a.t).slice(0, 30).map(r => '<div class="row"><span>' + esc(r.game.name) + ' <span class="sub">' + new Date(r.t).toLocaleDateString(LOC_DATE) + '</span></span><button class="btn" data-act="trashRestore" data-id="' + r.id + '">Вернуть</button></div>').join('') + '<div class="toolbar"><button class="btn red" data-act="trashClear">Очистить корзину</button></div>' : '<p class="sub">Удалённые игры хранятся 30 дней, их можно вернуть.</p>') + '</div>',
     '<div class="sec"><h3 style="margin-top:0">Свои свойства</h3>' + (propRows || '<p class="sub">Свойства других типов (текст, число, дата) для игр. Для «галочек» используйте коллекции.</p>') + '<div class="toolbar"><button class="btn" data-act="propAdd">＋ Добавить свойство</button></div></div>',
     (installEvt ? '<div class="sec"><button class="btn acc" data-act="install">Установить приложение</button></div>' : ''),
     '<div class="sec"><button class="btn red" data-act="wipe">Удалить все данные</button></div>'
@@ -2637,7 +2642,7 @@ const ACT = {
   sortBy: t => { const f = S.set.f; if (f.sort === t.dataset.k) f.dir = f.dir === 'asc' ? 'desc' : 'asc'; else { f.sort = t.dataset.k; f.dir = 'asc'; } saveSet(); libRefilter(); },
   fToggle: t => { const a = S.set.f[t.dataset.k], v = t.dataset.k === 'years' ? +t.dataset.v : t.dataset.v, i = a.findIndex(x => String(x) === String(v)); i < 0 ? a.push(v) : a.splice(i, 1); saveSet(); if (t.classList) t.classList.toggle('on', i < 0); libRefilter(); },
   rmF: t => { const k = t.dataset.k; S.set.f[k] = S.set.f[k].filter(x => String(x) !== t.dataset.v); saveSet(); libRefilter(); },
-  resetF: () => { const f = S.set.f; Object.assign(f, { q: '', years: [], genres: [], platforms: [], series: [], collections: [], props: [], mainPlats: [], addedFrom: '', addedTo: '', seriesMode: '', maxTime: 0, done: '', minRating: 0 }); saveSet(); const q = $('#q'); if (q) q.value = ''; libRefilter(); if (sheetEl) openFilters(); },
+  resetF: () => { const f = S.set.f; Object.assign(f, { q: '', years: [], genres: [], platforms: [], series: [], collections: [], props: [], mainPlats: [], addedFrom: '', addedTo: '', seriesMode: '', maxTime: 0, done: '', minRating: 0 }); const hadGroup = !!S.set.group; S.set.group = ''; saveSet(); const q = $('#q'); if (q) q.value = ''; if (hadGroup) renderLibrary(); else libRefilter(); if (sheetEl) openFilters(); }, // «Сбросить» убирает все плашки, в том числе группировку
   selToggle: () => { S.selMode = !S.selMode; S.sel.clear(); renderLibrary(); $('#fab').classList.toggle('hidden', S.selMode); },
   selAct: t => selectionAction(t.dataset.m),
   openGame: (t) => { if (lp.fired) { lp.fired = false; return; } const id = t.dataset.gid; if (S.selMode) toggleSel(id); else openGameSheet(id); },
@@ -2648,7 +2653,7 @@ const ACT = {
   saveGame: () => closeSheet(),
   pickSeries: async () => {
     const m = new Map(); S.games.forEach(g => { if (g.series) m.set(g.series, (m.get(g.series) || 0) + 1); });
-    const names = Array.from(m.keys()).sort((a, b) => a.localeCompare(b, 'ru'));
+    const names = Array.from(m.keys()).sort((a, b) => a.localeCompare(b, LOC));
     const r = await choose({ title: 'Серия игр', search: true, items: [{ id: '__none', label: 'Без серии', accent: true, pin: true }].concat(names.map(n => ({ id: n, label: n, sub: gWord(m.get(n)) }))) });
     if (r === null) return; const f = $('#f_series'); if (f) { f.value = r === '__none' ? '' : r; markDirty(); }
   },
@@ -2692,6 +2697,7 @@ const ACT = {
   trashClear: async () => { if (!await confirmBox('Удалить всё из корзины без возможности вернуть?', 'Очистить')) return; for (const r of S.trash) await DB.del('trash', r.id); S.trash = []; render(); },
   setMinRating: t => { S.set.f.minRating = +t.dataset.v; saveSet(); libRefilter(); if (sheetEl) openFilters(); },
   zoom: t => { const k = t.dataset.k, R = ZOOM_RANGE[k], c = colsFor(k); S.set.zoom[k] = c >= R[1] ? R[0] : c + 1; saveSet(); if (S.tab === 'library') renderLibrary(); else render(); },
+  setLang: t => { try { if (t.dataset.v) localStorage.setItem('gc_lang', t.dataset.v); else localStorage.removeItem('gc_lang'); } catch (e) { /* ignore */ } location.reload(); }, // язык переключается перезагрузкой: русская и английская сборки лежат в разных файлах
   setTheme: t => { S.set.theme = t.dataset.v; saveSet(); applyTheme(); render(); },
   unblock: () => { S.block = null; render(); if (S.tab === 'search') runSearch(true); },
   saveSgdb: async () => { S.set.sgdbKey = $('#sgdbIn').value.trim(); await saveSet(); toast(S.set.sgdbKey ? 'Ключ SteamGridDB сохранён' : 'Ключ удалён'); },
@@ -2785,7 +2791,7 @@ const ACT = {
     if (r === 'rename') { const v = await askPrompt('Новое название', nm); if (!v) return; const n = await dictRename(kind, nm, v); toast('Изменено игр: ' + n); }
     else if (r === 'long') { const v = await askPrompt('Длинное название', d[nm].long || nm); if (!v) return; d[nm].long = v; S._pi = null; saveSet(); }
     else if (r === 'merge') {
-      const to = await askChoose({ title: 'Объединить «' + nm + '» с…', search: Object.keys(d).length > 10, items: Object.keys(d).filter(x => x !== nm).sort((a, b) => a.localeCompare(b, 'ru')).map(x => ({ id: x, label: x, sub: 'игр: ' + dictCount(kind, x) })) }); if (!to) return;
+      const to = await askChoose({ title: 'Объединить «' + nm + '» с…', search: Object.keys(d).length > 10, items: Object.keys(d).filter(x => x !== nm).sort((a, b) => a.localeCompare(b, LOC)).map(x => ({ id: x, label: x, sub: 'игр: ' + dictCount(kind, x) })) }); if (!to) return;
       if (!await confirmBox('Объединить «' + nm + '» с «' + to + '»? Игр, которые изменятся: ' + cnt + '. Название «' + nm + '» станет вариантом написания «' + to + '».', 'Объединить')) return;
       const n = await dictMerge(kind, nm, to); toast('Объединено, изменено игр: ' + n);
     } else if (r === 'del') { if (cnt) return toast('Используется в играх: ' + cnt + '. Сначала объедините с другим названием'); delete d[nm]; S._pi = S._gi = null; saveSet(); }
@@ -2842,7 +2848,7 @@ const ACT = {
     toast('Изменено строк: ' + items.length); S.inSel.clear(); S.inSelMode = false; rerenderInbox();
   },
   retGame: () => { const r = S.retGame; S.retGame = null; if (!r) return; S.tab = r.tab; render(); if (gameById(r.id)) openGameSheet(r.id); },
-  shEditName: async () => { const inp = $('#f_name'), v = await askPrompt('Название игры', inp.value); if (v === null) return; inp.value = v.trim(); markDirty(); },
+  shEditName: async () => { const inp = $('#f_name'), v = await askPrompt('Название игры', inp.value, '', '', 5); if (v === null) return; inp.value = v.trim(); markDirty(); },
   shMenu: async () => {
     const d = S.sheet.draft, srcs = srcsOf(d), miss = ['igdb', 'rawg'].filter(k => !d[k + 'Id']);
     const items = srcs.map(k => ({ id: 'refresh:' + k, label: 'Обновить из ' + PROV[k].name, sub: 'название, год, жанры, платформы, описание', ico: '🔄' })).concat([{ id: 'hltbOpen', label: 'HowLongToBeat', sub: 'время прохождения', ico: '⏱' }, { id: 'cubiqOpen', label: 'Cubiq.ru', sub: 'время прохождения', ico: '⏱' }])

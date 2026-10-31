@@ -1,0 +1,14 @@
+GAME CATALOG: YOUR OWN SERVER FOR THE HOME NETWORK
+
+Step-by-step guide: open INSTRUCTIONS.html (double-click, it opens in your browser).
+The same guide is inside the app: Settings -> Sync and own server.
+
+In short:
+  1. Extract the whole archive to a folder, for example C:\GameCatalog (do not run files from inside the archive).
+  2. If the computer has no Node.js: file "1. Install Node.js".
+  3. File "2. Start server": the address and the access code appear. Do not close the window.
+  4. On this computer open http://localhost:8787 in a browser.
+  5. In the app on your phone: Settings -> Sync -> enter the address and the code.
+
+If the phone cannot see the server: file "3. Allow network access" (right-click, run as administrator).
+All your data is in the data folder. To make a backup, copy that folder.

@@ -586,3 +586,11 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 @keyframes nxl{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}
 @keyframes nxr{from{transform:translateX(-40px);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){.nxt{animation:none!important}}
+
+/* текстовый вид: год, платформы и время разными цветами; выделение синее и у пройденных */
+:root{--ty:#e6b94d;--ttm:#4fd1c5}
+:root[data-theme="light"]{--ty:#9a6700;--ttm:#0b7a72}
+.tl .ty{color:var(--ty)}
+.tl .tp{color:var(--mut)}
+.tl .tt{color:var(--ttm)}
+.tl.sel,.tl.isdone.sel,.tl.sel.last,.tl.isdone.sel.last{background:rgba(79,140,255,.30)}

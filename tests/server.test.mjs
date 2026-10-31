@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createServer } from '../server/server.mjs';
 
+setTimeout(() => { console.log('тест завис (сторож)'); process.exit(1); }, 120000).unref();
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gcs-')), www = path.join(tmp, 'www');
 fs.mkdirSync(www); fs.writeFileSync(path.join(www, 'index.html'), '<p>hi</p>'); fs.writeFileSync(path.join(www, 'sw.js'), "const C='gc-__BUILD__';");
 const cfg = { port: 0, token: 'abcde-fghjk', igdbClientId: '', igdbClientSecret: '' };

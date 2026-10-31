@@ -28,6 +28,7 @@ const igdbData = (ep, body) => {
 };
 const realFetch = global.fetch;
 global.FileReader = class { readAsDataURL(b) { b.arrayBuffer().then(ab => { this.result = 'data:' + (b.type || 'image/jpeg') + ';base64,' + Buffer.from(ab).toString('base64'); this.onload && this.onload(); }); } };
+setTimeout(() => { console.log('FAIL тест завис дольше 120 секунд (сторож)'); process.exit(1); }, 120000).unref();
 global.fetch = async (u, o) => { const p = String(u); if (p.startsWith('http://127.0.0.1:')) { (global.__fl = global.__fl || []).push(p); return realFetch(u, o); } if (p.includes('images.igdb.com')) return { ok: false };
   if (p.includes('steamgriddb')) { if (p.includes('autocomplete')) return { ok: true, status: 200, json: async () => ({ success: true, data: [{ id: 7, name: 'Fallout NV' }] }) }; return { ok: true, status: 200, json: async () => ({ success: true, data: [{ url: 'https://cdn/x.png', thumb: 'https://cdn/t.png', score: 5, width: 600, height: 900 }] }) }; }
   if (p.includes('id.twitch.tv')) return { ok: true, status: 200, json: async () => ({ access_token: 'TOKEN', expires_in: 3600 }) };
@@ -381,6 +382,7 @@ const L = require('../www/app.js');
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'gcs2-')), www = path.join(tmp, 'www'); fs.mkdirSync(www);
     const cfg = { port: 0, token: 'aaaaa-bbbbb', igdbClientId: '', igdbClientSecret: '' }, srv = createServer({ cfg, wwwDir: www, dataDir: path.join(tmp, 'd') });
     await new Promise(r => srv.listen(0, '127.0.0.1', r));
+    try {
     const need = (c, m) => { if (!c) throw new Error(m); }, wipeLocal = async () => { for (const x of ['games', 'collections', 'props', 'covers', 'shots', 'inboxLists', 'inboxItems', 'tomb']) await G.DB.clearRaw(x); G.DB.tombs.clear(); S.games = []; S.collections = []; };
     S.tab = 'library'; S.sheet = null;
     S.set.sync = { url: 'http://127.0.0.1:' + srv.address().port, token: 'aaaaa-bbbbb', auto: false, off: 0, last: 0, msg: '', err: '', igdb: false };
@@ -400,10 +402,11 @@ const L = require('../www/app.js');
     await wipeLocal(); need(await G.syncNow(true), 'повторное восстановление');
     need(S.games.length === n - 1 && !S.games.some(x => x.id === victim) && S.games.find(x => x.id === id0).name === 'Переименована', 'удалённая игра не должна вернуться, правка должна сохраниться');
     // ничего не менялось: фоновая сверка пропускается, ручная всё равно выполняется
-    await G.syncNow(true); G.SY.dirty = false; const before = S.set.sync.last; await new Promise(r => setTimeout(r, 5));
-    need(await G.syncNow(true) && S.set.sync.last > before, 'ручная синхронизация должна выполняться всегда');
+    await G.syncNow(true); G.SY.dirty = false; 
+    global.__fl.length = 0; need(await G.syncNow(true), 'ручная синхронизация'); need(global.__fl.some(x => x.includes('/manifest')), 'ручная синхронизация должна выполняться всегда');
     global.__fl.length = 0; G.SY.dirty = false; need(await G.syncNow(false), 'фоновая сверка'); need(!global.__fl.some(x => x.includes('/manifest')), 'без изменений полная сверка не нужна');
     await G.DB.put('games', S.games[0]); global.__fl.length = 0; need(await G.syncNow(false), 'сверка после правки'); need(global.__fl.some(x => x.includes('/manifest')), 'после правки сверка должна выполниться');
-    srv.close(); srv.closeAllConnections && srv.closeAllConnections();
+    } finally { srv.close(); srv.closeAllConnections && srv.closeAllConnections(); srv.flush(); }
   });
+  setTimeout(() => process.exit(process.exitCode || 0), 1000); // оставшиеся соединения не должны держать процесс
 })();

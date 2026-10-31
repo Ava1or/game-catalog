@@ -401,10 +401,12 @@ const L = require('../www/app.js');
     need(!srv.db.items.games[victim] && srv.db.tombs.games[victim], 'удаление должно дойти до сервера');
     await wipeLocal(); need(await G.syncNow(true), 'повторное восстановление');
     need(S.games.length === n - 1 && !S.games.some(x => x.id === victim) && S.games.find(x => x.id === id0).name === 'Переименована', 'удалённая игра не должна вернуться, правка должна сохраниться');
-    // ничего не менялось: фоновая сверка пропускается, ручная всё равно выполняется
-    await G.syncNow(true); G.SY.dirty = false; 
+    // ничего не менялось: фоновая сверка пропускается, ручная всё равно выполняется.
+    // После собственных отправок приложение по замыслу делает ещё одну полную сверку, поэтому сначала ждём, пока обмен успокоится
+    for (let k = 0; k < 10; k++) { await new Promise(r => setTimeout(r, 100)); if (!G.SY.dirty && S.set.sync.rev === srv.db.rev) break; await G.syncNow(true); } // запоздавшие записи в базу тоже помечают данные изменёнными
+    need(!G.SY.dirty && S.set.sync.rev === srv.db.rev, 'обмен должен успокоиться: rev на устройстве ' + S.set.sync.rev + ', на сервере ' + srv.db.rev + ', dirty ' + G.SY.dirty);
     global.__fl.length = 0; need(await G.syncNow(true), 'ручная синхронизация'); need(global.__fl.some(x => x.includes('/manifest')), 'ручная синхронизация должна выполняться всегда');
-    global.__fl.length = 0; G.SY.dirty = false; need(await G.syncNow(false), 'фоновая сверка'); need(!global.__fl.some(x => x.includes('/manifest')), 'без изменений полная сверка не нужна');
+    global.__fl.length = 0; need(await G.syncNow(false), 'фоновая сверка'); need(!global.__fl.some(x => x.includes('/manifest')), 'без изменений полная сверка не нужна');
     await G.DB.put('games', S.games[0]); global.__fl.length = 0; need(await G.syncNow(false), 'сверка после правки'); need(global.__fl.some(x => x.includes('/manifest')), 'после правки сверка должна выполниться');
     } finally { srv.close(); srv.closeAllConnections && srv.closeAllConnections(); srv.flush(); }
   });

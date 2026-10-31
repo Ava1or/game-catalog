@@ -24,6 +24,7 @@ jobs:
         with:
           node-version: 20
       - name: Тесты
+        timeout-minutes: 10
         run: node --test tests/logic.test.js tests/smoke.test.js tests/server.test.mjs tests/i18n.test.js
 
   web:

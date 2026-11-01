@@ -1086,8 +1086,8 @@ function listHtml(items, total) {
     h += '<tr data-gid="' + g.id + '"' + (rc ? ' class="' + rc + '"' : '') + '>' + (S.selMode ? '<td class="' + cls(0).trim() + '"' + stl(0) + open + '>' + (S.sel.has(g.id) ? '☑' : '☐') + '</td>' : '')
       + (c.cover ? '<td' + open + '><div class="thumb" data-cvid="' + g.id + '"' + (src ? ' style="background-image:url(\'' + bgu(src) + '\')"' : '') + '></div></td>' : '')
       + '<td class="nmc' + cls(2) + '"' + stl(2, 'name') + dk('name') + open + '><div class="n">' + (e.x ? '<span class="xs" title="Not from the main list: a series game">★</span>' : '') + esc(g.name) + '</div></td>'
-      + (c.genres ? td('genres', '<div class="gpt">' + esc((g.genres || []).join(', ')) + '</div>', 'gp') : '')
-      + (c.platforms ? td('platforms', '<div class="gpt">' + esc((g.platforms || []).map(shortPlat).join(', ')) + '</div>', 'gp') : '') + (c.done ? '<td>' + (g.done ? '<span style="color:var(--green);font-weight:700">✓</span>' : '') + '</td>' : '')
+      + (c.genres ? td('genres', '<div class="gpt"><span>' + esc((g.genres || []).join(', ')) + '</span></div>', 'gp') : '')
+      + (c.platforms ? td('platforms', '<div class="gpt"><span>' + esc((g.platforms || []).map(shortPlat).join(', ')) + '</span></div>', 'gp') : '') + (c.done ? '<td>' + (g.done ? '<span style="color:var(--green);font-weight:700">✓</span>' : '') + '</td>' : '')
       + (c.doneDate ? td('doneDate', fmtDate(g.doneDate)) : '') + (c.year ? td('year', g.year || '—') : '')
       + (c.rating ? td('rating', g.rating ? '<span style="color:#ffa000">★ ' + g.rating + '</span>' : '—') : '') + (c.time ? td('time', g.time ? g.time + ' h' : '—') : '')
       + (c.series ? td('series', '<div class="scd"' + (cwid.series ? ' style="max-width:none"' : '') + '>' + esc(g.series || '') + '</div>') : '')
@@ -1178,12 +1178,12 @@ function libRows(a, b) {
   const part = S.entries.slice(a, b), v = S.set.view;
   return v === 'list' ? listHtml(part, S.nMain) : v === 'text' ? textHtml(part, S.nMain) : part.map(e => e.t === 'h' ? ghHtml(e) : cardHtml(e.g, e.x)).join('');
 }
-// жанры и платформы в списке: не больше строк, чем занимает название игры (высота строки зависит только от масштаба и названия)
+// жанры и платформы в списке лежат поверх ячейки и не влияют на высоту строки: число видимых строк считается по высоте строки,
+// которая зависит только от масштаба и названия игры
 function fitList() {
-  const rows = Array.from(document.querySelectorAll('.wrap tbody tr[data-gid]')); if (!rows.length) return;
-  const first = rows[0].querySelector('.n'); if (!first || typeof getComputedStyle !== 'function') return;
-  const cs = getComputedStyle(first), lh = parseFloat(cs.lineHeight) || (parseFloat(cs.fontSize) || 13) * 1.25;
-  const n = rows.map(tr => { const e = tr.querySelector('.n'); return e ? Math.max(1, Math.round(e.clientHeight / lh)) : 1; });
+  const rows = Array.from(document.querySelectorAll('.wrap tbody tr[data-gid]')); if (!rows.length || typeof getComputedStyle !== 'function') return;
+  const sp = rows[0].querySelector('.gpt span'); const lh = sp ? (parseFloat(getComputedStyle(sp).lineHeight) || 12) : 12;
+  const n = rows.map(tr => Math.max(1, Math.floor((tr.clientHeight - 2) / lh)));
   rows.forEach((tr, i) => tr.style.setProperty('--gl', n[i]));
 }
 const fitSoon = () => { if (typeof requestAnimationFrame === 'function') requestAnimationFrame(fitList); };

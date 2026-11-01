@@ -614,6 +614,10 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .grid .card .t{min-height:0;margin-top:3px}
 /* ===== Список: жанры и платформы мелко, с переносом; число строк задаёт скрипт по имени игры ===== */
 .wrap tbody tr{content-visibility:visible}
-.wrap td.gp{white-space:normal;min-width:90px;max-width:170px;vertical-align:middle}
-.wrap .gpt{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:var(--gl,1);overflow:hidden;overflow-wrap:anywhere;font-size:10px;line-height:12px;color:var(--mut)}
+.wrap td.gp{position:relative;white-space:normal;width:120px;min-width:90px;max-width:170px;padding:0!important}
+.wrap .gpt{position:absolute;left:8px;right:4px;top:0;bottom:0;display:flex;align-items:center;overflow:hidden;font-size:10px;line-height:12px;color:var(--mut)}
+.wrap .gpt span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:var(--gl,1);overflow:hidden;overflow-wrap:anywhere}
 .wrap.d1 .gpt{font-size:9px;line-height:11px}
+
+.tlist .ts{color:#b794f6}
+:root[data-theme="light"] .tlist .ts{color:#7a4fc7}

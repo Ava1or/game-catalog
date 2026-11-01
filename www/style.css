@@ -425,14 +425,6 @@ tr.isdone.last td{background-image:linear-gradient(rgba(255,255,255,.055),rgba(2
 .wrap th{position:sticky}
 .wrap td.sc,.wrap .scd{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-/* ===== Игры без основной платформы: бледно-красный фон и красный «!» ===== */
-.npb{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:8px;background:#e5484d;color:#fff;font-size:11px;font-weight:700;line-height:1;margin-right:5px;flex:none;vertical-align:1px}
-.card .cv .npb{position:absolute;left:5px;top:5px;width:20px;height:20px;border-radius:10px;font-size:13px;margin:0;z-index:2}
-.grid.z4 .cv .npb{width:16px;height:16px;font-size:10px;left:4px;top:4px}
-.grid.z5 .cv .npb,.grid.z6 .cv .npb{width:12px;height:12px;font-size:8px;left:3px;top:3px}
-.card.noplat .cv{box-shadow:inset 0 0 0 2px rgba(229,72,77,.5)}
-.card.noplat .cv::after{content:'';position:absolute;inset:0;background:rgba(229,72,77,.15);pointer-events:none;border-radius:inherit}
-.wrap tr.noplat td,.wrap tr.noplat td.pc{background:linear-gradient(rgba(229,72,77,.13),rgba(229,72,77,.13)),var(--bg2)}
 .p.red,.chip.red{color:#ff6b6b;border-color:#e5484d}
 .p.red.on,.chip.red{background:rgba(229,72,77,.18)}
 .p.red.on{color:#ff8a8a}
@@ -453,7 +445,6 @@ h3.red{color:#ff6b6b}
 .donerow .donecard .dc2{font-size:13px;gap:6px}
 .donerow .linkchips{gap:10px}
 .brk{flex-basis:100%;height:0}
-.tag.mp{background:var(--accbg);color:var(--acc);border-color:var(--accbd)}
 span.tag{cursor:default}
 .cmp .chips{gap:4px;margin-bottom:6px}
 
@@ -471,8 +462,7 @@ span.tag{cursor:default}
 .card.extra .cv,.card.extra .t,.card.extra .m{opacity:.6}
 .wrap tr.extra td{opacity:.62}
 .xs{color:#f5c451;margin-right:4px;font-size:12px}
-.card .cv .xb{position:absolute;left:5px;top:5px;z-index:2;color:#f5c451;font-size:16px;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,.8)}
-.card .cv .npb + .xb{left:30px}
+.card .cv .xb{position:absolute;right:5px;top:5px;z-index:2;color:#f5c451;font-size:16px;line-height:1;text-shadow:0 1px 2px rgba(0,0,0,.8)}
 .gh{font-weight:700;color:var(--acc);font-size:14px;padding:10px 4px 4px}
 .gh b{font-weight:400;font-size:11px;color:var(--mut);margin-left:8px}
 .gh.l2{color:#f5c451;font-size:15px;border-top:1px solid var(--line);margin-top:6px}
@@ -616,3 +606,14 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 ::-webkit-scrollbar-thumb:hover{background:var(--sbh);background-clip:content-box}
 ::-webkit-scrollbar-corner{background:transparent}
 ::-webkit-scrollbar-button{display:none}
+
+/* ===== Плитка: рейтинг слева вверху, год слева внизу, под картинкой только название ===== */
+.card .cv .rt{position:absolute;left:0;top:0;z-index:2;padding:1px 5px;background:rgba(0,0,0,.66);color:#fff;font-size:10px;line-height:13px;border-bottom-right-radius:8px;pointer-events:none}
+.card .cv .rt i{font-style:normal;color:#ffc107;margin-right:1px}
+.grid.z5 .cv .rt,.grid.z6 .cv .rt{font-size:8px;line-height:11px;padding:0 3px}
+.grid .card .t{min-height:0;margin-top:3px}
+/* ===== Список: жанры и платформы мелко, с переносом; число строк задаёт скрипт по имени игры ===== */
+.wrap tbody tr{content-visibility:visible}
+.wrap td.gp{white-space:normal;min-width:90px;max-width:170px;vertical-align:middle}
+.wrap .gpt{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:var(--gl,1);overflow:hidden;overflow-wrap:anywhere;font-size:10px;line-height:12px;color:var(--mut)}
+.wrap.d1 .gpt{font-size:9px;line-height:11px}

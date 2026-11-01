@@ -34,22 +34,21 @@ x=f(); x.sort='series'; eq(L.sortGames(g.slice(),x).map(z=>z.name),['B','C','A']
   eq([1,2,5,11,21,22,111].map(L.gWord),['1 игра','2 игры','5 игр','11 игр','21 игра','22 игры','111 игр'],'gWord'); }
 
 { eq(L.parseLine("id 4545 | Assassin's Creed IV (2013 | PC, PS3) – 23 ч"), { text: "Assassin's Creed IV", year: 2013, hours: 23, x: { gid: '4545', platforms: ['PC', 'PS3'] } }, 'parseLine id + платформы + время');
-  const gms = [{ id: 'a1', name: 'Game; "X"', year: 2020, platforms: ['PC', 'PS4'], mainPlatform: 'PC', genres: ['RPG'], time: 12, rating: 8.1, series: 'S', collections: ['c1'], done: true, doneDate: '2021-01-02', igdbId: 5 }];
-  const keys = ['id', 'name', 'year', 'platforms', 'mainPlatform', 'genres', 'time', 'rating', 'series', 'collections', 'done', 'doneDate', 'igdbId'];
+  const gms = [{ id: 'a1', name: 'Game; "X"', year: 2020, platforms: ['PC', 'PS4'], genres: ['RPG'], time: 12, rating: 8.1, series: 'S', collections: ['c1'], done: true, doneDate: '2021-01-02', igdbId: 5 }];
+  const keys = ['id', 'name', 'year', 'platforms', 'genres', 'time', 'rating', 'series', 'collections', 'done', 'doneDate', 'igdbId'];
   for (const fmt of ['csv', 'txt']) {
     const rows = L.parseInboxText(L.buildExport(gms, keys, fmt, () => 'Кол'));
-    eq([rows.length, rows[0].text, rows[0].year, rows[0].hours, rows[0].x.gid, rows[0].x.platforms, rows[0].x.mainPlatform, rows[0].x.colls, rows[0].x.done, rows[0].x.igdbId], [1, 'Game; "X"', 2020, 12, 'a1', ['PC', 'PS4'], 'PC', ['Кол'], true, 5], 'выгрузка и обратный разбор ' + fmt);
+    eq([rows.length, rows[0].text, rows[0].year, rows[0].hours, rows[0].x.gid, rows[0].x.platforms, null, rows[0].x.colls, rows[0].x.done, rows[0].x.igdbId], [1, 'Game; "X"', 2020, 12, 'a1', ['PC', 'PS4'], null, ['Кол'], true, 5], 'выгрузка и обратный разбор ' + fmt);
   }
   eq(L.parseInboxText('Zelda | 2017\nMario (2020)').map(x => [x.text, x.year]), [['Zelda', 2017], ['Mario', 2020]], 'обычные строки без заголовков'); }
 
 { eq(L.parseLine('Final Fantasy II (1988) (1988 | Game Boy Advance, iOS, PSP)'), { text: 'Final Fantasy II', year: 1988, hours: 0, x: { gid: '', platforms: ['Game Boy Advance', 'iOS', 'PSP'] } }, 'год в названии не дублируется'); }
 
-// игры без основной платформы и фильтр по дате добавления
+// фильтр по дате добавления
 {
   const T = d => new Date(d + 'T12:00:00').getTime();
-  const gg = [{ name: 'A', platforms: ['PC', 'PS4'], added: T('2026-10-01'), genres: [], collections: [], props: {} }, { name: 'B', platforms: ['PC'], added: T('2026-10-20'), genres: [], collections: [], props: {} }, { name: 'C', platforms: ['PC', 'PS4'], mainPlatform: 'PS4', genres: [], collections: [], props: {} }];
-  let y = JSON.parse(JSON.stringify(L.DEFAULTS.f)); y.mainPlats = [L.NO_MAIN]; eq(L.filterGames(gg, y).map(z => z.name), ['A'], 'без платформы');
-  y = JSON.parse(JSON.stringify(L.DEFAULTS.f)); y.addedFrom = '2026-10-10'; eq(L.filterGames(gg, y).map(z => z.name), ['B'], 'добавлена с');
+  const gg = [{ name: 'A', platforms: ['PC', 'PS4'], added: T('2026-10-01'), genres: [], collections: [], props: {} }, { name: 'B', platforms: ['PC'], added: T('2026-10-20'), genres: [], collections: [], props: {} }];
+  let y = JSON.parse(JSON.stringify(L.DEFAULTS.f)); y.addedFrom = '2026-10-10'; eq(L.filterGames(gg, y).map(z => z.name), ['B'], 'добавлена с');
   y = JSON.parse(JSON.stringify(L.DEFAULTS.f)); y.addedTo = '2026-10-05'; eq(L.filterGames(gg, y).map(z => z.name), ['A'], 'добавлена по');
   y = JSON.parse(JSON.stringify(L.DEFAULTS.f)); y.addedFrom = '2026-09-01'; y.addedTo = '2026-10-31'; eq(L.filterGames(gg, y).map(z => z.name), ['A', 'B'], 'добавлена в период');
   eq(L.DEFAULTS.cols.added, 0, 'колонка даты добавления по умолчанию выключена');
@@ -82,16 +81,26 @@ x=f(); x.sort='series'; eq(L.sortGames(g.slice(),x).map(z=>z.name),['B','C','A']
   eq(L.buildEntries([{ items: all }], '', 'asc').entries.every(e => e.t === 'g'), true, 'без группировки заголовков нет');
 }
 
+// формат строки: серия после платформ, «Xbox Series X|S», время «~9 ч», «? ч»
+{ const eq2 = (a, b, m) => eq(a, b, m);
+  eq2(L.parseLine("Assassin's Creed Valhalla (2020 | PC, PS4, PS5, Xbox One, Xbox Series X|S | Assassin's Creed) – 60 ч"), { text: "Assassin's Creed Valhalla", year: 2020, hours: 60, x: { gid: '', platforms: ['PC', 'PS4', 'PS5', 'Xbox One', 'Xbox Series X/S'], series: "Assassin's Creed" } }, 'серия и X|S');
+  eq2(L.parseLine('Doom (2016 | PC) – ~9 ч').hours, 9, '~9 ч'); eq2(L.parseLine('Doom (2016 | PC) – 7.5 ч').hours, 7.5, '7.5 ч');
+  const u = L.parseLine('Doom (2016 | PC | Doom) – ? ч'); eq2([u.hours, u.unk, u.x.series], [0, true, 'Doom'], '? ч = 0 и пометка');
+  eq2(L.parseLine('Doom (2016 | PC)').x.series, undefined, 'серия необязательна');
+  eq2(L.parseLine('Game (2020 | | Серия (ремастер)) – 3 ч').x.series, 'Серия (ремастер)', 'серия без платформ и со скобками');
+  eq2(L.platOut('PC, Xbox Series X|S'), 'PC, Xbox Series X/S', 'платформа при выгрузке');
+  const ex = L.buildExport([{ id: '1', name: 'G', year: 2020, platforms: ['Xbox Series X|S'], genres: [], collections: [] }], ['name', 'platforms'], 'txt', () => ''); eq2(ex.includes('Xbox Series X/S'), true, 'выгрузка txt X/S'); }
+
 // время прохождения «до N часов» и часы в статистике
 {
-  const mk = (id, name, time, o) => Object.assign({ id, name, time, platforms: ['PS5'], mainPlatform: 'PS5', genres: [], collections: [], props: {}, done: false, series: '' }, o);
-  const gg = [mk('a', 'A', 8), mk('b', 'B', 12), mk('c', 'C', 0), mk('d', 'D', 5, { done: true, doneDate: '2025-03-01' }), mk('e', 'E', 20, { done: true, doneDate: '2026-01-05', mainPlatform: '', platforms: ['PC', 'PS4'] })];
+  const mk = (id, name, time, o) => Object.assign({ id, name, time, platforms: ['PS5'], genres: [], collections: [], props: {}, done: false, series: '' }, o);
+  const gg = [mk('a', 'A', 8), mk('b', 'B', 12), mk('c', 'C', 0), mk('d', 'D', 5, { done: true, doneDate: '2025-03-01' }), mk('e', 'E', 20, { done: true, doneDate: '2026-01-05', platforms: ['PC', 'PS4'] })];
   const f = JSON.parse(JSON.stringify(L.DEFAULTS.f)); f.maxTime = 10; eq(L.filterGames(gg, f).map(g => g.id), ['a', 'd'], 'время до 10 ч: без неизвестного времени');
   f.done = 'no'; eq(L.filterGames(gg, f).map(g => g.id), ['a'], 'непройденные до 10 ч');
   const h = L.statsHours(gg);
   eq(h.left, { n: 3, h: 20 }, 'осталось пройти'); eq(h.noTime, 1, 'игр без времени');
   eq(h.byYear, [['2026', 20], ['2025', 5]], 'часы по годам завершения');
-  eq(h.leftPlat, [['PS5', 20]], 'осталось по платформам'); eq(h.donePlat.map(e => e[0]), [L.NO_MAIN, 'PS5'], 'пройдено по платформам, без платформы отдельно');
+  eq(h.leftPlat, [['PS5', 20]], 'осталось по платформам'); eq(h.donePlat.map(e => e[0]).sort(), ['PC', 'PS4', 'PS5'], 'пройдено: игра учитывается на каждой своей платформе');
   eq(h.longest.map(g => g.id), ['e', 'b', 'a', 'd'], 'самые долгие игры');
 }
 

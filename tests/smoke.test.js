@@ -128,7 +128,7 @@ const L = require('../www/app.js');
     const orig = global.confirmBoxHook; S.set.igdbSecret = ''; // только каталог
     let warned = ''; global.__confirmHook = async txt => { warned = txt; return true; };
     const pr = G.autoResolve('l2'); await pr; delete global.__confirmHook;
-    if (!/не указана платформа/.test(warned)) throw new Error('нет предупреждения об играх без платформы: ' + warned);
+    if (/не указана платформа/.test(warned)) throw new Error('предупреждения о платформе быть не должно');
     const it = S.inbox.items.filter(i => i.listId === 'l2'); const z = it.find(i => i.text === 'Zork');
     if (!z || !z.done) throw new Error('zork not matched: ' + JSON.stringify(it));
     const unk = it.find(i => i.text.startsWith('Totally')); if (!unk || unk.done || !unk.failed) throw new Error('unknown should fail');
@@ -176,27 +176,16 @@ const L = require('../www/app.js');
     if (!/✓ \d+%/.test(G.collTilesHtml())) throw new Error('percent');
     const g = S.games[0]; G.openGameSheet(g.id); G.ACT.editPlats({}); if (!S.sheet.platsEdit) throw new Error('plats on'); G.ACT.editPlats({}); if (S.sheet.platsEdit) throw new Error('plats off'); G.closeSheet();
   });
-  await step('основная платформа, массовые действия, поиск с коллекциями', async () => {
+  await step('массовые действия, поиск с коллекциями', async () => {
     const W = global.window || global; if (!S.collections.some(c => c.id === 'zz')) S.collections.push({ id: 'zz', name: 'ZZ', created: 1 });
-    if (G.mainOf({ platforms: ['PC'] }) !== 'PC' || G.mainOf({ platforms: ['PC', 'PS4'] }) !== '' || G.mainOf({ platforms: ['PC', 'PS4'], mainPlatform: 'PS4' }) !== 'PS4') throw new Error('mainOf');
-    W.__chooseHook = async o => o.items[1].id; if (await G.requirePlatform(['PC', 'PS4'], '') !== 'PS4') throw new Error('ask pick');
-    W.__chooseHook = async () => null; if (await G.requirePlatform(['PC', 'PS4'], '') !== null) throw new Error('ask cancel');
-    if (await G.requirePlatform(['PC'], '') !== 'PC' || await G.requirePlatform(['PC', 'PS4'], 'PS4') !== 'PS4') throw new Error('single/preset');
-    W.__promptHook = async () => ' PC '; if (await G.requirePlatform([], '') !== 'PC') throw new Error('no platforms prompt');
-    W.__promptHook = async () => null; if (await G.requirePlatform([], '') !== null) throw new Error('no platforms cancel');
     const a = S.games[0], b = S.games[1]; a.platforms = ['PC', 'PS4']; b.platforms = ['PC', 'Xbox One'];
     W.__chooseHook = async o => o.items.find(x => x.id === 'PC') ? 'PC' : 'done'; W.__promptHook = async () => 'Тестовая серия';
     S.tab = 'library'; S.selMode = true; S.sel = new Set([a.id, b.id]);
-    W.__chooseHook = async () => 'main'; // шаг 1: выбор действия «основная платформа» вернёт 'main', шаг 2 нужен id платформы
-    let calls = 0; W.__chooseHook = async o => (++calls === 1 ? 'main' : 'PC'); await G.bulkMore([a.id, b.id]);
-    if (a.mainPlatform !== 'PC' || b.mainPlatform !== 'PC') throw new Error('bulk main');
     W.__chooseHook = async () => 'series'; await G.bulkMore([a.id, b.id]); if (a.series !== 'Тестовая серия' || b.series !== 'Тестовая серия') throw new Error('bulk series');
     W.__chooseHook = async () => 'done'; await G.bulkMore([a.id, b.id]); if (!a.done || !b.done) throw new Error('bulk done');
     W.__chooseHook = async () => 'undone'; await G.bulkMore([a.id, b.id]); if (a.done || b.done) throw new Error('bulk undone');
     W.__chooseHook = async () => 'genre'; W.__promptHook = async () => 'Тест-жанр'; await G.bulkMore([a.id]); if (!a.genres.includes('Тест-жанр')) throw new Error('bulk genre');
     S.selMode = false; S.sel.clear(); delete W.__chooseHook; delete W.__promptHook;
-    const f = JSON.parse(JSON.stringify(S.set.f)); f.mainPlats = ['PC']; if (!G.filterGames(S.games, f).every(g => G.mainOf(g) === 'PC')) throw new Error('mainPlats filter');
-    f.mainPlats = [G.NO_MAIN]; if (G.filterGames(S.games, f).some(g => G.mainOf(g))) throw new Error('no main filter');
     S.tab = 'search'; G.render(); S.search.addColls = ['zz', G.DONE_ID]; G.renderSearchBody();
     const tools = document.querySelector('#sTools').innerHTML; if (!tools.includes('Добавлять в')) throw new Error('add colls button'); if (!document.querySelector('#sActive').innerHTML.includes('Завершено')) throw new Error('add colls chips');
     await G.quickTap('igdb:1', S.search.addColls); const q = S.games.find(g => g.igdbId === 1); if (!q || !q.collections.includes('zz') || !q.done) throw new Error('quick tap');
@@ -206,22 +195,20 @@ const L = require('../www/app.js');
     S.tab = 'library'; G.render(); if (document.querySelector('#view').className !== 'fx') throw new Error('fx layout'); S.tab = 'settings'; G.render(); if (document.querySelector('#view').className !== '') throw new Error('settings layout');
     S.tab = 'library'; G.render();
   });
-  await step('основная платформа по тапу, +N коллекций, настройки списка разбора', async () => {
+  await step('+N коллекций, настройки списка разбора', async () => {
     const W = global.window || global;
-    const g = S.games[0]; g.platforms = ['PC', 'PS4']; g.mainPlatform = ''; G.openGameSheet(g.id); document.querySelector('#f_platforms').value = 'PC, PS4';
-    G.ACT.shPlat({ dataset: { v: 'PS4' } }); if (S.sheet.draft.mainPlatform !== 'PS4') throw new Error('shPlat'); G.ACT.shPlat({ dataset: { v: 'PS4' } }); if (S.sheet.draft.mainPlatform) throw new Error('shPlat off'); G.closeSheet();
-    S.set.cols.mainPlatform = 1; S.set.cols.platforms = 0; S.set.view = 'list'; S.tab = 'library'; G.render(); S.set.view = 'grid';
+    S.set.cols.platforms = 1; S.set.view = 'list'; S.tab = 'library'; G.render(); S.set.view = 'grid';
         S.collections.push({ id: 'n1', name: 'Н1', created: 1 }, { id: 'n2', name: 'Н2', created: 2 }, { id: 'n3', name: 'Н3', created: 3 }); const gg = S.games[0]; gg.collections = ['n1', 'n2', 'n3'];
     S.set.view = 'list'; S.tab = 'library'; G.render(); G.ACT.gameColls({ dataset: { gid: gg.id } }); S.set.view = 'grid';
     G.ACT.openFilters(); G.ACT.openFilters();
     const l = S.inbox.lists[0] || { id: 'l1', name: 'Список', created: 1 }; if (!S.inbox.lists.length) S.inbox.lists.push(l);
     const it = { id: 'it1', listId: l.id, text: 'Тестовая игра', done: false, gameId: '', created: 1 }; S.inbox.items.push(it);
-    l.platform = 'PC'; l.colls = ['n1']; l.markDone = true; const e = G.effItem(it); if (e.platform !== 'PC' || e.colls[0] !== 'n1' || !e.markDone) throw new Error('effItem');
-    it.platform = 'PlayStation 4'; it.colls = []; it.markDone = false; const e2 = G.effItem(it); if (e2.platform !== 'PlayStation 4' || e2.colls.length || e2.markDone) throw new Error('item override');
-    delete it.platform; delete it.colls; delete it.markDone;
+    l.colls = ['n1']; l.markDone = true; const e = G.effItem(it); if (e.colls[0] !== 'n1' || !e.markDone) throw new Error('effItem');
+    it.colls = []; it.markDone = false; const e2 = G.effItem(it); if (e2.colls.length || e2.markDone) throw new Error('item override');
+    delete it.colls; delete it.markDone;
     const tg = { id: 'tg', name: 'Target', platforms: ['PS4', 'Xbox One'], genres: [], collections: [], props: {}, done: false, hasCover: false }; S.games.push(tg);
-    G.linkItem(it, tg, true); if (!tg.collections.includes('n1') || !tg.done || tg.mainPlatform !== 'PC' || !tg.platforms.includes('PC')) throw new Error('applyDefaults');
-    S.inboxList = l.id; S.tab = 'inbox'; G.render(); if (!G.viewInbox().includes('lstPlat')) throw new Error('list settings ui');
+    G.linkItem(it, tg, true); if (!tg.collections.includes('n1') || !tg.done) throw new Error('applyDefaults');
+    S.inboxList = l.id; S.tab = 'inbox'; G.render(); if (G.viewInbox().includes('lstPlat') || !G.viewInbox().includes('lstColls')) throw new Error('list settings ui');
     W.__chooseHook = async () => 'done'; const it2 = { id: 'it2', listId: l.id, text: 'Вторая', done: false, gameId: '', created: 2 }; S.inbox.items.push(it2); await G.itemOpts(it2); if (it2.markDone !== false) throw new Error('itemOpts toggle ' + it2.markDone); delete W.__chooseHook;
     S.inboxList = null; S.tab = 'library'; G.render();
   });
@@ -241,7 +228,7 @@ const L = require('../www/app.js');
     S.set.rawgKey = 'RK'; S.set.mainSrc = 'rawg'; S.search.src = 'rawg'; S.tab = 'search'; S.search.q = 'rawg game'; S.search.f = { genre: '', genreName: '', platform: '', platformName: '', year: '', minRating: 0 };
     await G.runSearch(true); if (!S.search.results.length || S.search.results[0].rid !== 'rawg:500') throw new Error('rawg search');
     if (!document.querySelector('#sTools').innerHTML.includes('RAWG')) throw new Error('source button');
-    const left0 = S.set.rawgQuota.left, g = await G.addFromIgdb('rawg:500', []); if (!g || g.rawgId !== 500 || !g.rawgUrl.includes('rawg-game') || g.mainPlatform !== 'PC') throw new Error('add from rawg');
+    const left0 = S.set.rawgQuota.left, g = await G.addFromIgdb('rawg:500', []); if (!g || g.rawgId !== 500 || !g.rawgUrl.includes('rawg-game')) throw new Error('add from rawg');
     if (S.set.rawgQuota.left >= left0) throw new Error('quota not spent');
     await G.refreshOne(g, 'rawg');
     S.set.rawgQuota = { left: 5, renew: '2000-01-01' }; G.rawgQuotaTick(); if (S.set.rawgQuota.left !== 20000 || S.set.rawgQuota.renew <= '2000-01-01') throw new Error('quota renew');
@@ -260,16 +247,21 @@ const L = require('../www/app.js');
     await G.handleShared('Alpha Game (2011 | PC) – 5 ч\nBeta Game'); if (S.tab !== 'inbox' || !S.inbox.items.some(i => i.text === 'Alpha Game' && i.x && i.x.platforms[0] === 'PC')) throw new Error('shared to inbox');
     W.__chooseHook = async () => 'search'; await G.handleShared('Gamma Game (2012)'); if (S.tab !== 'search' || S.search.q !== 'Gamma Game') throw new Error('shared to search'); delete W.__chooseHook;
     const tg = { id: 'ex1', name: 'Extra Game', platforms: [], genres: [], collections: [], props: {}, done: false, hasCover: false, series: '' };
-    G.applyExtra({ year: 2001, hours: 7, x: { platforms: ['PC', 'PS4'], mainPlatform: 'PS4', genres: ['RPG'], series: 'Saga', colls: ['Новая из текста'], done: true, rating: 7.5 } }, tg);
-    if (tg.year !== 2001 || tg.time !== 7 || tg.mainPlatform !== 'PS4' || !tg.genres.length || tg.series !== 'Saga' || !tg.done || tg.rating !== 7.5 || tg.collections.length !== 1) throw new Error('applyExtra');
+    G.applyExtra({ year: 2001, hours: 7, x: { platforms: ['PC', 'PS4'], genres: ['RPG'], series: 'Saga', colls: ['Новая из текста'], done: true, rating: 7.5 } }, tg);
+    if (tg.year !== 2001 || tg.time !== 7 || !tg.genres.length || tg.series !== 'Saga' || !tg.done || tg.rating !== 7.5 || tg.collections.length !== 1) throw new Error('applyExtra');
     const doubt = { id: 'db1', listId: lst.id, text: 'Doubt Game', year: 0, hours: 0, done: false, gameId: '', created: 1, doubt: true, cands: [{ rid: 'igdb:1', name: 'Fallout: New Vegas', year: 2010, platforms: ['PC'] }] }; S.inbox.items.push(doubt);
     W.__chooseHook = async () => 'igdb:1'; await G.ACT.itPick({ dataset: { id: 'db1' } }); delete W.__chooseHook; if (!doubt.done || doubt.doubt) throw new Error('doubt pick');
     G.openExport(S.games, 'Тест'); if (!G.exportText().startsWith('Название')) throw new Error('export text ' + G.exportText().slice(0, 20));
     G.ACT.expCol({ dataset: { k: 'rating' } }); if (!G.exportText().includes('Рейтинг')) throw new Error('export col'); G.ACT.expFmt({ dataset: { v: 'txt' } }); if (!G.exportText().includes(' | ')) throw new Error('export fmt'); G.closeSheet();
     if (G.gameLine({ name: 'A', year: 2020, platforms: ['PC', 'PS4'], time: 5 }) !== 'A (2020 | PC, PS4) – 5 ч') throw new Error('gameLine');
-    S.set.igdbProxy = 'http://localhost:8787/'; S.set.igdbId = ''; S.set.igdbSecret = ''; global.__urls = []; const f0 = global.fetch; global.fetch = async (u, o) => { global.__urls.push(String(u)); return f0(u, o); };
-    S.block = null; S.lists = {}; await G.igdb('/genres', 'fields id; limit 1;'); global.fetch = f0; if (!global.__urls.some(u => u.startsWith('http://localhost:8787/genres')) || global.__urls.some(u => u.includes('twitch'))) throw new Error('proxy url ' + global.__urls);
-    S.set.igdbProxy = ''; S.set.igdbId = 'ID'; S.set.igdbSecret = 'SEC'; S.tab = 'library'; G.render();
+    S.set.sync = Object.assign({}, S.set.sync, { url: 'http://localhost:8787', token: 'TOK', on: true, igdb: true }); S.set.igdbId = ''; S.set.igdbSecret = ''; global.__urls = []; const f0 = global.fetch; global.fetch = async (u, o) => { global.__urls.push(String(u)); return f0(u, o); };
+    S.block = null; S.lists = {}; await G.igdb('/genres', 'fields id; limit 1;'); global.fetch = f0; if (!global.__urls.some(u => u.startsWith('http://localhost:8787/igdb/genres')) || global.__urls.some(u => u.includes('twitch'))) throw new Error('proxy url ' + global.__urls);
+    // сервер выключен переключателем: ключей нет, поиск недоступен; сервер включён, но не отвечает: предложение отключить
+    S.set.sync.on = false; if (S.set.sync.on !== false) throw new Error('toggle'); S.set.igdbId = 'ID'; S.set.igdbSecret = 'SEC'; S.set.sync = Object.assign({}, S.set.sync, { url: '', token: '', igdb: false, on: true });
+    { const f1 = global.fetch; let asked = ''; S.set.sync = Object.assign({}, S.set.sync, { url: 'http://127.0.0.1:9', token: 'TOK', igdb: true, on: true }); global.__confirmHook = async t => { asked = t; return true; }; global.fetch = async u => { if (String(u).startsWith('http://127.0.0.1:9')) throw new Error('down'); return f1(u); };
+      S.block = null; await G.igdb('/genres', 'fields id; limit 1;'); global.fetch = f1; delete global.__confirmHook;
+      if (!/локального сервера/.test(asked) || S.set.sync.on !== false) throw new Error('напоминание о локальном сервере: ' + asked); S.set.sync = Object.assign({}, S.set.sync, { url: '', token: '', igdb: false, on: true }); }
+    S.tab = 'library'; G.render();
   });
   await step('карточка: название, завершено, обложка, меню; выбор в разборе; график статистики', async () => {
     const W = global.window || global;
@@ -281,7 +273,6 @@ const L = require('../www/app.js');
     G.ACT.shCover(); W.__chooseHook = async () => 'shareGame'; (global.window || global).open = () => {}; await G.ACT.shMenu(); delete W.__chooseHook; G.closeSheet();
     const lst = S.inbox.lists[0]; const a = { id: 'sa1', listId: lst.id, text: 'Sel A', done: false, gameId: '', created: 1 }, b = { id: 'sb1', listId: lst.id, text: 'Sel B', done: false, gameId: '', created: 2 }; S.inbox.items.push(a, b);
     S.inboxList = lst.id; S.tab = 'inbox'; G.render(); G.toggleInSel('sa1', true); G.toggleInSel('sb1'); if (S.inSel.size !== 2 || !S.inSelMode) throw new Error('inbox select');
-    W.__chooseHook = async () => 'PC'; await G.ACT.inAct({ dataset: { m: 'plat' } }); delete W.__chooseHook; if (a.platform !== 'PC' || b.platform !== 'PC') throw new Error('inbox platform for selected');
     G.toggleInSel('sa1', true); W.__chooseHook = async () => 'yes'; await G.ACT.inAct({ dataset: { m: 'done' } }); delete W.__chooseHook; if (a.markDone !== true) throw new Error('inbox done');
     S.inboxList = null; S.tab = 'stats'; G.render(); G.ACT.statGo({ dataset: { k: 'genres', v: 'RPG' } }); if (S.tab !== 'library' || S.set.f.genres[0] !== 'RPG') throw new Error('statGo');
     G.ACT.statGo({ dataset: { k: 'done' } }); if (S.set.f.done !== 'yes' || S.set.f.genres.length) throw new Error('statGo done'); S.set.f.done = '';
@@ -296,7 +287,7 @@ const L = require('../www/app.js');
     S.tab = 'library'; S.selMode = true; S.sel = new Set([S.games[0].id]); G.render(); const bar = document.querySelector('#selbar').innerHTML; if (!bar.includes('data-m="add"') || bar.includes('Переместить') || !bar.includes('selcnt')) throw new Error('selbar'); S.selMode = false; S.sel.clear(); G.render();
     G.ACT.statGo({ dataset: { k: 'genres', v: 'RPG' } }); if (S.tab !== 'library' || S.set.f.genres[0] !== 'RPG') throw new Error('statGo'); G.ACT.statGo({ dataset: { k: 'done' } }); if (S.set.f.done !== 'yes' || S.set.f.genres.length) throw new Error('statGo done'); Object.assign(S.set.f, { done: '', genres: [] });
     const lst = S.inbox.lists[0]; S.inboxList = lst.id; S.tab = 'inbox'; const its = [{ id: 'sel1', listId: lst.id, text: 'Sel one', done: false, gameId: '', created: 1 }, { id: 'sel2', listId: lst.id, text: 'Sel two', done: false, gameId: '', created: 2 }]; S.inbox.items.push(...its); G.render();
-    G.toggleInSel('sel1', true); G.toggleInSel('sel2', true); if (S.inSel.size !== 2 || !document.querySelector('#selbar').innerHTML.includes('data-m="plat"')) throw new Error('inbox select');
+    G.toggleInSel('sel1', true); G.toggleInSel('sel2', true); if (S.inSel.size !== 2 || !document.querySelector('#selbar').innerHTML.includes('data-m="colls"') || document.querySelector('#selbar').innerHTML.includes('data-m="plat"')) throw new Error('inbox select');
     W.__chooseHook = async () => 'yes'; await G.ACT.inAct({ dataset: { m: 'done' } }); delete W.__chooseHook; if (its[0].markDone !== true || its[1].markDone !== true || S.inSelMode) throw new Error('inbox bulk done');
     const pp = await G.ACT.inAct({ dataset: { m: 'all' } }); S.inSel.clear(); S.inSelMode = false;
     S.retGame = { id: S.games[0].id, tab: 'library' }; S.tab = 'search'; G.ACT.retGame(); if (S.tab !== 'library' || !S.sheet) throw new Error('retGame'); G.closeSheet();
@@ -323,8 +314,8 @@ const L = require('../www/app.js');
   });
   await step('общие списки платформ и жанров: короткие названия и объединение', async () => {
     if (G.canonPlat('PlayStation 4', true) !== 'PS4' || G.canonPlat('Playstation 4', true) !== 'PS4' || G.canonPlat('PS4', true) !== 'PS4') throw new Error('canon PS4');
-    const a = { id: 'pd1', name: 'Dict Game', platforms: ['PlayStation 4', 'PS4', 'Game Boy Advance'], genres: ['Role-playing (RPG)', 'RPG2'], mainPlatform: 'Playstation 4', collections: [], props: {}, done: false, hasCover: false, series: '' }; S.games.push(a);
-    await G.canonAll(); if (JSON.stringify(a.platforms) !== JSON.stringify(['PS4', 'Game Boy Advance']) || a.mainPlatform !== 'PS4') throw new Error('canonAll ' + JSON.stringify(a.platforms) + a.mainPlatform);
+    const a = { id: 'pd1', name: 'Dict Game', platforms: ['PlayStation 4', 'PS4', 'Game Boy Advance'], genres: ['Role-playing (RPG)', 'RPG2'], collections: [], props: {}, done: false, hasCover: false, series: '' }; S.games.push(a);
+    await G.canonAll(); if (JSON.stringify(a.platforms) !== JSON.stringify(['PS4', 'Game Boy Advance'])) throw new Error('canonAll ' + JSON.stringify(a.platforms));
     let n = await G.dictRename('plat', 'Game Boy Advance', 'GBA'); if (n < 1 || !a.platforms.includes('GBA') || G.canonPlat('Game Boy Advance') !== 'GBA') throw new Error('rename ' + n);
     n = await G.dictMerge('genre', 'RPG2', 'Role-playing (RPG)'); if (a.genres.length !== 1 || G.canonGenre('RPG2') !== 'Role-playing (RPG)') throw new Error('genre merge ' + JSON.stringify(a.genres));
     S.set.f.platforms = ['PlayStation 4']; await G.canonAll(); if (S.set.f.platforms[0] !== 'PS4') throw new Error('filters canon'); S.set.f.platforms = [];
@@ -332,28 +323,45 @@ const L = require('../www/app.js');
     const W = global.window || global; W.__promptHook = async () => 'ps 4'; W.__chooseHook = async () => 'x'; delete W.__promptHook; delete W.__chooseHook;
     S.games = S.games.filter(g => g.id !== 'pd1');
   });
+  await step('обновление из источника: сравнение, время IGDB, адрес сервера', async () => {
+    const W = global.window || global; S.set.igdbId = 'ID'; S.set.igdbSecret = 'SEC'; S.block = null; S.set.sync = Object.assign({}, S.set.sync, { url: '', token: '', on: true });
+    const g = { id: 'cmpg', name: 'Compare Me', year: 1999, rating: 5, time: 3, genres: ['X'], platforms: ['PC'], series: 'Моя', collections: [], props: {}, done: false, hasCover: false, shotCount: 0, igdbId: 1, rawgId: 0, added: 1 }; S.games.push(g);
+    G.openGameSheet(g.id); W.__chooseHook = async () => 'cmp'; await G.ACT.refreshIgdb({ dataset: { src: 'igdb' } }); delete W.__chooseHook;
+    if (!S.mg || !S.mgRefresh || S.mg.ids.length !== 2) throw new Error('сравнение не открылось');
+    const vid = S.mg.ids[1]; G.ACT.mgTake({ dataset: { id: vid, k: 'year' } }); G.ACT.mgDo(); await G.ACT.mgGo();
+    if (g.year !== 2010 || g.series !== 'Моя' || !S.games.includes(g) || S.games.some(x => x.virtual)) throw new Error('применение результата сравнения ' + g.year);
+    // только время IGDB у выделенных
+    g.time = 0; W.__chooseHook = async () => 'igdbtime'; await G.bulkMore([g.id]); delete W.__chooseHook;
+    if (g.time !== 30) throw new Error('время IGDB ' + g.time);
+    // адрес сервера из трёх полей
+    if (G.ipMask('192.168.0.15x') !== '192.168.0.15' || G.addrOf({ url: 'https://10.0.0.2:8787' }).port !== '8787') throw new Error('маска адреса');
+    // текстовый вид с серией
+    S.set.tcols = { year: 1, platforms: 1, series: 1, time: 1, done: 0, main: 0 };
+    const t = G.textLines([{ t: 'g', g: { name: 'AC', year: 2020, platforms: ['Xbox Series X|S'], series: 'Assassins', time: 60 }, x: false }]);
+    if (t.trim() !== 'AC (2020 | Series X/S | Assassins) – 60 ч') throw new Error('текст: ' + t);
+    S.games = S.games.filter(x => x.id !== 'cmpg'); S.tab = 'library'; G.render();
+  });
   await step('export/import', async () => { const d = { app: 'game-catalog', games: S.games, collections: S.collections, props: [], covers: {} }; const before = S.games.length; const n = await G.importData(JSON.parse(JSON.stringify(d)), 'merge'); if (S.games.length !== before) throw new Error('dup ' + S.games.length + ' vs ' + before); });
-  await step('без платформы: красная метка, фильтр, ширина колонок, дата добавления, без вопроса о платформе', async () => {
+  await step('список: жанры и платформы, ширина колонок, дата добавления, без вопроса о платформе', async () => {
     S.games = S.games.filter(g => !g.id.startsWith('np_'));
     const mk = (id, name, extra) => Object.assign({ id, name, year: 2001, rating: 0, time: 0, genres: [], platforms: ['PC', 'PS4'], series: 'Очень длинное название серии игр', collections: [], props: {}, done: false, hasCover: false, shotCount: 0, mainPlatform: '', igdbId: 0, rawgId: 0, added: Date.UTC(2026, 9, 20) }, extra);
-    S.games.push(mk('np_a', 'NoPlat A'), mk('np_b', 'NoPlat B', { mainPlatform: 'PC' }));
+    S.games.push(mk('np_a', 'NoPlat A'), mk('np_b', 'NoPlat B'));
     S.set.cols.added = 1; S.set.colW = { series: 90 };
     const html = G.listHtml(S.games.filter(g => g.id.startsWith('np_')));
-    if (!/tr data-gid="np_a" class="[^"]*noplat/.test(html) || /tr data-gid="np_b" class="[^"]*noplat/.test(html)) throw new Error('метка noplat в списке');
-    if (!html.includes('class="npb sm"') || !html.includes('data-rz="series"') || !html.includes('width:90px') || !html.includes('Добавлена') || !html.includes('20.10.2026')) throw new Error('список: ! / ширина / дата добавления');
-    if (!G.cardHtml(S.games.find(g => g.id === 'np_a')).includes('noplat') || G.cardHtml(S.games.find(g => g.id === 'np_b')).includes('noplat')) throw new Error('метка noplat на плитке');
-    if (!G.noPlatSect().includes('Без платформы')) throw new Error('красный фильтр');
+    if (html.includes('noplat') || html.includes('npb') || !html.includes('class="gpt"') || html.includes('data-ck="mainPlatform"')) throw new Error('список: колонки жанров/платформ');
+    if (!html.includes('data-rz="series"') || !html.includes('width:90px') || !html.includes('Добавлена') || !html.includes('20.10.2026')) throw new Error('список: ! / ширина / дата добавления');
+    { const ch = G.cardHtml(Object.assign({}, S.games.find(g => g.id === 'np_a'), { rating: 8.1, year: 2001 })); if (ch.includes('noplat') || !ch.includes('class="rt"') || !ch.includes('<span class="sp">2001</span>') || ch.includes('class="m"')) throw new Error('плитка: рейтинг сверху, год снизу'); }
     S.set.cols.added = 0; S.set.colW = {};
     // платформу при добавлении не спрашиваем: без выбора у игры с несколькими платформами основной нет, заданная заранее ставится
     let asked = false; global.__chooseHook = async () => { asked = true; return null; }; global.__promptHook = async () => { asked = true; return null; };
     const g1 = await G.addFromIgdb('igdb:150', [], {}); if (!g1 || asked) throw new Error('спросили платформу или не добавили');
-    const g2 = await G.addFromIgdb('igdb:151', [], { platform: 'Switch' }); if (!g2 || g2.mainPlatform !== 'Switch' || !g2.platforms.includes('Switch')) throw new Error('заранее выбранная платформа ' + (g2 && g2.mainPlatform));
+    const g2 = await G.addFromIgdb('igdb:151', [], { series: 'Моя серия', hours: 42 }); if (!g2 || g2.series !== 'Моя серия' || g2.time !== 42) throw new Error('серия и время из строки важнее источника ' + (g2 && g2.series + g2.time));
     if (!g1.added || !g2.added) throw new Error('дата добавления не записана');
     delete global.__chooseHook; delete global.__promptHook;
     S.games = S.games.filter(g => !g.id.startsWith('np_') && g.id !== g1.id && g.id !== g2.id);
   });
   await step('текстовый вид, группы, игры серий, жанры колонкой', async () => {
-    const mk = (id, name, extra) => Object.assign({ id, name, year: 2003, rating: 0, time: 9.5, genres: ['RPG'], platforms: ['PC', 'PS2'], series: 'S', collections: [], props: {}, done: false, hasCover: false, shotCount: 0, mainPlatform: 'PC', igdbId: 0, rawgId: 0, added: 1 }, extra);
+    const mk = (id, name, extra) => Object.assign({ id, name, year: 2003, rating: 0, time: 9.5, genres: ['RPG'], platforms: ['PC', 'PS2'], series: 'S', collections: [], props: {}, done: false, hasCover: false, shotCount: 0, igdbId: 0, rawgId: 0, added: 1 }, extra);
     const a = mk('tx_a', 'Silent Hill 3'), b = mk('tx_b', 'Silent Hill 2', { year: 2001, done: true });
     const items = [{ t: 'h', text: '2003', n: 1, lvl: 1 }, { t: 'g', g: a, x: false }, { t: 'h', text: '★ Из серий', n: 1, lvl: 2 }, { t: 'g', g: b, x: true }];
     S.set.tcols = { year: 1, platforms: 1, time: 1, done: 1, main: 1 };

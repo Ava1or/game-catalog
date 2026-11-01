@@ -153,3 +153,12 @@ IMPORTANT: Android will not install an app with a new signature over the old one
 - **Filter presets** (the bookmark button in the header and in “Filters”): ready-made “No platform”, “Added this month”, “Not completed”, “Not completed, up to 10 hours” and your own saved ones (“Save the current filters…”, deleting is there as well).
 - **Quick platform edit:** a long press on the “Platform” cell in the list or on the red “!” (list, tile) opens the main platform choice without entering the card.
 - **Statistics:** not completed and how many hours are left, games without time, hours of completed ones by year, the remainder and completed by platform (a tap on a platform opens the uncompleted ones), the longest games.
+
+## Latest changes (they take precedence over earlier descriptions above)
+- The main platform is removed completely (card, filters, saved sets, search, Inbox, table, red highlighting, groupings, export).
+- List: “Genres” and “Platforms” columns are on by default, small font, wrapping, never more lines than the title.
+- Tiles: rating top-left and year bottom-left on the cover; only the title below.
+- Inbox: `Title (2020 | PC, PS4 | Series) – 60 h`; series optional; `~9 h`, `7.5 h`; `? h` = unknown (time from IGDB); `Xbox Series X|S` becomes `Xbox Series X/S`.
+- Text view: series added, no “Export to file” button.
+- Card: update from source offers “Update all” or “Compare” (merge tool); “Update time from IGDB”; time editor has IGDB, Cubiq, HLTB buttons. Selection: “Update only IGDB time”.
+- Local server: on/off switch, address in three fields (http/https, IP, port), offer to turn it off when unreachable during IGDB search; own-proxy field removed.

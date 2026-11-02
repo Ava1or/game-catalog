@@ -18,7 +18,7 @@ const plug = n => window.Capacitor && window.Capacitor.Plugins && window.Capacit
 const COLS = [['cover', 'Cover'], ['genres', 'Genres'], ['platforms', 'Platforms'], ['done', 'Completed'], ['doneDate', 'Completion date'], ['year', 'Year'], ['rating', 'Rating'], ['time', 'Time'], ['series', 'Series'], ['colls', 'Collections'], ['added', 'Date added']];
 const SORTS = [['name', 'Title'], ['year', 'Year'], ['rating', 'Rating'], ['time', 'Playtime'], ['series', 'Series'], ['added', 'Date added'], ['done', 'Completed'], ['doneDate', 'Completion date']];
 const DEFAULTS = {
-  platDict: {}, genreDict: {}, rawgKey: '', mainSrc: 'igdb', rawgQuota: { left: 20000, renew: '' }, rawgWarn: 0, igdbId: '', igdbSecret: '', igdbToken: '', igdbExp: 0, sync: { url: '', token: '', on: true, scheme: 'http', auto: true, off: 0, last: 0, msg: '', err: '', igdb: false }, exp: { fmt: 'csv', keys: ['name', 'year', 'platforms', 'time', 'done'] }, sgdbKey: '', pin: true, propCols: {}, theme: 'dark', zoom: {}, usage: { m: '', igdb: 0, sgdb: 0, hltb: 0 }, hltbCache: {}, view: 'grid', group: '', groupDir: 'asc', tcols: { year: 1, platforms: 1, series: 1, time: 1, done: 1, main: 1 }, colW: {}, mgW: {}, pageSize: 40, vmode: { coll: 'tiles', series: 'tiles', search: 'tiles' },
+  platDict: {}, genreDict: {}, rawgKey: '', mainSrc: 'igdb', rawgQuota: { left: 20000, renew: '' }, rawgWarn: 0, igdbId: '', igdbSecret: '', igdbToken: '', igdbExp: 0, match: { cLow: 85, cHigh: 98, sLow: 50, sHigh: 98 }, sync: { url: '', token: '', on: true, scheme: 'http', auto: true, off: 0, last: 0, msg: '', err: '', igdb: false }, exp: { fmt: 'csv', keys: ['name', 'year', 'platforms', 'time', 'done'] }, sgdbKey: '', pin: true, propCols: {}, theme: 'dark', zoom: {}, usage: { m: '', igdb: 0, sgdb: 0, hltb: 0 }, hltbCache: {}, view: 'grid', group: '', groupDir: 'asc', tcols: { year: 1, platforms: 1, series: 1, time: 1, done: 1, main: 1 }, colW: {}, mgW: {}, pageSize: 40, vmode: { coll: 'tiles', series: 'tiles', search: 'tiles' },
   cols: { cover: 1, genres: 1, platforms: 1, done: 1, doneDate: 1, year: 1, rating: 1, time: 1, series: 1, colls: 1, added: 0 },
   f: { q: '', years: [], genres: [], platforms: [], series: [], collections: [], collMode: 'or', props: [], addedFrom: '', addedTo: '', seriesMode: '', maxTime: 0, done: '', minRating: 0, sort: 'name', dir: 'asc' }
 };
@@ -1794,15 +1794,15 @@ function viewInbox() {
       const it = itemsOf(l.id), left = it.filter(i => !i.done).length, pct = it.length ? Math.round((it.length - left) * 100 / it.length) : 0;
       return '<div class="lcard" data-act="listOpen" data-id="' + l.id + '"><div style="flex:1;min-width:0"><div class="nm">' + esc(l.name) + '</div><div class="ct">left ' + left + ' of ' + it.length + '</div><div class="pb"><i style="width:' + pct + '%"></i></div></div><button class="mn2" data-act="listMenu" data-id="' + l.id + '">⋮</button></div>';
     }).join('');
-    return '<div class="hdr2"><h2>Inbox</h2></div>' + (cards || '<p class="hint">Here live the lists of games that need processing: paste titles from notes or Steam, then find them one by one in IGDB.<br>Tap “+” to create a list.</p>');
+    return '<div class="hdr2"><h2>Parse</h2></div>' + (cards || '<p class="hint">Here live the lists of games that need processing: paste titles from notes or Steam, then find them one by one in IGDB.<br>Tap “+” to create a list.</p>');
   }
-  const l = S.inbox.lists.find(x => x.id === S.inboxList), all = itemsOf(l.id), left = all.filter(i => !i.done).length;
+  const l = S.inbox.lists.find(x => x.id === S.inboxList), all = itemsOf(l.id), left = all.filter(i => !i.done).length, nChk = all.filter(i => !i.done && (i.rev || i.doubt)).length;
   const list = S.showDone ? all : all.filter(i => !i.done);
   const row = i => {
     const g = i.done ? gameById(i.gameId) : null;
-    return '<div class="it' + (i.done ? ' done' : '') + (S.inSel.has(i.id) ? ' isel' : '') + '"' + (i.done ? '' : ' data-iid="' + i.id + '" data-lpm="item"') + '><div class="tx" data-act="itOpen" data-id="' + i.id + '">' + (S.inSelMode && !i.done ? '<span class="ichk">' + (S.inSel.has(i.id) ? '✓' : '') + '</span>' : '') + (i.done ? '<span class="okc">✓</span> ' : '') + esc(i.text)
-      + (i.done ? '<div class="sub">→ ' + (g ? esc(g.name) : 'the game was deleted from the catalog') + '</div>' : (() => { const e = effItem(i), parts = [i.year || '', i.hours ? i.hours + ' h' : i.unk ? '? h' : '', i.x && i.x.series ? '📚 ' + i.x.series : '', i.failed ? '⚠ not recognized' : '', i.doubt ? '❓ doubtful: choose from the options' : '', collNames(e.colls), e.markDone ? '✓ completed' : ''].filter(Boolean); return parts.length ? '<div class="sub">' + esc(parts.join(' · ')) + '</div>' : ''; })()) + '</div><div class="ia">'
-      + (i.done ? '' : (i.doubt ? '<button data-act="itPick" data-id="' + i.id + '" title="Choose from the options">❓</button>' : '') + '<button data-act="itOpts" data-id="' + i.id + '" title="Collections and “Completed” for this row">⚙</button><button data-act="itMatch" data-id="' + i.id + '" title="Match with a game from the catalog">🔗</button><button data-act="itEdit" data-id="' + i.id + '" title="Edit">✎</button>')
+    return '<div class="it' + (i.done ? ' done' : '') + (!i.done && (i.rev || i.doubt) ? ' chkrow' : '') + (S.inSel.has(i.id) ? ' isel' : '') + '"' + (i.done ? '' : ' data-iid="' + i.id + '" data-lpm="item"') + '><div class="tx" data-act="itOpen" data-id="' + i.id + '">' + (S.inSelMode && !i.done ? '<span class="ichk">' + (S.inSel.has(i.id) ? '✓' : '') + '</span>' : '') + (i.done ? '<span class="okc">✓</span> ' : '') + esc(i.text)
+      + (i.done ? '<div class="sub">→ ' + (g ? esc(g.name) : 'the game was deleted from the catalog') + '</div>' : (() => { const e = effItem(i), parts = [i.year || '', i.hours ? i.hours + ' h' : i.unk ? '? h' : '', i.x && i.x.series ? '📚 ' + i.x.series : '', i.failed ? '⚠ not recognized' : '', i.rev ? '≈ ' + i.rev.pct + '%: in the catalog “' + ((gameById(i.rev.gid) || {}).name || '?') + '”, please check' : '', i.doubt ? '≈ found in the source inexactly (' + ((i.cands && i.cands[0] && i.cands[0].pct) || '') + '%), please check' : '', collNames(e.colls), e.markDone ? '✓ completed' : ''].filter(Boolean); return parts.length ? '<div class="sub">' + esc(parts.join(' · ')) + '</div>' : ''; })()) + '</div><div class="ia">'
+      + (i.done ? '' : (i.doubt ? '<button data-act="itPick" data-id="' + i.id + '" title="Choose from the options">≈</button>' : '') + (i.rev ? '<button data-act="itRev" data-id="' + i.id + '" title="Check the match with the catalog">≈</button>' : '') + '<button data-act="itOpts" data-id="' + i.id + '" title="Collections and “Completed” for this row">⚙</button><button data-act="itMatch" data-id="' + i.id + '" title="Match with a game from the catalog">🔗</button><button data-act="itEdit" data-id="' + i.id + '" title="Edit">✎</button>')
       + '<button data-act="itDel" data-id="' + i.id + '" title="Delete">🗑</button></div></div>';
   };
   return '<div class="hdr2"><div style="display:flex;align-items:center;gap:10px;min-width:0"><button class="btn" data-act="listBack">←</button><h2 style="font-size:19px">' + esc(l.name) + '</h2></div><span class="sub">left ' + left + ' of ' + all.length + '</span></div>'
@@ -1810,7 +1810,7 @@ function viewInbox() {
     + '<div class="lrw"><span>Collections</span><button class="btn" data-act="lstColls">' + esc(collNames((l.colls || []).filter(id => collById(id))) || 'not chosen') + '</button></div>'
     + '<div class="lrw"><span>Completed</span><button class="p' + (l.markDone ? ' on' : '') + '" data-act="lstDone">' + (l.markDone ? '✓ yes' : 'no') + '</button></div></div>'
     + '<div class="addrow"><input id="itNew" placeholder="Game title…"><button class="btn acc" data-act="itAdd">Add</button></div>'
-    + '<div class="toolbar"><button class="btn acc" data-act="itAuto">⚡ Process automatically</button><button class="btn" data-act="itPaste">Paste a list…</button><button class="btn" data-act="itToggleDone">' + (S.showDone ? 'Hide processed' : 'Show processed') + '</button></div>'
+    + '<div class="toolbar"><button class="btn acc" data-act="itAuto">⚡ Process automatically</button>' + (nChk ? '<button class="btn warn" data-act="itReview">≈ Process mismatches (' + nChk + ')</button>' : '') + '<button class="btn" data-act="itPaste">Paste a list…</button><button class="btn" data-act="itToggleDone">' + (S.showDone ? 'Hide processed' : 'Show processed') + '</button></div>'
     + '<div class="sec" style="padding:4px 12px">' + (list.map(row).join('') || '<p class="sub" style="padding:14px">The list is empty.</p>') + '</div><p class="sub">Tap a title to find the game in the search source. 🔗 matches the row with a game already in the catalog. A long press on a row turns on row selection: you can set collections and “Completed” for several at once.</p>';
 }
 async function createList() {
@@ -1856,42 +1856,73 @@ function applyExtra(it, g) {
   }
   if (ch) saveGame(g);
 }
-function bestCatalog(it) {
-  if (it.x) { const gx = (it.x.gid && gameById(it.x.gid)) || S.games.find(g => (it.x.igdbId && g.igdbId === it.x.igdbId) || (it.x.rawgId && g.rawgId === it.x.rawgId)); if (gx) return gx; } // id из выгрузки точнее названия
+// лучшая игра каталога для строки и процент совпадения (id из выгрузки точнее названия: 100%)
+function catalogMatch(it) {
+  if (it.x) { const gx = (it.x.gid && gameById(it.x.gid)) || S.games.find(g => (it.x.igdbId && g.igdbId === it.x.igdbId) || (it.x.rawgId && g.rawgId === it.x.rawgId)); if (gx) return { g: gx, pct: 100 }; }
   let best = null, bs = 0;
   for (const g of S.games) {
     let sc = similarity(it.text, g.name);
     if (it.year && g.year) sc += Math.abs(it.year - g.year) <= 1 ? 0.03 : -0.2;
     if (sc > bs) { bs = sc; best = g; }
   }
-  return bs >= 0.9 ? best : null;
+  return best ? { g: best, pct: pct(bs) } : null;
 }
+const bestCatalog = (it, cfg) => { const m = catalogMatch(it); return m && m.pct >= (cfg || matchCfg()).cHigh ? m.g : null; };
 // данные строки разбора, которые важнее данных источника при добавлении новой игры: серия и время из текста
+// пороги совпадения (в процентах): каталог и источник; «от» - ниже строка не считается найденной, «до» - от этого значения игра считается найденной точно
+const matchCfg = l => { const d = Object.assign({ cLow: 85, cHigh: 98, sLow: 50, sHigh: 98 }, S.set.match, l && l.match); const c = (v, def) => Math.min(100, Math.max(0, +v || def)); const o = { cLow: c(d.cLow, 85), cHigh: c(d.cHigh, 98), sLow: c(d.sLow, 50), sHigh: c(d.sHigh, 98) }; o.cLow = Math.min(o.cLow, o.cHigh); o.sLow = Math.min(o.sLow, o.sHigh); return o; };
+const pct = sc => Math.max(0, Math.min(100, Math.round(sc * 100)));
 const itemAddOpts = it => ({ series: it && it.x && it.x.series ? canonSeries(it.x.series) : '', hours: it && it.hours > 0 ? it.hours : 0 });
+// окно перед разбором: проценты совпадения для каталога и источника; результат {cfg, src} или null
+function matchDialog(cfg, srcName) {
+  if (typeof window !== 'undefined' && window.__matchHook) return window.__matchHook(cfg, srcName); // для автотестов
+  return new Promise(res => {
+    const m = openModal(), num = (id, v) => '<input id="' + id + '" inputmode="numeric" maxlength="3" value="' + v + '" style="width:64px;text-align:center">';
+    m.innerHTML = '<h4>Automatic parsing</h4><p class="sub">Rows are matched with the catalog first. A match at or above the upper percentage counts as exact. Between the lower and the upper one the row is marked ≈ and handled manually. Below the lower one the game is not considered found in the catalog.</p>'
+      + '<div class="lrw"><span>Catalog: from</span>' + num('mcl', cfg.cLow) + '<span>to</span>' + num('mch', cfg.cHigh) + '<span>%</span></div>'
+      + (srcName ? '<p class="sub">For the remaining rows the game is searched in ' + esc(srcName) + ' (same rule).</p><div class="lrw"><span>' + esc(srcName) + ': from</span>' + num('msl', cfg.sLow) + '<span>to</span>' + num('msh', cfg.sHigh) + '<span>%</span></div>' : '')
+      + '<div class="acts"><span data-x="cancel">Cancel</span>' + (srcName ? '<span data-x="cat">Catalog only</span>' : '') + '<span data-x="ok">' + (srcName ? 'Search in ' + esc(srcName) : 'Parse') + '</span></div>';
+    const rd = () => { const g = id => { const e = $('#' + id, m); return e ? +e.value.replace(/\D/g, '') : 0; }; const c = { cLow: g('mcl'), cHigh: g('mch'), sLow: srcName ? g('msl') : cfg.sLow, sHigh: srcName ? g('msh') : cfg.sHigh }; return matchCfg({ match: c }); };
+    modalCancel = () => { closeModal(); res(null); };
+    m.onclick = e => { const x = e.target.closest('[data-x]'); if (!x) return; const k = x.dataset.x; if (k === 'cancel') { closeModal(); res(null); } else { const cf = rd(); closeModal(); res({ cfg: cf, src: k === 'ok' && !!srcName }); } };
+  });
+}
+// поиск строки в источнике (IGDB/RAWG): 'added' - найдена точно (от верхнего порога) и добавлена, 'doubt' - нужна проверка вручную, 'skipped', 'failed'
+async function sourceResolve(it, cfg, after) {
+  const src = S.set.mainSrc;
+  const found = src === 'rawg' ? (await rawg('/games', { search: it.text, page_size: 5 })).results.map(x => Object.assign(x, { _src: 'rawg' })) : (await igdb('/games', 'search "' + igdbQuote(it.text) + '"; fields ' + IGDB_FIELDS + '; where ' + GAME_TYPES + '; limit 5;')).map(x => Object.assign(x, { _src: 'igdb' }));
+  const ranked = found.map(mapItem).map(x => ({ x, sc: similarity(it.text, x.name) + (it.year && x.year ? (Math.abs(it.year - x.year) <= 1 ? 0.04 : -0.2) : 0) })).sort((a, b) => b.sc - a.sc), best = ranked[0];
+  if (best && pct(best.sc) >= cfg.sHigh) { const gg = await addFromIgdb(best.x.rid, [], itemAddOpts(it)); if (after) after(); if (gg) { linkItem(it, gg, true); return 'added'; } if (gg === false) return 'skipped'; }
+  if (best && pct(best.sc) >= cfg.sLow) { // игра нашлась, но совпадение неполное: строка получает пометку «проверить» и разбирается вручную
+    it.doubt = true; it.failed = false; delete it.rev; it.cands = ranked.filter(r => r.sc >= 0.5).slice(0, 5).map(r => ({ rid: r.x.rid, name: r.x.name, year: r.x.year, pct: pct(r.sc), platforms: r.x.platforms.slice(0, 3) })); await DB.put('inboxItems', it); return 'doubt';
+  }
+  return 'failed';
+}
 async function autoResolve(listId) {
   const items = itemsOf(listId).filter(i => !i.done);
   if (!items.length) return toast('All rows are already processed');
-  let useIgdb = PROV[S.set.mainSrc].ready();
-  if (useIgdb) useIgdb = await confirmBox('First I will match the rows with the catalog. For the rest I will search for the game in ' + PROV[S.set.mainSrc].name + ' and add what is found (match from 85%; when in doubt, 50-85%, the row gets a ❓ mark to choose from a list). “Cancel”: catalog only.', 'Search in ' + PROV[S.set.mainSrc].name);
-  let nCat = 0, nRaw = 0, nDoubt = 0, skipped = 0, stop = false; const bad = [];
+  const lst = S.inbox.lists.find(x => x.id === listId), cfg0 = matchCfg(lst), srcName = PROV[S.set.mainSrc].name, canSrc = PROV[S.set.mainSrc].ready();
+  const ch = await matchDialog(cfg0, canSrc ? srcName : '');
+  if (!ch) return; const cfg = ch.cfg; if (lst) { lst.match = cfg; await DB.put('inboxLists', lst); }
+  let useIgdb = canSrc && ch.src;
+  let nCat = 0, nRaw = 0, nDoubt = 0, nRev = 0, skipped = 0, stop = false; const bad = [];
   const showProg = () => { const m = openModal(); m.innerHTML = '<h4>Processing the list…</h4><p class="sub" id="apTxt">0 of ' + items.length + '</p><div class="acts"><span data-x="stop">Stop</span></div>'; m.onclick = e => { if (e.target.closest('[data-x]')) stop = true; }; modalCancel = () => { stop = true; }; };
   showProg(); // окно выбора платформы закрывает это окно, поэтому после него оно открывается заново
   for (let k = 0; k < items.length && !stop; k++) {
     const it = items[k], tx = $('#apTxt'); if (tx) tx.textContent = (k + 1) + ' of ' + items.length + ': ' + it.text;
-    const g = bestCatalog(it); if (g) { linkItem(it, g, true); nCat++; if (it.unk && !g.time && g.igdbId && S.set.mainSrc === 'igdb') { try { await fillTimeIgdb(g); } catch (e) { /* время останется пустым */ } } continue; }
+    const cm = catalogMatch(it);
+    if (cm && cm.pct >= cfg.cLow && cm.pct < cfg.cHigh) { it.rev = { gid: cm.g.id, pct: cm.pct }; it.failed = false; it.doubt = false; delete it.cands; await DB.put('inboxItems', it); nRev++; continue; } // найдена в каталоге, но не точно: проверить вручную
+    const g = cm && cm.pct >= cfg.cHigh ? cm.g : null; if (g) { linkItem(it, g, true); nCat++; if (it.unk && !g.time && g.igdbId && S.set.mainSrc === 'igdb') { try { await fillTimeIgdb(g); } catch (e) { /* время останется пустым */ } } continue; }
     const rid0 = it.x && (it.x.igdbId ? 'igdb:' + it.x.igdbId : it.x.rawgId ? 'rawg:' + it.x.rawgId : '');
     if (rid0 && PROV[parseRid(rid0).src].ready()) { // в строке есть id источника: добавляем эту игру точно
       try { const gg = await addFromIgdb(rid0, [], itemAddOpts(it)); if (!modalEl) showProg(); if (gg) { linkItem(it, gg, true); nRaw++; continue; } if (gg === false) { skipped++; continue; } } catch (e) { /* ищем по названию */ }
     }
     if (useIgdb && !blockFor(S.set.mainSrc)) {
       try {
-        const found = S.set.mainSrc === 'rawg' ? (await rawg('/games', { search: it.text, page_size: 5 })).results.map(x => Object.assign(x, { _src: 'rawg' })) : (await igdb('/games', 'search "' + igdbQuote(it.text) + '"; fields ' + IGDB_FIELDS + '; where ' + GAME_TYPES + '; limit 5;')).map(x => Object.assign(x, { _src: 'igdb' }));
-        const ranked = found.map(mapItem).map(x => ({ x, sc: similarity(it.text, x.name) + (it.year && x.year ? (Math.abs(it.year - x.year) <= 1 ? 0.04 : -0.2) : 0) })).sort((a, b) => b.sc - a.sc), best = ranked[0];
-        if (best && best.sc >= 0.5 && best.sc < 0.85) { // игра нашлась, но есть сомнения: выбор вручную из вариантов
-          it.doubt = true; it.failed = false; it.cands = ranked.filter(r => r.sc >= 0.5).slice(0, 5).map(r => ({ rid: r.x.rid, name: r.x.name, year: r.x.year, platforms: r.x.platforms.slice(0, 3) })); await DB.put('inboxItems', it); nDoubt++;
-          await new Promise(r => setTimeout(r, 300)); continue;
-        }
-        if (best && best.sc >= 0.85) { const gg = await addFromIgdb(best.x.rid, [], itemAddOpts(it)); if (!modalEl) showProg(); if (gg) { linkItem(it, gg, true); nRaw++; await new Promise(r => setTimeout(r, 300)); continue; } if (gg === false) { skipped++; continue; } }
+        const st = await sourceResolve(it, cfg, () => { if (!modalEl) showProg(); });
+        if (st === 'added') { nRaw++; await new Promise(r => setTimeout(r, 300)); continue; }
+        if (st === 'doubt') { nDoubt++; await new Promise(r => setTimeout(r, 300)); continue; }
+        if (st === 'skipped') { skipped++; continue; }
       } catch (e) { if (blockFor(S.set.mainSrc)) useIgdb = false; }
       await new Promise(r => setTimeout(r, 300));
     }
@@ -1899,7 +1930,7 @@ async function autoResolve(listId) {
   }
   closeModal();
   const r = openModal();
-  r.innerHTML = '<h4>Processing finished</h4><p class="sub">From the catalog: <b>' + nCat + '</b>, added from IGDB: <b>' + nRaw + '</b>, not recognized: <b>' + bad.length + '</b>' + (nDoubt ? ', doubtful: <b>' + nDoubt + '</b> (marked ❓, choose an option manually)' : '') + (skipped ? ', skipped without a platform: <b>' + skipped + '</b>' : '') + (stop ? ' (stopped)' : '') + '</p>'
+  r.innerHTML = '<h4>Processing finished</h4><p class="sub">From the catalog: <b>' + nCat + '</b>, added from IGDB: <b>' + nRaw + '</b>, not recognized: <b>' + bad.length + '</b>' + (nRev ? ', matched in the catalog inexactly: <b>' + nRev + '</b>' : '') + (nDoubt ? ', found in the source inexactly: <b>' + nDoubt + '</b>' : '') + (nRev + nDoubt ? ' (marked ≈, tap “Process mismatches”)' : '') + (skipped ? ', skipped without a platform: <b>' + skipped + '</b>' : '') + (stop ? ' (stopped)' : '') + '</p>'
     + (bad.length ? '<div class="sub" style="max-height:200px;overflow:auto;white-space:pre-wrap">' + esc(bad.slice(0, 40).join('\n')) + (bad.length > 40 ? '\n…' : '') + '</div><p class="sub">These rows stayed in the list marked ⚠: process them manually (tap the title) or fix the text.</p>' : '')
     + '<div class="acts"><span data-x="ok">OK</span></div>';
   modalCancel = () => closeModal(); r.onclick = e => { if (e.target.closest('[data-x]')) closeModal(); };
@@ -1929,6 +1960,34 @@ function pickGame(prefill) {
     m.onclick = e => { const o = e.target.closest('.opt'), x = e.target.closest('[data-x]'); if (x) { closeModal(); res(null); } else if (o) { closeModal(); res(o.dataset.id); } };
   });
 }
+// ручная обработка строк с неполным совпадением: по очереди строка из разбора и найденная игра
+async function reviewOne(it, k, n) {
+  const title = k + ' of ' + n + ': «' + it.text + '»' + (it.year ? ' (' + it.year + ')' : '');
+  const tail = [{ id: '__skip', label: 'Skip', ico: '⏭' }, { id: '__stop', label: 'Finish processing', ico: '⏹' }];
+  if (it.rev) {
+    const g = gameById(it.rev.gid); if (!g) { delete it.rev; await DB.put('inboxItems', it); return 'next'; }
+    const r = await askChoose({ title, items: [{ id: 'same', label: 'The same game: ' + g.name + (g.year ? ' (' + g.year + ')' : ''), sub: 'in the catalog, match ' + it.rev.pct + '% · ' + (g.platforms || []).slice(0, 3).map(shortPlat).join(', '), ico: '✅' }, { id: 'other', label: 'Another game: search in the source', ico: '🔎' }, { id: 'pick', label: 'Pick another from the catalog…', ico: '📚' }].concat(tail) });
+    if (r === null || r === '__stop') return 'stop'; if (r === '__skip') return 'next';
+    if (r === 'same') { linkItem(it, g, true); return 'next'; }
+    if (r === 'pick') { const id = await pickGame(it.text), g2 = id && gameById(id); if (g2) { linkItem(it, g2, true); } return 'next'; }
+    delete it.rev; await DB.put('inboxItems', it);
+    if (PROV[S.set.mainSrc].ready() && !blockFor(S.set.mainSrc)) { try { const st = await sourceResolve(it, Object.assign(matchCfg(S.inbox.lists.find(l => l.id === it.listId)), { sHigh: 101 })); if (st === 'failed') { it.failed = true; await DB.put('inboxItems', it); toast('In ' + PROV[S.set.mainSrc].name + ' nothing similar found'); } } catch (e) { toast(e.message); } if (it.doubt) return reviewOne(it, k, n); }
+    else { it.failed = true; await DB.put('inboxItems', it); }
+    return 'next';
+  }
+  const c = it.cands || [];
+  const r = await askChoose({ title, items: c.map(x => ({ id: x.rid, label: x.name + (x.year ? ' (' + x.year + ')' : ''), sub: (x.pct ? x.pct + '% · ' : '') + (x.platforms || []).join(', '), ico: '🎮' })).concat([{ id: '__none', label: 'None fits', ico: '✖' }], tail) });
+  if (r === null || r === '__stop') return 'stop'; if (r === '__skip') return 'next';
+  if (r === '__none') { it.doubt = false; it.failed = true; delete it.cands; await DB.put('inboxItems', it); return 'next'; }
+  try { const g = await addFromIgdb(r, [], itemAddOpts(it)); if (g) linkItem(it, g, true); } catch (er) { toast(er.message); return 'stop'; }
+  return 'next';
+}
+async function reviewItems(listId) {
+  const todo = itemsOf(listId).filter(i => !i.done && (i.rev || i.doubt)); if (!todo.length) return toast('No rows to check');
+  let k = 0;
+  for (const it of todo) { k++; const st = await reviewOne(it, k, todo.length); if (st === 'stop') break; }
+  render();
+}
 async function matchItem(it) {
   if (!it || it.done) return;
   if (!S.games.length) return toast('There are no games in the catalog yet');
@@ -1936,7 +1995,7 @@ async function matchItem(it) {
 }
 function linkItem(it, g, quiet) {
   applyDefaults(it, g); applyExtra(it, g);
-  it.done = true; it.failed = false; it.doubt = false; delete it.cands; it.gameId = g.id; it.igdbId = g.igdbId || 0; it.rawgId = g.rawgId || 0; DB.put('inboxItems', it);
+  it.done = true; it.failed = false; it.doubt = false; delete it.rev; delete it.cands; it.gameId = g.id; it.igdbId = g.igdbId || 0; it.rawgId = g.rawgId || 0; DB.put('inboxItems', it);
   const pend = S.pending && S.pending.itemId === it.id ? S.pending : null, sc0 = S.tab === 'inbox' ? $('#view').scrollTop : null;
   if (pend) S.pending = null;
   if (quiet) return;
@@ -2351,9 +2410,18 @@ function viewSettings() {
     + grp('sync', '🔄 Sync and own server', syncHtml())
     + grp('data', '💾 Data and backups', A[9] + A[10])
     + grp('src', '🔎 Sources and keys', A[1] + A[2] + A[3] + A[4] + A[5])
+    + grp('parse', '⚡ Automatic parsing', matchHtml())
     + grp('view', '🎨 Appearance', A[0] + A[12])
     + grp('tools', '🧰 Tools', A[6] + A[7] + A[8] + A[11])
     + grp('danger', '⚠ Danger zone', A[13]);
+}
+// проценты совпадения по умолчанию для автоматического разбора (в окне разбора можно изменить для конкретного списка)
+function matchHtml() {
+  const c = matchCfg(), f = (id, v) => '<input id="' + id + '" inputmode="numeric" maxlength="3" value="' + v + '" style="width:64px;text-align:center">';
+  return '<div class="sec"><h3 style="margin-top:0">Title match, %</h3><p class="sub">Above the upper percentage the game counts as found exactly. Between the lower and the upper one the row is marked ≈ and handled manually with “Process mismatches”. Below the lower one the game counts as not found.</p>'
+    + '<div class="lrw"><span>In the catalog: from</span>' + f('mcl0', c.cLow) + '<span>to</span>' + f('mch0', c.cHigh) + '</div>'
+    + '<div class="lrw"><span>In IGDB / RAWG: from</span>' + f('msl0', c.sLow) + '<span>to</span>' + f('msh0', c.sHigh) + '</div>'
+    + '<div class="toolbar"><button class="btn acc" data-act="matchSave">Save</button><button class="btn" data-act="matchReset">Default (85/98 and 50/98)</button></div></div>';
 }
 function dl(name, data) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(data instanceof Blob ? data : new Blob([data], { type: 'application/json' })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { a.remove(); URL.revokeObjectURL(a.href); }, 1000);
@@ -2631,7 +2699,7 @@ const ACT = {
   },
   itPick: async t => {
     const it = S.inbox.items.find(i => i.id === t.dataset.id); if (!it || it.done) return;
-    const c = it.cands || [], r = await askChoose({ title: 'Choose: “' + it.text + '»', items: c.map(x => ({ id: x.rid, label: x.name + (x.year ? ' (' + x.year + ')' : ''), sub: (x.platforms || []).join(', '), ico: '🎮' })).concat([{ id: '__search', label: 'Open search' }, { id: '__none', label: 'None fits' }]) });
+    const c = it.cands || [], r = await askChoose({ title: 'Choose: “' + it.text + '»', items: c.map(x => ({ id: x.rid, label: x.name + (x.year ? ' (' + x.year + ')' : ''), sub: (x.pct ? x.pct + '% · ' : '') + (x.platforms || []).join(', '), ico: '🎮' })).concat([{ id: '__search', label: 'Open search' }, { id: '__none', label: 'None fits' }]) });
     if (r === null) return;
     if (r === '__search') return ACT.itOpen({ dataset: { id: it.id } });
     if (r === '__none') { it.doubt = false; it.failed = true; delete it.cands; await DB.put('inboxItems', it); return render(); }
@@ -2906,6 +2974,8 @@ const ACT = {
   itAdd: async () => { const i = $('#itNew'); if (!i || !i.value.trim() || !S.inboxList) return; await addItems(S.inboxList, [i.value]); render(); const n = $('#itNew'); if (n) focusEnd(n); },
   itPaste: () => pasteModal(S.inboxList),
   itAuto: () => autoResolve(S.inboxList),
+  itReview: () => reviewItems(S.inboxList),
+  itRev: async t => { const it = S.inbox.items.find(i => i.id === t.dataset.id); if (it && !it.done) { await reviewOne(it, 1, 1); render(); } },
   itToggleDone: () => { S.showDone = !S.showDone; render(); },
   itOpen: t => {
     const it = S.inbox.items.find(i => i.id === t.dataset.id); if (!it) return;
@@ -2921,6 +2991,8 @@ const ACT = {
   pendingCancel: () => backToInbox(),
   pendingMatch: () => matchItem(pendingItem()),
   rsSeries: t => showSeries(t.dataset.rid, t.dataset.t),
+  matchSave: () => { const g = id => +(($('#' + id) || {}).value || '').replace(/\D/g, ''); S.set.match = matchCfg({ match: { cLow: g('mcl0'), cHigh: g('mch0'), sLow: g('msl0'), sHigh: g('msh0') } }); saveSet(); toast('Saved'); render(); },
+  matchReset: () => { S.set.match = { cLow: 85, cHigh: 98, sLow: 50, sHigh: 98 }; saveSet(); render(); },
   saveKey: async () => {
     S.set.igdbId = $('#idIn').value.trim(); S.set.igdbSecret = $('#secIn').value.trim(); S.set.igdbToken = ''; S.set.igdbExp = 0; S.block = null; await saveSet(); S.lists = {};
     if (!hasKeys()) return toast('Keys deleted');
@@ -3036,7 +3108,7 @@ function applyTheme() {
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
   const m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', dark ? '#0b0b0d' : '#f2f3f6');
 }
-window.__GC = { ipMask, addrOf, textLines, syncNow, SY, DB, reloadData, nextPool, PRESETS, applyFilterSet, withSeries, buildEntries, groupGames, textHtml, listHtml, cardHtml, openYoutube, canonPlat, canonGenre, canonAll, dictMerge, dictRename, dictRewrite, openDict, mergeGroups, openMergeCompare, applyMerge, mgBase, renderKeep, toggleInSel, handleShared, applyExtra, addParsed, openExport, exportText, copyText, gameLine, zipBuild, zipRead, shotStats, delShots, rawgQuotaTick, refreshOne, rawg, effItem, applyDefaults, linkItem, itemOpts, viewInbox, quickTap, bulkMore, openAddCollSheet, openLb, libToolsHtml: () => { renderLibHead(); return $('#libTools').innerHTML; }, filterGames, getShots, putShots, collTilesHtml, seriesTilesHtml, viewCollections, viewSeries, DONE_ID, autoResolve, viewStats, restoreGames, removeGame, canonSeries, findDupes, mergeAllDupes, collectSheet, persistDraft, closeSheet, S, ACT, bump, igdb, hltbFind, sgdbAuto, openSgdb, applyTheme, colsFor, usageHtml, serMenu, viewInbox, addItems, linkItem, createList, pendingItem, render, runSearch, addFromIgdb, importData, openIgdbSheet, openGameSheet, openFilters, openCols, selectionAction, loadAll, renderSearchBody };
+window.__GC = { reviewOne, catalogMatch, matchCfg, reviewItems, autoResolve, ipMask, addrOf, textLines, syncNow, SY, DB, reloadData, nextPool, PRESETS, applyFilterSet, withSeries, buildEntries, groupGames, textHtml, listHtml, cardHtml, openYoutube, canonPlat, canonGenre, canonAll, dictMerge, dictRename, dictRewrite, openDict, mergeGroups, openMergeCompare, applyMerge, mgBase, renderKeep, toggleInSel, handleShared, applyExtra, addParsed, openExport, exportText, copyText, gameLine, zipBuild, zipRead, shotStats, delShots, rawgQuotaTick, refreshOne, rawg, effItem, applyDefaults, linkItem, itemOpts, viewInbox, quickTap, bulkMore, openAddCollSheet, openLb, libToolsHtml: () => { renderLibHead(); return $('#libTools').innerHTML; }, filterGames, getShots, putShots, collTilesHtml, seriesTilesHtml, viewCollections, viewSeries, DONE_ID, autoResolve, viewStats, restoreGames, removeGame, canonSeries, findDupes, mergeAllDupes, collectSheet, persistDraft, closeSheet, S, ACT, bump, igdb, hltbFind, sgdbAuto, openSgdb, applyTheme, colsFor, usageHtml, serMenu, viewInbox, addItems, linkItem, createList, pendingItem, render, runSearch, addFromIgdb, importData, openIgdbSheet, openGameSheet, openFilters, openCols, selectionAction, loadAll, renderSearchBody };
 (async () => {
   try {
     await loadAll();

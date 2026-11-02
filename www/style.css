@@ -621,3 +621,6 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 
 .tlist .ts{color:#b794f6}
 :root[data-theme="light"] .tlist .ts{color:#7a4fc7}
+.it.chkrow{background:rgba(255,170,0,.12);border-radius:10px;box-shadow:inset 3px 0 0 #ffa000}
+.it.chkrow .sub{color:#ffa000}
+.btn.warn{background:#ffa000;color:#000;border-color:#ffa000}

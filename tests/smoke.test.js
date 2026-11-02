@@ -127,7 +127,7 @@ const L = require('../www/app.js');
     await G.addItems('l2', ['Zork | 5ч | 2000', 'Fallout: New Vegas', 'Totally Unknown Title 999']);
     const orig = global.confirmBoxHook; S.set.igdbSecret = ''; // только каталог
     let warned = ''; global.__confirmHook = async txt => { warned = txt; return true; };
-    const pr = G.autoResolve('l2'); await pr; delete global.__confirmHook;
+    (global.window || global).__matchHook = async (cfg, srcName) => ({ cfg, src: !!srcName }); const pr = G.autoResolve('l2'); await pr; delete global.__confirmHook;
     if (/не указана платформа/.test(warned)) throw new Error('предупреждения о платформе быть не должно');
     const it = S.inbox.items.filter(i => i.listId === 'l2'); const z = it.find(i => i.text === 'Zork');
     if (!z || !z.done) throw new Error('zork not matched: ' + JSON.stringify(it));
@@ -340,6 +340,20 @@ const L = require('../www/app.js');
     const t = G.textLines([{ t: 'g', g: { name: 'AC', year: 2020, platforms: ['Xbox Series X|S'], series: 'Assassins', time: 60 }, x: false }]);
     if (t.trim() !== 'AC (2020 | Series X/S | Assassins) – 60 ч') throw new Error('текст: ' + t);
     S.games = S.games.filter(x => x.id !== 'cmpg'); S.tab = 'library'; G.render();
+  });
+  await step('разбор: пороги совпадения, пометка и ручная обработка несовпадений', async () => {
+    const W = global.window || global; const mk = (id, name) => ({ id, name, year: 2016, rating: 0, time: 0, genres: [], platforms: ['PC'], series: '', collections: [], props: {}, done: false, hasCover: false, shotCount: 0, igdbId: 0, rawgId: 0, added: 1 });
+    S.games.push(mk('ff15', 'Final Fantasy XV'));
+    const c = G.matchCfg(); if (c.cLow !== 85 || c.cHigh !== 98 || c.sLow !== 50) throw new Error('пороги по умолчанию');
+    const m6 = G.catalogMatch({ text: 'Final Fantasy VI' }), m15 = G.catalogMatch({ text: 'Final Fantasy XV' });
+    if (!(m6.g.id === 'ff15' && m6.pct >= c.cLow && m6.pct < c.cHigh)) throw new Error('FF VI должна попасть в проверку: ' + m6.pct);
+    if (m15.pct < c.cHigh) throw new Error('точное совпадение ' + m15.pct);
+    if (G.matchCfg({ match: { cLow: 99, cHigh: 90 } }).cLow !== 90) throw new Error('нижний порог не выше верхнего');
+    const it = { id: 'rv1', listId: 'x', text: 'Final Fantasy VI', year: 0, hours: 0, done: false, rev: { gid: 'ff15', pct: m6.pct } }; S.inbox.items.push(it);
+    W.__chooseHook = async () => '__skip'; if (await G.reviewOne(it, 1, 1) !== 'next' || it.done || !it.rev) throw new Error('пропуск');
+    W.__chooseHook = async () => 'same'; await G.reviewOne(it, 1, 1); delete W.__chooseHook;
+    if (!it.done || it.rev || it.gameId !== 'ff15') throw new Error('«та же игра»');
+    S.inbox.items = S.inbox.items.filter(x => x.id !== 'rv1'); S.games = S.games.filter(x => x.id !== 'ff15');
   });
   await step('export/import', async () => { const d = { app: 'game-catalog', games: S.games, collections: S.collections, props: [], covers: {} }; const before = S.games.length; const n = await G.importData(JSON.parse(JSON.stringify(d)), 'merge'); if (S.games.length !== before) throw new Error('dup ' + S.games.length + ' vs ' + before); });
   await step('список: жанры и платформы, ширина колонок, дата добавления, без вопроса о платформе', async () => {

@@ -69,8 +69,8 @@ h3{margin:16px 2px 8px;font-size:16px}
 .field textarea{min-height:110px;resize:vertical}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .backdrop{position:fixed;inset:0;background:#000a;z-index:30}
-.sheet{position:fixed;left:0;right:0;bottom:0;max-height:92%;overflow-y:auto;background:var(--sheet);border-radius:22px 22px 0 0;padding:14px 16px calc(24px + env(safe-area-inset-bottom));z-index:31;animation:up .14s ease-out}
-@keyframes up{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+.sheet{position:fixed;left:0;right:0;bottom:0;max-height:92%;overflow-y:auto;background:var(--sheet);border-radius:22px 22px 0 0;padding:14px 16px calc(24px + env(safe-area-inset-bottom));z-index:31;animation:up .16s ease-out}
+@keyframes up{from{transform:translateY(60px);opacity:0}to{transform:none;opacity:1}}
 .grab{width:44px;height:5px;border-radius:3px;background:var(--bd2);margin:0 auto 12px}
 .hero{display:flex;gap:14px;align-items:flex-start}
 .hero .cv{width:38%;flex:0 0 38%;aspect-ratio:3/4}
@@ -493,7 +493,7 @@ tr.gh.l2 td{color:#f5c451}
 /* текст в окнах можно выделять и копировать */
 .modal,.sheet,.sub,.nm{-webkit-user-select:text;user-select:text}
 /* меньше движения по системной настройке */
-@media (prefers-reduced-motion:reduce){.sheet,.lb,.modal{animation:none!important}*{transition-duration:.01ms!important}}
+@media (prefers-reduced-motion:reduce){.lb,.modal{animation:none!important}}
 /* подсветка под мышью (на телефоне не действует) */
 @media (hover:hover){.card:not(.sel):not(.last):hover .cv{box-shadow:0 0 0 2px var(--acc)}.tile:hover{outline:2px solid var(--acc)}.wrap tbody tr:hover td{background:var(--hl,rgba(255,255,255,.05))}.tl:hover{background:rgba(255,255,255,.05)}}
 
@@ -633,12 +633,14 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .donerow{align-items:stretch}
 .srcline{flex:1;min-width:0;align-self:center;font-size:9px;line-height:10.5px;color:var(--mut);overflow-wrap:anywhere;cursor:pointer}
 #shColls{gap:0}
-#shColls .p{padding:2px 8px;font-size:11px;border-radius:10px;margin:1px 3px 1px 0}
+.shcolls{gap:0}
+.shcolls .p{padding:2px 8px;font-size:11px;border-radius:10px;margin:1px 3px 1px 0}
 .wrap td[data-ck="doneDate"],.wrap td[data-ck="added"],.wrap .scd{font-size:10.5px}
 .wrap.d1 td[data-ck="doneDate"],.wrap.d1 td[data-ck="added"],.wrap.d1 .scd{font-size:9.5px}
-@keyframes swr{from{transform:translateX(44px);opacity:.3}to{transform:none;opacity:1}}
-@keyframes swl{from{transform:translateX(-44px);opacity:.3}to{transform:none;opacity:1}}
+@keyframes swr{from{transform:translateX(70px);opacity:.2}to{transform:none;opacity:1}}
+@keyframes swl{from{transform:translateX(-70px);opacity:.2}to{transform:none;opacity:1}}
 @keyframes bump{0%,100%{transform:none}35%{transform:translateX(-10px)}70%{transform:translateX(6px)}}
 @keyframes dn{from{transform:none;opacity:1}to{transform:translateY(40px);opacity:0}}
-.sheet.swr{animation:swr .14s ease-out}.sheet.swl{animation:swl .14s ease-out}.sheet.bump{animation:bump .22s ease-out}
+.sheet{touch-action:pan-y}
+.sheet.swr{animation:swr .16s ease-out}.sheet.swl{animation:swl .16s ease-out}.sheet.bump{animation:bump .22s ease-out}
 .closing{pointer-events:none}.closing .sheet{animation:dn .14s ease-in forwards}.closing .backdrop{opacity:0;transition:opacity .14s}

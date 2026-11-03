@@ -844,5 +844,12 @@
  "По умолчанию (85/98 и 50/98)": "Default (85/98 and 50/98)",
  "Сначала строки сопоставляются с каталогом. Совпадение от верхнего процента считается точным. Между нижним и верхним строка помечается ≈ и разбирается вручную. Ниже нижнего игра в каталоге не считается найденной.": "Rows are matched with the catalog first. A match at or above the upper percentage counts as exact. Between the lower and the upper one the row is marked ≈ and handled manually. Below the lower one the game is not considered found in the catalog.",
  "Сохранено": "Saved",
- "Сохранить": "Save"
+ "Сохранить": "Save",
+ "Искать эту строку в источнике": "Search this line in the source",
+ "Это последняя игра в списке": "This is the last game in the list",
+ "Это первая игра в списке": "This is the first game in the list",
+ "Анимации": "Animations",
+ "✓ Включены": "✓ On",
+ "Выключены": "Off",
+ "Быстрое открытие и закрытие карточки игры, смена карточки свайпом влево и вправо.": "Fast opening and closing of the game card, switching the card by swiping left and right."
 }

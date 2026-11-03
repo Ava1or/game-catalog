@@ -355,6 +355,17 @@ const L = require('../www/app.js');
     if (!it.done || it.rev || it.gameId !== 'ff15') throw new Error('«та же игра»');
     S.inbox.items = S.inbox.items.filter(x => x.id !== 'rv1'); S.games = S.games.filter(x => x.id !== 'ff15');
   });
+  await step('карточка: свайп к соседней игре, строка из разбора, анимации', async () => {
+    const W = global.window || global; S.set.anim = false;
+    const mk = (id, n) => ({ id, name: n, year: 2000, rating: 0, time: 0, genres: [], platforms: [], series: '', collections: [], props: {}, done: false, hasCover: false, shotCount: 0, igdbId: 0, rawgId: 0, added: 1, srcLine: id === 'sw1' ? 'Swipe One (2000 | PC) – 5 ч' : '' });
+    S.games.push(mk('sw1', 'Swipe One'), mk('sw2', 'Swipe Two')); S.shown = [S.games.find(g => g.id === 'sw1'), S.games.find(g => g.id === 'sw2')];
+    G.openGameSheet('sw1'); if (document.querySelector('#shLine').textContent !== 'Swipe One (2000 | PC) – 5 ч') throw new Error('строка-источник в карточке');
+    G.sheetSibling(1); if (S.sheet.draft.id !== 'sw2') throw new Error('следующая игра'); G.sheetSibling(1); if (S.sheet.draft.id !== 'sw2') throw new Error('за последней остаёмся');
+    G.sheetSibling(-1); if (S.sheet.draft.id !== 'sw1') throw new Error('предыдущая игра');
+    G.ACT.shSrcLine(); if (S.tab !== 'search' || S.search.q !== 'Swipe One' || !S.retGame) throw new Error('поиск по строке ' + S.search.q);
+    const g = await G.addFromIgdb('igdb:151', [], { line: 'Zelda (1998 | N64) – ? ч' }); if (!g || g.srcLine !== 'Zelda (1998 | N64) – ? ч') throw new Error('строка запоминается при создании');
+    S.games = S.games.filter(x => !['sw1', 'sw2'].includes(x.id) && x.id !== g.id); S.shown = null; S.retGame = null; S.tab = 'library'; S.set.anim = true; G.render();
+  });
   await step('export/import', async () => { const d = { app: 'game-catalog', games: S.games, collections: S.collections, props: [], covers: {} }; const before = S.games.length; const n = await G.importData(JSON.parse(JSON.stringify(d)), 'merge'); if (S.games.length !== before) throw new Error('dup ' + S.games.length + ' vs ' + before); });
   await step('список: жанры и платформы, ширина колонок, дата добавления, без вопроса о платформе', async () => {
     S.games = S.games.filter(g => !g.id.startsWith('np_'));

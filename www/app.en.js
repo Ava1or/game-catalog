@@ -18,8 +18,8 @@ const plug = n => window.Capacitor && window.Capacitor.Plugins && window.Capacit
 const COLS = [['cover', 'Cover'], ['genres', 'Genres'], ['platforms', 'Platforms'], ['done', 'Completed'], ['doneDate', 'Completion date'], ['year', 'Year'], ['rating', 'Rating'], ['time', 'Time'], ['series', 'Series'], ['colls', 'Collections'], ['added', 'Date added']];
 const SORTS = [['name', 'Title'], ['year', 'Year'], ['rating', 'Rating'], ['time', 'Playtime'], ['series', 'Series'], ['added', 'Date added'], ['done', 'Completed'], ['doneDate', 'Completion date']];
 const DEFAULTS = {
-  platDict: {}, genreDict: {}, rawgKey: '', mainSrc: 'igdb', rawgQuota: { left: 20000, renew: '' }, rawgWarn: 0, igdbId: '', igdbSecret: '', igdbToken: '', igdbExp: 0, match: { cLow: 85, cHigh: 98, sLow: 50, sHigh: 98 }, sync: { url: '', token: '', on: true, scheme: 'http', auto: true, off: 0, last: 0, msg: '', err: '', igdb: false }, exp: { fmt: 'csv', keys: ['name', 'year', 'platforms', 'time', 'done'] }, sgdbKey: '', pin: true, propCols: {}, theme: 'dark', zoom: {}, usage: { m: '', igdb: 0, sgdb: 0, hltb: 0 }, hltbCache: {}, view: 'grid', group: '', groupDir: 'asc', tcols: { year: 1, platforms: 1, series: 1, time: 1, done: 1, main: 1 }, colW: {}, mgW: {}, pageSize: 40, vmode: { coll: 'tiles', series: 'tiles', search: 'tiles' },
-  cols: { cover: 1, genres: 1, platforms: 1, done: 1, doneDate: 1, year: 1, rating: 1, time: 1, series: 1, colls: 1, added: 0 },
+  platDict: {}, genreDict: {}, rawgKey: '', mainSrc: 'igdb', rawgQuota: { left: 20000, renew: '' }, rawgWarn: 0, igdbId: '', igdbSecret: '', igdbToken: '', igdbExp: 0, anim: true, match: { cLow: 85, cHigh: 98, sLow: 50, sHigh: 98 }, sync: { url: '', token: '', on: true, scheme: 'http', auto: true, off: 0, last: 0, msg: '', err: '', igdb: false }, exp: { fmt: 'csv', keys: ['name', 'year', 'platforms', 'time', 'done'] }, sgdbKey: '', pin: true, propCols: {}, theme: 'dark', zoom: {}, usage: { m: '', igdb: 0, sgdb: 0, hltb: 0 }, hltbCache: {}, view: 'grid', group: '', groupDir: 'asc', tcols: { year: 1, platforms: 1, series: 1, time: 1, done: 1, main: 1 }, colW: {}, mgW: {}, pageSize: 40, vmode: { coll: 'tiles', series: 'tiles', search: 'tiles' },
+  cols: { cover: 1, genres: 1, platforms: 1, done: 1, doneDate: 1, year: 1, rating: 1, time: 1, series: 1, colls: 1, added: 1 },
   f: { q: '', years: [], genres: [], platforms: [], series: [], collections: [], collMode: 'or', props: [], addedFrom: '', addedTo: '', seriesMode: '', maxTime: 0, done: '', minRating: 0, sort: 'name', dir: 'asc' }
 };
 
@@ -364,8 +364,9 @@ async function loadAll() {
   S.set.zoom = S.set.zoom || {}; S.set.hltbCache = S.set.hltbCache || {};
   S.set.f = Object.assign(clone(DEFAULTS.f), S.set.f);
   S.set.cols = Object.assign({}, DEFAULTS.cols, S.set.cols);
-  if (S.set.colsV !== 4) { // один раз: основная платформа удалена, в списке снова колонки «Жанры» и «Платформы»
-    delete S.set.cols.mainGenre; delete S.set.cols.mainPlatform; S.set.cols.platforms = 1; S.set.cols.genres = 1; S.set.colsV = 4;
+  if (S.set.colsV === 4) { S.set.cols.added = 1; S.set.colsV = 5; saveSet(); }
+  if (S.set.colsV !== 4 && S.set.colsV !== 5) { // один раз: основная платформа удалена, в списке снова колонки «Жанры» и «Платформы»
+    delete S.set.cols.mainGenre; delete S.set.cols.mainPlatform; S.set.cols.platforms = 1; S.set.cols.genres = 1; S.set.cols.added = 1; S.set.colsV = 5;
     delete S.set.f.mainPlats; if (S.set.group === 'mainPlatform') S.set.group = ''; if (S.set.f.sort === 'mainPlatform') S.set.f.sort = 'name';
     if (S.set.colW) delete S.set.colW.mainPlatform; if (S.set.exp && S.set.exp.keys) S.set.exp.keys = S.set.exp.keys.filter(k => k !== 'mainPlatform');
     if (S.set.saved) S.set.saved = S.set.saved.filter(x => !(x.f && x.f.mainPlats && x.f.mainPlats.length)).map(x => { if (x.f) delete x.f.mainPlats; if (x.f && x.f.sort === 'mainPlatform') x.f.sort = 'name'; return x; });
@@ -792,6 +793,7 @@ async function addFromIgdb(rid, collIds = [], opts = {}) {
         if (!g.hasCover) { g.coverSrc = src; await cacheCover(g); }
         await saveGame(g);
       } else {
+        if (opts.line) n0.srcLine = opts.line; // строка разбора, из которой создана карточка
         if (opts.series) n0.series = opts.series; // серия из строки разбора важнее серии источника
         if (opts.hours > 0) n0.time = opts.hours; // время из строки разбора важнее времени источника
         g = n0; g.series = canonSeries(g.series); S.games.push(g); await DB.put('games', g); await cacheCover(g);
@@ -940,11 +942,12 @@ function focusLast() {
   const r = el.getBoundingClientRect(), b = box.getBoundingClientRect();
   if (r.top < b.top + 30 || r.bottom > b.bottom - 30) el.scrollIntoView({ block: 'center' });
 }
-function closeSheet() {
+const animOn = () => S.set.anim !== false;
+function closeSheet(instant) {
   const sh0 = S.sheet;
   if (sh0 && sh0.dirty && sheetEl) { collectSheet(); sh0.dirty = false; persistDraft(sh0).then(ok => { if (!ok && !sh0.draft.name) toast('The game was not saved: the title is empty'); }); } // список перерисуется, когда запись закончится
   else if (sh0 && sh0.saved && sheetEl) setTimeout(renderKeep, 0); // уже сохранено автоматически (надпись «Сохранено»): список нужно обновить
-  if (sheetEl) { sheetEl.remove(); sheetEl = null; } S.sheet = null;
+  if (sheetEl) { const el = sheetEl; sheetEl = null; if (!instant && animOn() && el.classList && el.querySelectorAll) { el.querySelectorAll('[id]').forEach(n => n.removeAttribute('id')); el.classList.add('closing'); setTimeout(() => el.remove(), 150); } else el.remove(); } S.sheet = null;
   S.shotUrls.forEach(u => URL.revokeObjectURL(u)); S.shotUrls = [];
 }
 function openModal() {
@@ -1410,6 +1413,7 @@ const ICO = {
 const I = (n, c) => '<svg class="ic ic-' + n + (c ? ' ' + c : '') + '" viewBox="0 0 24 24" fill="' + (n === 'star' ? '#f5a524' : 'none') + '" stroke="' + (n === 'star' ? '#f5a524' : 'currentColor') + '" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + ICO[n] + '</svg>';
 // верх карточки: источники (цветные рамки со ссылками)
 function drawShName() { const el = $('#shName'), v = (($('#f_name') || {}).value || '').trim(); if (el) { el.textContent = v || 'Title: tap to enter'; if (el.classList) el.classList.toggle('ph', !v); } }
+function drawShLine() { const el = $('#shLine'); if (!el) return; const t = S.sheet && S.sheet.draft.srcLine; el.textContent = t || ''; el.style.display = t ? '' : 'none'; }
 function drawShDone() {
   const d = S.sheet && S.sheet.draft; if (!d) return; const c = $('#shDone2'), dt = ($('#f_donedate') || {}).value || '';
   if (c && c.classList) c.classList.toggle('on', !!d.done);
@@ -1430,8 +1434,8 @@ function markLast(id) { // едва заметная подсветка откр
   $$('#libBody .last').forEach(e => e.classList.remove('last'));
   const el = $('#libBody [data-gid="' + id + '"]'); if (el) el.classList.add('last');
 }
-function openGameSheet(id) {
-  closeSheet();
+function openGameSheet(id, dir) {
+  closeSheet(true);
   const isNew = !id; if (id) { S.lastGame = id; markLast(id); }
   const g = isNew ? { id: uid(), igdbId: 0, rawgId: 0, name: '', year: 0, rating: 0, time: 0, genres: [], platforms: [], series: '', coverUrl: '', hasCover: false, collections: [], props: {}, done: false, doneDate: '', shotCount: 0, added: Date.now() } : gameById(id);
   if (!g) return;
@@ -1441,12 +1445,12 @@ function openGameSheet(id) {
     ? '<textarea data-prop="' + p.id + '" rows="2">' + esc(d.props[p.id] != null ? d.props[p.id] : '') + '</textarea>'
     : '<input data-prop="' + p.id + '" type="' + (p.type === 'number' ? 'number' : 'date') + '"' + (p.type === 'number' ? ' step="any" inputmode="decimal"' : '') + ' value="' + esc(d.props[p.id] != null ? d.props[p.id] : '') + '">') + '</label>').join('');
   const sb = (ic, label, act, extra) => '<button class="btn sm" data-act="' + act + '"' + (extra || '') + '>' + I(ic) + ' ' + label + '</button>';
-    const sh = openSheet('<div class="cmp"><div class="hero2"><div class="cv' + (src ? '' : ' nocover') + '" id="shCover" data-cvid="' + g.id + '" data-act="shCover"' + (src ? ' style="background-image:url(\'' + bgu(src) + '\')"' : '') + '><button class="cgear" data-act="shCover" aria-label="Cover">' + I('gear') + '</button></div><div class="hr"><button class="ib mnb" data-act="shMenu" title="Actions" aria-label="Actions">⋮</button><div class="srcrow2" id="shSrc"></div>'
+    const sh = openSheet('<div class="cmp"><div class="hero2"><div class="cv' + (src ? '' : ' nocover') + '" id="shCover" data-cvid="' + g.id + '" data-act="shCover"' + (src ? ' style="background-image:url(\'' + bgu(src) + '\')"' : '') + '><button class="cgear" data-act="shCover" aria-label="Cover">' + I('gear') + '</button><button class="cvb l" data-act="shYoutube" title="Search on YouTube" aria-label="Search on YouTube"><svg viewBox="0 0 24 24"><rect x="2.5" y="5.5" width="19" height="13" rx="4" style="fill:#f00;stroke:none"/><path d="M10 9.2v5.6l5-2.8z" style="fill:#fff;stroke:none"/></svg></button><button class="cvb r" data-act="shWiki" title="Search “title wiki” on Google" aria-label="Wiki"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3.2 3.2 3.2 14.8 0 18M12 3c-3.2 3.2-3.2 14.8 0 18"/></svg></button></div><div class="hr"><button class="ib mnb" data-act="shMenu" title="Actions" aria-label="Actions">⋮</button><div class="srcrow2" id="shSrc"></div>'
     + '<div class="namebox"><span class="nm2" id="shName" data-act="shEditName"></span><button class="pen" data-act="shEditName" aria-label="Edit title">' + I('edit') + '</button></div><input id="f_name" type="hidden" value="' + esc(d.name) + '"><div class="infochips" id="shInfo"></div></div></div>'
     + '<div class="hidden"><input id="f_year" type="number" value="' + (d.year || '') + '"><input id="f_rating" type="number" step="any" value="' + (d.rating || '') + '"><input id="f_time" type="number" step="any" value="' + (d.time || '') + '"><input id="f_series" value="' + esc(d.series) + '"></div>'
     + '<input type="file" id="coverFile" accept="image/*" class="hidden">'
     + '<div class="donerow"><div class="donecard" id="shDone2" data-act="shDone"><div class="dc1" id="doneL"></div><div class="dc2"><span id="doneTxt"></span><label class="dpick" data-act="noop" aria-label="Edit date">' + I('edit') + '<input id="f_donedate" type="date" value="' + esc(d.doneDate || '') + '"></label></div></div>'
-    + '<div class="linkchips"><button class="ib lnk" data-act="shYoutube" title="Search on YouTube" aria-label="Search on YouTube"><svg viewBox="0 0 24 24"><rect x="2.5" y="5.5" width="19" height="13" rx="4" style="fill:#f00;stroke:none"/><path d="M10 9.2v5.6l5-2.8z" style="fill:#fff;stroke:none"/></svg></button><button class="ib lnk" data-act="shWiki" title="Search “title wiki” on Google" aria-label="Wiki"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3.2 3.2 3.2 14.8 0 18M12 3c-3.2 3.2-3.2 14.8 0 18"/></svg></button></div></div>'
+    + '<div class="srcline" id="shLine" data-act="shSrcLine" title="Search this line in the source"></div></div>'
     + '<h3>Collections</h3><div class="chips" id="shColls"></div>'
     + '<div class="hdr3"><h3>Genres</h3><button class="btn" data-act="editGenres" aria-label="Edit genres">' + I('edit') + '</button></div><div class="chips" id="shGenres"></div>'
     + '<label class="field hidden" id="genresRow"><span>Genres (comma-separated)</span><input id="f_genres" value="' + esc(d.genres.join(', ')) + '"></label>'
@@ -1456,7 +1460,8 @@ function openGameSheet(id) {
     + (d.added ? '<div class="addedAt">Added: ' + fmtTs(d.added) + '</div>' : '')
     + '<div class="sbar"><button class="btn acc" data-act="closeSheet">Done</button><span id="svst" class="sub">Saved automatically</span>'
     + (isNew ? '<span style="width:44px"></span>' : '<button class="ib red" data-act="delGame" title="Delete game" aria-label="Delete game"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button>') + '</div>');
-  drawShColls(); drawShGenres(d.genres); drawShPlats(d.platforms); drawShots(); drawShHead(); drawShInfo(); drawShName(); drawShDone();
+  drawShColls(); drawShGenres(d.genres); drawShPlats(d.platforms); drawShots(); drawShHead(); drawShInfo(); drawShName(); drawShDone(); drawShLine();
+  attachSwipe(sheetEl); if (dir && animOn() && sh.classList) { sh.classList.add(dir > 0 ? 'swr' : 'swl'); setTimeout(() => sh.classList.remove('swr', 'swl'), 200); }
   $('#f_donedate').onchange = () => { const dd = S.sheet.draft; if ($('#f_donedate').value) dd.done = true; markDirty(); drawShDone(); };
   if (isNew) setTimeout(() => ACT.shEditName(), 60);
   $('#shotFile', sh).onchange = async e => { const files = Array.from(e.target.files || []); e.target.value = ''; if (files.length) await addShotFiles(files); };
@@ -1464,6 +1469,19 @@ function openGameSheet(id) {
     const file = e.target.files[0]; if (!file) return;
     try { const b = await toThumb(file); S.sheet.cover = b; markDirty(); const u = URL.createObjectURL(b); const c = $('#shCover'); c.style.backgroundImage = "url('" + u + "')"; c.classList.remove('nocover'); } catch (er) { toast('Could not read the image'); }
   };
+}
+// свайп в карточке: следующая или предыдущая игра из текущего списка
+function sheetSibling(dir) {
+  const sh = S.sheet; if (!sh || sh.isNew || !S.shown) return;
+  const i = S.shown.findIndex(g => g.id === sh.draft.id); if (i < 0) return;
+  const n = S.shown[i + dir]; if (!n) { if (sheetEl && animOn() && sheetEl.firstChild) { const s = sheetEl.querySelector('.sheet'); if (s) { s.classList.remove('bump'); void s.offsetWidth; s.classList.add('bump'); } } return toast(dir > 0 ? 'This is the last game in the list' : 'This is the first game in the list'); }
+  openGameSheet(n.id, dir);
+}
+function attachSwipe(el) {
+  if (!el || !el.addEventListener) return; let sx = 0, sy = 0, t0 = 0, ok = false;
+  el.addEventListener('touchstart', e => { const t = e.touches && e.touches[0]; ok = !!t && e.touches.length === 1 && !(e.target.closest && e.target.closest('input,textarea,select,#shotsSaved,#shotsBox,.chips.scroll')); if (ok) { sx = t.clientX; sy = t.clientY; t0 = Date.now(); } }, { passive: true });
+  el.addEventListener('touchend', e => { if (!ok) return; ok = false; const t = e.changedTouches && e.changedTouches[0]; if (!t) return; const dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 2 && Date.now() - t0 < 700) sheetSibling(dx < 0 ? 1 : -1); }, { passive: true });
 }
 function drawShColls() {
   const d = S.sheet.draft;
@@ -1828,12 +1846,12 @@ async function listMenu(id) {
     S.inbox.items = S.inbox.items.filter(i => i.listId !== id); S.inbox.lists = S.inbox.lists.filter(x => x.id !== id); await DB.del('inboxLists', id); render();
   }
 }
-async function addItems(listId, lines) { return addParsed(listId, lines.map(parseLine).filter(Boolean)); }
+async function addItems(listId, lines) { return addParsed(listId, lines.map(l => { const x = parseLine(l); if (x) x.raw = String(l).replace(/^\s*(?:\d+[.)]|[-•*–])\s*/, '').trim(); return x; }).filter(Boolean)); }
 async function addParsed(listId, rows) {
   const have = new Set(itemsOf(listId).map(i => normName(i.text))); let n = 0;
   for (const p of rows) {
     if (!p || have.has(normName(p.text))) continue; have.add(normName(p.text));
-    const it = { id: uid(), listId, text: p.text, year: p.year, hours: p.hours, done: false, gameId: '', igdbId: 0, created: Date.now() + n }; if (p.x) it.x = p.x; if (p.unk) it.unk = true;
+    const it = { id: uid(), listId, text: p.text, year: p.year, hours: p.hours, done: false, gameId: '', igdbId: 0, created: Date.now() + n }; if (p.x) it.x = p.x; if (p.unk) it.unk = true; if (p.raw) it.raw = p.raw;
     S.inbox.items.push(it); await DB.put('inboxItems', it); n++;
   }
   return n;
@@ -1872,7 +1890,7 @@ const bestCatalog = (it, cfg) => { const m = catalogMatch(it); return m && m.pct
 // пороги совпадения (в процентах): каталог и источник; «от» - ниже строка не считается найденной, «до» - от этого значения игра считается найденной точно
 const matchCfg = l => { const d = Object.assign({ cLow: 85, cHigh: 98, sLow: 50, sHigh: 98 }, S.set.match, l && l.match); const c = (v, def) => Math.min(100, Math.max(0, +v || def)); const o = { cLow: c(d.cLow, 85), cHigh: c(d.cHigh, 98), sLow: c(d.sLow, 50), sHigh: c(d.sHigh, 98) }; o.cLow = Math.min(o.cLow, o.cHigh); o.sLow = Math.min(o.sLow, o.sHigh); return o; };
 const pct = sc => Math.max(0, Math.min(100, Math.round(sc * 100)));
-const itemAddOpts = it => ({ series: it && it.x && it.x.series ? canonSeries(it.x.series) : '', hours: it && it.hours > 0 ? it.hours : 0 });
+const itemAddOpts = it => ({ line: it ? (it.raw || it.text || '') : '', series: it && it.x && it.x.series ? canonSeries(it.x.series) : '', hours: it && it.hours > 0 ? it.hours : 0 });
 // окно перед разбором: проценты совпадения для каталога и источника; результат {cfg, src} или null
 function matchDialog(cfg, srcName) {
   if (typeof window !== 'undefined' && window.__matchHook) return window.__matchHook(cfg, srcName); // для автотестов
@@ -2391,7 +2409,7 @@ function viewSettings() {
   const propRows = S.props.map(p => '<div class="row"><span>' + esc(p.name) + ' <span class="sub">(' + ({ text: 'text', number: 'number', date: 'date' }[p.type]) + ')</span></span><button class="btn red" data-act="propDel" data-id="' + p.id + '">✕</button></div>').join('');
   const grp = (id, title, inner) => '<details class="grp" data-g="' + id + '"' + (S.gopen[id] ? ' open' : '') + '><summary>' + title + '</summary>' + inner + '</details>';
   const A = [
-    '<div class="sec"><h3 style="margin-top:0">Appearance</h3><div class="chips">' + [['dark', 'Dark'], ['light', 'Light'], ['auto', 'Same as system']].map(x => '<button class="p' + (S.set.theme === x[0] ? ' on' : '') + '" data-act="setTheme" data-v="' + x[0] + '">' + x[1] + '</button>').join('') + '</div><h3>Language</h3><div class="chips">' + [['', 'Same as system'], ['ru', 'Русский'], ['en', 'English']].map(x => '<button class="p' + (langPref() === x[0] ? ' on' : '') + '" data-act="setLang" data-v="' + x[0] + '">' + x[1] + '</button>').join('') + '</div></div>',
+    '<div class="sec"><h3 style="margin-top:0">Appearance</h3><div class="chips">' + [['dark', 'Dark'], ['light', 'Light'], ['auto', 'Same as system']].map(x => '<button class="p' + (S.set.theme === x[0] ? ' on' : '') + '" data-act="setTheme" data-v="' + x[0] + '">' + x[1] + '</button>').join('') + '</div><h3>Animations</h3><div class="chips"><button class="p' + (animOn() ? ' on' : '') + '" data-act="animToggle">' + (animOn() ? '✓ On' : 'Off') + '</button></div><p class="sub">Fast opening and closing of the game card, switching the card by swiping left and right.</p><h3>Language</h3><div class="chips">' + [['', 'Same as system'], ['ru', 'Русский'], ['en', 'English']].map(x => '<button class="p' + (langPref() === x[0] ? ' on' : '') + '" data-act="setLang" data-v="' + x[0] + '">' + x[1] + '</button>').join('') + '</div></div>',
     '<div class="sec"><h3 style="margin-top:0">Main search</h3><div class="chips">' + ['igdb', 'rawg'].map(k => '<button class="p' + (S.set.mainSrc === k ? ' on' : '') + '" data-act="setMainSrc" data-v="' + k + '" style="border-color:' + PROV[k].color + '">' + (S.set.mainSrc === k ? '✓ ' : '') + PROV[k].name + '</button>').join('') + '</div><p class="sub">Search, quick add and Inbox processing go through the main source. Another source is switched on with the button in the search window, but the next time you open search it returns to the main one.</p></div>',
     '<div class="sec"><h3 style="margin-top:0">IGDB keys</h3>' + blockBanner(false, 'igdb') + '<label class="field"><span>Client ID</span><input id="idIn" value="' + esc(S.set.igdbId) + '" placeholder="Client ID" autocomplete="off"></label><label class="field"><span>Client Secret</span><input id="secIn" type="password" value="' + esc(S.set.igdbSecret) + '" placeholder="Client Secret" autocomplete="off"></label><div class="toolbar"><button class="btn acc" data-act="saveKey">Save and check</button></div>' + usageHtml() + '<p class="sub">You can skip the IGDB keys if they are stored on your local server (only for devices in the home network). Free: register an app at dev.twitch.tv/console/apps (Twitch may require two-factor protection), create a Client Secret and copy both values. Documentation: api-docs.igdb.com.</p></div>',
     '<div class="sec"><h3 style="margin-top:0">RAWG key</h3>' + blockBanner(false, 'rawg') + '<label class="field"><input id="rawgIn" value="' + esc(S.set.rawgKey) + '" placeholder="paste your RAWG key" autocomplete="off"></label><div class="toolbar"><button class="btn acc" data-act="saveRawg">Save and check</button></div>' + rawgUsageHtml() + '<p class="sub">Free key: rawg.io/apidocs (sign up, “Get API Key”).</p></div>',
@@ -2912,6 +2930,8 @@ const ACT = {
     const r = await askChoose({ title: 'YouTube: what to search', items: [{ id: '0', label: qs[0], sub: 'just the title', ico: '▶' }, { id: '1', label: qs[1], ico: '▶' }, { id: '2', label: qs[2], ico: '▶' }] });
     if (r === null) return; openYoutube(qs[+r] || n);
   },
+  shSrcLine: () => { const d = S.sheet && S.sheet.draft; if (!d || !d.srcLine) return; const pr = parseLine(d.srcLine); S.retGame = { id: d.id, tab: S.tab }; closeSheet(); S.pending = null; S.search.q = pr ? pr.text : d.srcLine; S.search.src = S.set.mainSrc; S.search.mode = 'search'; Object.assign(S.search.f, { genre: '', genreName: '', platform: '', platformName: '' }); S.tab = 'search'; render(); runSearch(true); },
+  animToggle: () => { S.set.anim = !animOn(); saveSet(); render(); },
   shWiki: () => { const n = (($('#f_name') || {}).value || '').trim(); if (!n) return toast('Enter the title first'); openExternal('https://www.google.com/search?q=' + encodeURIComponent(n + ' wiki')); },
   mgDo: () => openMergePreview(),
   mgGo: async () => { const n = S.mg.ids.filter(i => !String(i).startsWith('virt_')).length - 1; try { await applyMerge(S.mg); } catch (e) { return toast(e.message); } const rf = S.mgRefresh; S.mg = null; S.mgRefresh = false; S.mgVirt = null; closeSheet(); toast(rf ? 'Data applied' : 'Merged, cards deleted: ' + n); renderKeep(); },
@@ -3108,7 +3128,7 @@ function applyTheme() {
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
   const m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', dark ? '#0b0b0d' : '#f2f3f6');
 }
-window.__GC = { reviewOne, catalogMatch, matchCfg, reviewItems, autoResolve, ipMask, addrOf, textLines, syncNow, SY, DB, reloadData, nextPool, PRESETS, applyFilterSet, withSeries, buildEntries, groupGames, textHtml, listHtml, cardHtml, openYoutube, canonPlat, canonGenre, canonAll, dictMerge, dictRename, dictRewrite, openDict, mergeGroups, openMergeCompare, applyMerge, mgBase, renderKeep, toggleInSel, handleShared, applyExtra, addParsed, openExport, exportText, copyText, gameLine, zipBuild, zipRead, shotStats, delShots, rawgQuotaTick, refreshOne, rawg, effItem, applyDefaults, linkItem, itemOpts, viewInbox, quickTap, bulkMore, openAddCollSheet, openLb, libToolsHtml: () => { renderLibHead(); return $('#libTools').innerHTML; }, filterGames, getShots, putShots, collTilesHtml, seriesTilesHtml, viewCollections, viewSeries, DONE_ID, autoResolve, viewStats, restoreGames, removeGame, canonSeries, findDupes, mergeAllDupes, collectSheet, persistDraft, closeSheet, S, ACT, bump, igdb, hltbFind, sgdbAuto, openSgdb, applyTheme, colsFor, usageHtml, serMenu, viewInbox, addItems, linkItem, createList, pendingItem, render, runSearch, addFromIgdb, importData, openIgdbSheet, openGameSheet, openFilters, openCols, selectionAction, loadAll, renderSearchBody };
+window.__GC = { sheetSibling, animOn, reviewOne, catalogMatch, matchCfg, reviewItems, autoResolve, ipMask, addrOf, textLines, syncNow, SY, DB, reloadData, nextPool, PRESETS, applyFilterSet, withSeries, buildEntries, groupGames, textHtml, listHtml, cardHtml, openYoutube, canonPlat, canonGenre, canonAll, dictMerge, dictRename, dictRewrite, openDict, mergeGroups, openMergeCompare, applyMerge, mgBase, renderKeep, toggleInSel, handleShared, applyExtra, addParsed, openExport, exportText, copyText, gameLine, zipBuild, zipRead, shotStats, delShots, rawgQuotaTick, refreshOne, rawg, effItem, applyDefaults, linkItem, itemOpts, viewInbox, quickTap, bulkMore, openAddCollSheet, openLb, libToolsHtml: () => { renderLibHead(); return $('#libTools').innerHTML; }, filterGames, getShots, putShots, collTilesHtml, seriesTilesHtml, viewCollections, viewSeries, DONE_ID, autoResolve, viewStats, restoreGames, removeGame, canonSeries, findDupes, mergeAllDupes, collectSheet, persistDraft, closeSheet, S, ACT, bump, igdb, hltbFind, sgdbAuto, openSgdb, applyTheme, colsFor, usageHtml, serMenu, viewInbox, addItems, linkItem, createList, pendingItem, render, runSearch, addFromIgdb, importData, openIgdbSheet, openGameSheet, openFilters, openCols, selectionAction, loadAll, renderSearchBody };
 (async () => {
   try {
     await loadAll();

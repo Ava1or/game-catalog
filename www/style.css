@@ -69,7 +69,7 @@ h3{margin:16px 2px 8px;font-size:16px}
 .field textarea{min-height:110px;resize:vertical}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .backdrop{position:fixed;inset:0;background:#000a;z-index:30}
-.sheet{position:fixed;left:0;right:0;bottom:0;max-height:92%;overflow-y:auto;background:var(--sheet);border-radius:22px 22px 0 0;padding:14px 16px calc(24px + env(safe-area-inset-bottom));z-index:31;animation:up .2s ease-out}
+.sheet{position:fixed;left:0;right:0;bottom:0;max-height:92%;overflow-y:auto;background:var(--sheet);border-radius:22px 22px 0 0;padding:14px 16px calc(24px + env(safe-area-inset-bottom));z-index:31;animation:up .14s ease-out}
 @keyframes up{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
 .grab{width:44px;height:5px;border-radius:3px;background:var(--bd2);margin:0 auto 12px}
 .hero{display:flex;gap:14px;align-items:flex-start}
@@ -624,3 +624,21 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .it.chkrow{background:rgba(255,170,0,.12);border-radius:10px;box-shadow:inset 3px 0 0 #ffa000}
 .it.chkrow .sub{color:#ffa000}
 .btn.warn{background:#ffa000;color:#000;border-color:#ffa000}
+
+/* ===== Карточка игры: значки на обложке, строка-источник, мелкие коллекции, анимации ===== */
+.hero2 .cv::after{content:"";position:absolute;left:0;right:0;bottom:0;height:46%;border-radius:0 0 10px 10px;background:linear-gradient(to top,rgba(0,0,0,.62),rgba(0,0,0,0));pointer-events:none}
+.cvb{position:absolute;bottom:5px;z-index:2;width:28px;height:28px;padding:0;border:0;border-radius:14px;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;box-shadow:0 1px 5px rgba(0,0,0,.6);cursor:pointer}
+.cvb.l{left:5px}.cvb.r{right:5px}
+.cvb svg{width:20px;height:20px;stroke:#fff;fill:none;stroke-width:1.7}
+.donerow{align-items:stretch}
+.srcline{flex:1;min-width:0;align-self:center;font-size:9px;line-height:10.5px;color:var(--mut);overflow-wrap:anywhere;cursor:pointer}
+#shColls{gap:0}
+#shColls .p{padding:2px 8px;font-size:11px;border-radius:10px;margin:1px 3px 1px 0}
+.wrap td[data-ck="doneDate"],.wrap td[data-ck="added"],.wrap .scd{font-size:10.5px}
+.wrap.d1 td[data-ck="doneDate"],.wrap.d1 td[data-ck="added"],.wrap.d1 .scd{font-size:9.5px}
+@keyframes swr{from{transform:translateX(44px);opacity:.3}to{transform:none;opacity:1}}
+@keyframes swl{from{transform:translateX(-44px);opacity:.3}to{transform:none;opacity:1}}
+@keyframes bump{0%,100%{transform:none}35%{transform:translateX(-10px)}70%{transform:translateX(6px)}}
+@keyframes dn{from{transform:none;opacity:1}to{transform:translateY(40px);opacity:0}}
+.sheet.swr{animation:swr .14s ease-out}.sheet.swl{animation:swl .14s ease-out}.sheet.bump{animation:bump .22s ease-out}
+.closing{pointer-events:none}.closing .sheet{animation:dn .14s ease-in forwards}.closing .backdrop{opacity:0;transition:opacity .14s}

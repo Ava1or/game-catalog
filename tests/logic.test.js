@@ -51,7 +51,7 @@ x=f(); x.sort='series'; eq(L.sortGames(g.slice(),x).map(z=>z.name),['B','C','A']
   let y = JSON.parse(JSON.stringify(L.DEFAULTS.f)); y.addedFrom = '2026-10-10'; eq(L.filterGames(gg, y).map(z => z.name), ['B'], 'добавлена с');
   y = JSON.parse(JSON.stringify(L.DEFAULTS.f)); y.addedTo = '2026-10-05'; eq(L.filterGames(gg, y).map(z => z.name), ['A'], 'добавлена по');
   y = JSON.parse(JSON.stringify(L.DEFAULTS.f)); y.addedFrom = '2026-09-01'; y.addedTo = '2026-10-31'; eq(L.filterGames(gg, y).map(z => z.name), ['A', 'B'], 'добавлена в период');
-  eq(L.DEFAULTS.cols.added, 0, 'колонка даты добавления по умолчанию выключена');
+  eq(L.DEFAULTS.cols.added, 1, 'колонка даты добавления по умолчанию включена');
 }
 
 // сортировка: числа в названиях по значению, пустые серии в конце, равные значения по названию

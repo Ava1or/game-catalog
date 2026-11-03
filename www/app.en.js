@@ -1461,7 +1461,7 @@ function openGameSheet(id, dir) {
     + '<div class="sbar"><button class="btn acc" data-act="closeSheet">Done</button><span id="svst" class="sub">Saved automatically</span>'
     + (isNew ? '<span style="width:44px"></span>' : '<button class="ib red" data-act="delGame" title="Delete game" aria-label="Delete game"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button>') + '</div>');
   drawShColls(); drawShGenres(d.genres); drawShPlats(d.platforms); drawShots(); drawShHead(); drawShInfo(); drawShName(); drawShDone(); drawShLine();
-  attachSwipe(sheetEl); if (dir && animOn() && sh.classList) { sh.classList.add(dir > 0 ? 'swr' : 'swl'); setTimeout(() => sh.classList.remove('swr', 'swl'), 200); }
+  attachSwipe(sheetEl); if (dir && animOn() && sh.classList) sh.classList.add(dir > 0 ? 'swr' : 'swl');
   $('#f_donedate').onchange = () => { const dd = S.sheet.draft; if ($('#f_donedate').value) dd.done = true; markDirty(); drawShDone(); };
   if (isNew) setTimeout(() => ACT.shEditName(), 60);
   $('#shotFile', sh).onchange = async e => { const files = Array.from(e.target.files || []); e.target.value = ''; if (files.length) await addShotFiles(files); };
@@ -1474,15 +1474,36 @@ function openGameSheet(id, dir) {
 function sheetSibling(dir) {
   const sh = S.sheet; if (!sh || sh.isNew || !S.shown) return;
   const i = S.shown.findIndex(g => g.id === sh.draft.id); if (i < 0) return;
-  const n = S.shown[i + dir]; if (!n) { if (sheetEl && animOn() && sheetEl.firstChild) { const s = sheetEl.querySelector('.sheet'); if (s) { s.classList.remove('bump'); void s.offsetWidth; s.classList.add('bump'); } } return toast(dir > 0 ? 'This is the last game in the list' : 'This is the first game in the list'); }
+  const n = S.shown[i + dir]; if (!n) { bumpSheet(); return toast(dir > 0 ? 'This is the last game in the list' : 'This is the first game in the list'); }
   openGameSheet(n.id, dir);
 }
+function bumpSheet() { const s = sheetEl && sheetEl.querySelector && sheetEl.querySelector('.sheet'); if (!s || !animOn()) return; const a = s.classList.contains('bump') ? 'bump2' : 'bump'; s.classList.remove('bump', 'bump2'); void s.offsetWidth; s.classList.add(a); }
+const sibName = dir => { const sh = S.sheet; if (!sh || sh.isNew || !S.shown) return null; const i = S.shown.findIndex(g => g.id === sh.draft.id); return i < 0 ? null : (S.shown[i + dir] || false); };
+// свайп: карточка едет за пальцем, по краям появляются подсказки (название соседней игры или «край списка»)
 function attachSwipe(el) {
-  if (!el || !el.addEventListener) return; let sx = 0, sy = 0, lx = 0, ly = 0, t0 = 0, ok = false, lock = false;
-  const fin = () => { if (!ok) return; ok = false; const dx = lx - sx, dy = ly - sy; if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - t0 < 900) sheetSibling(dx < 0 ? 1 : -1); };
+  if (!el || !el.addEventListener) return; let sx = 0, sy = 0, lx = 0, ly = 0, t0 = 0, ok = false, lock = false, hl = null, hr = null;
+  const sheet = () => el.querySelector('.sheet'), anim = () => animOn();
+  const hints = () => { if (hl) return; hl = document.createElement('div'); hl.className = 'swh l'; hr = document.createElement('div'); hr.className = 'swh r'; el.appendChild(hl); el.appendChild(hr); };
+  const drag = dx => {
+    const s = sheet(); if (!s || !anim()) return; hints();
+    const dir = dx < 0 ? 1 : -1, nb = sibName(dir), k = nb === false ? 0.3 : 1; // у края списка карточка тянется туго
+    s.style.transition = 'none'; s.style.transform = 'translateX(' + Math.round(dx * k) + 'px)'; s.style.opacity = String(Math.max(0.35, 1 - Math.abs(dx) * k / 520));
+    const a = Math.min(1, Math.abs(dx) / 70), txt = nb === null ? '' : nb === false ? (dir > 0 ? 'This is the last game' : 'This is the first game') : (dir > 0 ? '' : '‹ ') + nb.name + (dir > 0 ? ' ›' : '');
+    hl.textContent = dir < 0 ? txt : ''; hr.textContent = dir > 0 ? txt : '';
+    hl.style.opacity = dir < 0 ? a : 0; hr.style.opacity = dir > 0 ? a : 0; hl.classList.toggle('edge', nb === false); hr.classList.toggle('edge', nb === false);
+  };
+  const reset = (animate) => { const s = sheet(); if (hl) { hl.style.opacity = 0; hr.style.opacity = 0; } if (!s) return; s.style.transition = animate ? 'transform .16s ease-out, opacity .16s' : 'none'; s.style.transform = ''; s.style.opacity = ''; if (animate) setTimeout(() => { s.style.transition = ''; }, 200); };
+  const fin = () => {
+    if (!ok) return; ok = false; const dx = lx - sx, dy = ly - sy, dir = dx < 0 ? 1 : -1;
+    if (!lock && !(Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5)) return;
+    const commit = Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - t0 < 1200, nb = sibName(dir), s = sheet();
+    if (commit && nb) { // текущая карточка уезжает, следующая приезжает с той же стороны
+      if (s && anim()) { s.style.transition = 'transform .1s ease-in, opacity .1s'; s.style.transform = 'translateX(' + (dir > 0 ? '-' : '') + '105%)'; s.style.opacity = '0'; if (hl) { hl.style.opacity = 0; hr.style.opacity = 0; } setTimeout(() => sheetSibling(dir), 100); } else sheetSibling(dir);
+    } else { reset(true); if (commit && nb === false) { toast(dir > 0 ? 'This is the last game in the list' : 'This is the first game in the list'); } }
+  };
   el.addEventListener('touchstart', e => { const t = e.touches && e.touches[0]; ok = !!t && e.touches.length === 1 && !(e.target.closest && e.target.closest('input,textarea,select,#shotsSaved,#shotsBox,.chips.scroll')); lock = false; if (ok) { sx = lx = t.clientX; sy = ly = t.clientY; t0 = Date.now(); } }, { passive: true });
   el.addEventListener('touchmove', e => { if (!ok) return; const t = e.touches && e.touches[0]; if (!t) return; lx = t.clientX; ly = t.clientY; const dx = lx - sx, dy = ly - sy;
-    if (!lock && Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.5) lock = true; if (lock && e.cancelable) e.preventDefault(); }, { passive: false }); // горизонтальный жест не должен превращаться в прокрутку
+    if (!lock && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5) lock = true; if (lock) { if (e.cancelable) e.preventDefault(); drag(dx); } }, { passive: false });
   el.addEventListener('touchend', e => { const t = e.changedTouches && e.changedTouches[0]; if (t) { lx = t.clientX; ly = t.clientY; } fin(); }, { passive: true });
   el.addEventListener('touchcancel', fin, { passive: true });
 }

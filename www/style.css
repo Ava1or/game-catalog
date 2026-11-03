@@ -639,8 +639,12 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .wrap.d1 td[data-ck="doneDate"],.wrap.d1 td[data-ck="added"],.wrap.d1 .scd{font-size:9.5px}
 @keyframes swr{from{transform:translateX(70px);opacity:.2}to{transform:none;opacity:1}}
 @keyframes swl{from{transform:translateX(-70px);opacity:.2}to{transform:none;opacity:1}}
-@keyframes bump{0%,100%{transform:none}35%{transform:translateX(-10px)}70%{transform:translateX(6px)}}
+@keyframes bump{0%,100%{transform:none}35%{transform:translateX(-16px)}70%{transform:translateX(8px)}}
+@keyframes bump2{0%,100%{transform:none}35%{transform:translateX(-16px)}70%{transform:translateX(8px)}}
 @keyframes dn{from{transform:none;opacity:1}to{transform:translateY(40px);opacity:0}}
 .sheet{touch-action:pan-y}
-.sheet.swr{animation:swr .16s ease-out}.sheet.swl{animation:swl .16s ease-out}.sheet.bump{animation:bump .22s ease-out}
+.sheet.swr{animation:swr .16s ease-out}.sheet.swl{animation:swl .16s ease-out}.sheet.bump{animation:bump .26s ease-out}.sheet.bump2{animation:bump2 .26s ease-out}
 .closing{pointer-events:none}.closing .sheet{animation:dn .14s ease-in forwards}.closing .backdrop{opacity:0;transition:opacity .14s}
+
+.swh{position:fixed;top:40%;z-index:33;max-width:42%;padding:8px 12px;border-radius:14px;background:rgba(0,0,0,.72);color:#fff;font-size:13px;line-height:16px;opacity:0;pointer-events:none;box-shadow:0 2px 10px rgba(0,0,0,.5);overflow-wrap:anywhere}
+.swh.l{left:8px}.swh.r{right:8px;text-align:right}.swh.edge{background:rgba(160,90,0,.85)}

@@ -575,7 +575,6 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .nxt.inl{animation:nxl .2s ease-out}.nxt.inr{animation:nxr .2s ease-out}
 @keyframes nxl{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}
 @keyframes nxr{from{transform:translateX(-40px);opacity:0}to{transform:none;opacity:1}}
-@media (prefers-reduced-motion:reduce){.nxt{animation:none!important}}
 
 /* текстовый вид: год, платформы и время разными цветами; выделение синее и у пройденных */
 :root{--ty:#e6b94d;--ttm:#4fd1c5}
@@ -643,8 +642,14 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 @keyframes bump2{0%,100%{transform:none}35%{transform:translateX(-16px)}70%{transform:translateX(8px)}}
 @keyframes dn{from{transform:none;opacity:1}to{transform:translateY(40px);opacity:0}}
 .sheet{touch-action:pan-y}
-.sheet.swr{animation:swr .16s ease-out}.sheet.swl{animation:swl .16s ease-out}.sheet.bump{animation:bump .26s ease-out}.sheet.bump2{animation:bump2 .26s ease-out}
+.shbody.swr{animation:swr .16s ease-out}.shbody.swl{animation:swl .16s ease-out}.shbody.bump{animation:bump .26s ease-out}.shbody.bump2{animation:bump2 .26s ease-out}
 .closing{pointer-events:none}.closing .sheet{animation:dn .14s ease-in forwards}.closing .backdrop{opacity:0;transition:opacity .14s}
 
-.swh{position:fixed;top:40%;z-index:33;max-width:42%;padding:8px 12px;border-radius:14px;background:rgba(0,0,0,.72);color:#fff;font-size:13px;line-height:16px;opacity:0;pointer-events:none;box-shadow:0 2px 10px rgba(0,0,0,.5);overflow-wrap:anywhere}
-.swh.l{left:8px}.swh.r{right:8px;text-align:right}.swh.edge{background:rgba(160,90,0,.85)}
+.swh{position:fixed;top:40%;z-index:33;max-width:44%;padding:9px 13px;border-radius:14px;background:#2f7bff;color:#fff;font-weight:700;font-size:14px;line-height:17px;opacity:0;pointer-events:none;box-shadow:0 2px 10px rgba(0,0,0,.5);overflow-wrap:anywhere}
+.swh.l{left:8px}.swh.r{right:8px;text-align:right}.swh.edge{background:#d98200}
+.swh{text-shadow:0 1px 2px rgba(0,0,0,.4)}
+
+/* текстовый вид: масштаб 1-4 и меньшие отступы внутри строки */
+.tlist .tl{padding:1px 4px;line-height:1.25;font-size:14px}
+.tlist.z1 .tl{font-size:11px}.tlist.z2 .tl{font-size:13px}.tlist.z3 .tl{font-size:16px}.tlist.z4 .tl{font-size:19px}
+.tlist .gh{padding-top:4px;padding-bottom:2px}

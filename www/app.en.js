@@ -943,11 +943,11 @@ function focusLast() {
   if (r.top < b.top + 30 || r.bottom > b.bottom - 30) el.scrollIntoView({ block: 'center' });
 }
 const animOn = () => S.set.anim !== false;
-function closeSheet(instant) {
+function closeSheet(instant, keep) {
   const sh0 = S.sheet;
   if (sh0 && sh0.dirty && sheetEl) { collectSheet(); sh0.dirty = false; persistDraft(sh0).then(ok => { if (!ok && !sh0.draft.name) toast('The game was not saved: the title is empty'); }); } // список перерисуется, когда запись закончится
   else if (sh0 && sh0.saved && sheetEl) setTimeout(renderKeep, 0); // уже сохранено автоматически (надпись «Сохранено»): список нужно обновить
-  if (sheetEl) { const el = sheetEl; sheetEl = null; if (!instant && animOn() && el.classList && el.querySelectorAll) { el.querySelectorAll('[id]').forEach(n => { n.setAttribute('data-oldid', n.id); n.removeAttribute('id'); }); el.classList.add('closing'); setTimeout(() => el.remove(), 150); } else el.remove(); } S.sheet = null;
+  if (sheetEl && !keep) { const el = sheetEl; sheetEl = null; if (!instant && animOn() && el.classList && el.querySelectorAll) { el.querySelectorAll('[id]').forEach(n => { n.setAttribute('data-oldid', n.id); n.removeAttribute('id'); }); el.classList.add('closing'); setTimeout(() => el.remove(), 150); } else el.remove(); } S.sheet = null;
   S.shotUrls.forEach(u => URL.revokeObjectURL(u)); S.shotUrls = [];
 }
 function openModal() {
@@ -1112,7 +1112,7 @@ function textLines(items) {
 }
 function textHtml(items, total) {
   const ents = normEnt(items), tc = textCols();
-  let h = '<div class="tlist ' + (S.set.textWrap === 'scroll' ? 'sc' : 'wr') + '">';
+  let h = '<div class="tlist z' + colsFor('text') + ' ' + (S.set.textWrap === 'scroll' ? 'sc' : 'wr') + '">';
   ents.forEach(e => {
     if (e.t === 'h') { h += '<div class="gh l' + e.lvl + '">' + esc(e.text) + '<b>' + e.n + '</b></div>'; return; }
     const g = e.g, yr = tc.year && g.year ? g.year : '', pl = tc.platforms && (g.platforms || []).length ? platOut(g.platforms.map(shortPlat).join(', ')) : '', sr = tc.series && g.series ? g.series : '';
@@ -1134,8 +1134,8 @@ const ICONS = {
   zoom: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4M11 8v6M8 11h6"/>',
   wrap: '<path d="M4 6h16M4 12h11a3 3 0 0 1 0 6h-3M12 18l2-2M12 18l2 2M4 18h4"/>', list: '<path d="M4 6h16M4 12h16M4 18h16"/>', mark: '<path d="M6 4h12v16l-6-4-6 4z"/>', dice: '<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="15" r="1"/><circle cx="12" cy="12" r="1"/>', text: '<path d="M5 7h14M5 12h14M5 17h9"/>', group: '<path d="M4 5h16M7 9h13M7 13h13M4 18h16"/>', cols: '<rect x="4" y="4" width="16" height="16"/><path d="M9.5 4v16M14.5 4v16"/>', sel: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 12l3 3 5-6"/>', coll: '<path d="M3 7h6l2 2h10v10H3z"/>'
 };
-const ZOOM_RANGE = { list: [1, 3], grid: [2, 6], search: [2, 6], coll: [1, 4], series: [1, 4] };
-const ZOOM_DEF = { list: [1, 1], grid: [3, 6], search: [3, 6], coll: [2, 4], series: [2, 4] };
+const ZOOM_RANGE = { text: [1, 4], list: [1, 3], grid: [2, 6], search: [2, 6], coll: [1, 4], series: [1, 4] };
+const ZOOM_DEF = { text: [2, 2], list: [1, 1], grid: [3, 6], search: [3, 6], coll: [2, 4], series: [2, 4] };
 const colsFor = k => S.set.zoom[k] || ZOOM_DEF[k][(window.innerWidth || 0) >= 620 ? 1 : 0];
 const zoomBtn = k => ib('zoom', 'zoom', 'Zoom', false, '<span class="cnt bw">' + colsFor(k) + '</span>', ' data-k="' + k + '"');
 const ib = (act, icon, label, on, extra, attrs) => '<button class="ib' + (on ? ' on' : '') + '" data-act="' + act + '"' + (attrs || '') + ' title="' + label + '" aria-label="' + label + '"><svg viewBox="0 0 24 24">' + ICONS[icon] + '</svg><span class="lbl">' + label + '</span>' + (extra || '') + '</button>';
@@ -1150,9 +1150,9 @@ function renderLibHead() {
   const f = S.set.f;
   $('#libTools').innerHTML = ib('openFilters', 'filter', 'Filters', activeCount() > 0, activeCount() ? '<span class="cnt">' + activeCount() + '</span>' : '')
     + ib('toggleView', S.set.view === 'grid' ? 'list' : S.set.view === 'list' ? 'text' : 'grid', S.set.view === 'grid' ? 'List' : S.set.view === 'list' ? 'Text' : 'Grid', false)
-    + (S.set.view === 'text' ? ib('toggleWrap', 'wrap', S.set.textWrap === 'scroll' ? 'Multi-line' : 'Single line with scrolling', S.set.textWrap === 'scroll') : zoomBtn(S.set.view === 'grid' ? 'grid' : 'list'))
+    + (S.set.view === 'text' ? ib('toggleWrap', 'wrap', S.set.textWrap === 'scroll' ? 'Multi-line' : 'Single line with scrolling', S.set.textWrap === 'scroll') + zoomBtn('text') : zoomBtn(S.set.view === 'grid' ? 'grid' : 'list'))
     + (S.set.view === 'grid' ? '' : ib('openCols', 'cols', 'Columns', false))
-    + ib('openGroup', 'group', 'Grouping', !!S.set.group) + ib('openSaved', 'mark', 'Presets', false) + ib('pickNext', 'dice', 'What to play', false)
+    + ib('openGroup', 'group', 'Grouping', !!S.set.group) + ib('pickNext', 'dice', 'What to play', false)
   const chips = [];
   const lab = (k, v) => k === 'collections' ? (v === DONE_ID ? 'Completed' : (collById(v) || {}).name || v) : k === 'props' ? ((S.props.find(p => p.id === v) || {}).name || v) : (k === 'series' && v === '' ? 'No series' : v);
   ['collections', 'years', 'genres', 'platforms', 'series', 'props'].forEach(k => f[k].forEach(v => chips.push('<button class="chip" data-act="rmF" data-k="' + k + '" data-v="' + esc(v) + '">' + esc(lab(k, v)) + ' ✕</button>')));
@@ -1347,12 +1347,29 @@ function showNext(dir) {
   if (!g) { nx.hist.splice(nx.i, 1); nx.i = nx.hist.length - 1; return showNext(1); } // игру успели удалить
   const src = coverSrc(g), fresh = !(S.nxOpen && modalEl && modalEl.querySelector('.nxt')), m = fresh ? openModal() : modalEl.querySelector('.modal');
   S.nxOpen = true; modalCancel = () => { S.nxOpen = false; closeModal(); }; m.style.touchAction = 'pan-y';
-  m.innerHTML = '<h4>What to play next<span class="nxcnt">' + (nx.i + 1) + ' of ' + pool.length + '</span></h4><div class="nxt' + (dir ? (dir < 0 ? ' inr' : ' inl') : '') + '"><div class="nxc' + (src ? '' : ' nocover') + '" data-cvid="' + g.id + '"' + (src ? ' style="background-image:url(\'' + bgu(src) + '\')"' : '') + '></div><div class="nxi"><div class="nxn">' + esc(g.name) + '</div><div class="sub">' + esc([g.year || '', (g.platforms || []).slice(0, 3).map(shortPlat).join(', '), g.time ? g.time + ' h' : ''].filter(Boolean).join(' · ')) + '</div>' + (g.series ? '<div class="sub">Series: ' + esc(g.series) + '</div>' : '') + (g.genres && g.genres.length ? '<div class="sub">' + esc(g.genres.slice(0, 3).join(', ')) + '</div>' : '') + '</div></div>'
-    + '<p class="sub" style="margin:10px 0 0">Swipe left: another game, right: the previous one. Only uncompleted games from the current list are used (not series games).</p><div class="nxbar"><button class="nxb" data-x="close" title="Close" aria-label="Close">✕</button><button class="nxb" data-x="prev" title="Back" aria-label="Back"' + (nx.i > 0 ? '' : ' disabled') + '>‹</button><button class="nxb" data-x="again" title="Another one" aria-label="Another one">›</button><button class="nxb acc" data-x="open" title="Open" aria-label="Open">↗</button></div>';
-  m.onclick = e => { const x = e.target.closest('[data-x]'); if (!x) return; const a = x.dataset.x; if (a === 'again') return showNext(1); if (a === 'prev') return showNext(-1); S.nxOpen = false; closeModal(); if (a === 'open') openGameSheet(g.id); };
-  m.onpointerdown = e => { m._sx = e.clientX; m._sy = e.clientY; };
-  m.onpointerup = e => { const dx = e.clientX - m._sx, dy = e.clientY - m._sy; if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) showNext(dx < 0 ? 1 : -1); };
+  const inner = '<div class="nxc' + (src ? '' : ' nocover') + '" data-cvid="' + g.id + '"' + (src ? ' style="background-image:url(\'' + bgu(src) + '\')"' : '') + '></div><div class="nxi"><div class="nxn">' + esc(g.name) + '</div><div class="sub">' + esc([g.year || '', (g.platforms || []).slice(0, 3).map(shortPlat).join(', '), g.time ? g.time + ' h' : ''].filter(Boolean).join(' · ')) + '</div>' + (g.series ? '<div class="sub">Series: ' + esc(g.series) + '</div>' : '') + (g.genres && g.genres.length ? '<div class="sub">' + esc(g.genres.slice(0, 3).join(', ')) + '</div>' : '') + '</div>';
+  if (fresh) { // рамка окна (заголовок, подсказка, кнопки) создаётся один раз; при смене игры меняется только середина с картинкой и описанием
+    m.innerHTML = '<h4>What to play next<span class="nxcnt" id="nxCnt"></span></h4><div class="nxt"></div>'
+      + '<p class="sub" style="margin:10px 0 0">Swipe left: another game, right: the previous one. Only uncompleted games from the current list are used (not series games).</p><div class="nxbar"><button class="nxb" data-x="close" title="Close" aria-label="Close">✕</button><button class="nxb" id="nxPrev" data-x="prev" title="Back" aria-label="Back">‹</button><button class="nxb" data-x="again" title="Another one" aria-label="Another one">›</button><button class="nxb acc" data-x="open" title="Open" aria-label="Open">↗</button></div>';
+    m.onclick = e => { const x = e.target.closest('[data-x]'); if (!x) return; const a = x.dataset.x; if (a === 'again') return nxGo(1); if (a === 'prev') return nxGo(-1); const cur = S.nx && gameById(S.nx.hist[S.nx.i]); S.nxOpen = false; closeModal(); if (a === 'open' && cur) openGameSheet(cur.id); };
+    const st = { x: 0, y: 0, on: false, lock: false, box: null };
+    const back = () => { const b = m.querySelector('.nxt'); if (!b) return; b.style.transition = 'transform .15s ease-out, opacity .15s'; b.style.transform = ''; b.style.opacity = ''; setTimeout(() => { b.style.transition = ''; }, 180); };
+    m.onpointerdown = e => { if (e.target.closest('button')) return; st.on = true; st.lock = false; st.x = e.clientX; st.y = e.clientY; st.box = m.querySelector('.nxt'); };
+    m.onpointermove = e => { if (!st.on || !st.box) return; const dx = e.clientX - st.x, dy = e.clientY - st.y;
+      if (!st.lock && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy) * 1.5) { st.lock = true; try { m.setPointerCapture(e.pointerId); } catch (er) { /* не страшно */ } }
+      if (st.lock && animOn()) { const k = dx > 0 && S.nx && S.nx.i <= 0 ? 0.3 : 1; st.box.style.transition = 'none'; st.box.style.transform = 'translateX(' + Math.round(dx * k) + 'px)'; st.box.style.opacity = String(Math.max(0.3, 1 - Math.abs(dx * k) / 300)); } };
+    const end = e => { if (!st.on) return; st.on = false; const dx = e.clientX - st.x, dy = e.clientY - st.y, dir = dx < 0 ? 1 : -1;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5 && !(dir < 0 && S.nx && S.nx.i <= 0)) { // старая середина уезжает, новая приезжает с той же стороны, рамка остаётся на месте
+        const b = st.box; if (b && animOn()) { b.style.transition = 'transform .09s ease-in, opacity .09s'; b.style.transform = 'translateX(' + (dir > 0 ? '-' : '') + '60px)'; b.style.opacity = '0'; setTimeout(() => { b.style.transition = ''; b.style.transform = ''; b.style.opacity = ''; nxGo(dir); }, 90); } else nxGo(dir);
+      } else back(); };
+    m.onpointerup = end; m.onpointercancel = () => { st.on = false; back(); };
+  }
+  const box = m.querySelector('.nxt'); box.innerHTML = inner; box.classList.remove('inl', 'inr');
+  if (dir && animOn()) { void box.offsetWidth; box.classList.add(dir < 0 ? 'inr' : 'inl'); }
+  const cnt = m.querySelector('#nxCnt'); if (cnt) cnt.textContent = (nx.i + 1) + ' of ' + pool.length;
+  const pv = m.querySelector('#nxPrev'); if (pv) pv.disabled = !(nx.i > 0);
 }
+const nxGo = dir => showNext(dir);
 function seriesModeSect() {
   const m = S.set.f.seriesMode || '';
   return '<h3>★ Series games</h3><p class="sub" style="margin:0 0 8px;line-height:1.35">Add all games from the series of the selected games: any year, platform and collection. Such games are marked ★ and shown paler; they are not part of the main list.</p><div class="chips">' + [['', 'Off'], ['below', 'Below the main list'], ['mixed', 'Together with the main list']].map(x => '<button class="p' + (m === x[0] ? ' on' : '') + '" data-act="setSeriesMode" data-v="' + x[0] + '">' + (m === x[0] ? '✓ ' : '') + x[1] + '</button>').join('') + '</div>';
@@ -1435,7 +1452,8 @@ function markLast(id) { // едва заметная подсветка откр
   const el = $('#libBody [data-gid="' + id + '"]'); if (el) el.classList.add('last');
 }
 function openGameSheet(id, dir) {
-  closeSheet(true);
+  closeSheet(true, !!(dir && sheetEl)); // при смене соседней игры рамка карточки остаётся, меняется только содержимое
+  if (dir && sheetEl) { sheetKey = 'game'; sheetEl._key = 'game'; }
   const isNew = !id; if (id) { S.lastGame = id; markLast(id); }
   const g = isNew ? { id: uid(), igdbId: 0, rawgId: 0, name: '', year: 0, rating: 0, time: 0, genres: [], platforms: [], series: '', coverUrl: '', hasCover: false, collections: [], props: {}, done: false, doneDate: '', shotCount: 0, added: Date.now() } : gameById(id);
   if (!g) return;
@@ -1445,7 +1463,7 @@ function openGameSheet(id, dir) {
     ? '<textarea data-prop="' + p.id + '" rows="2">' + esc(d.props[p.id] != null ? d.props[p.id] : '') + '</textarea>'
     : '<input data-prop="' + p.id + '" type="' + (p.type === 'number' ? 'number' : 'date') + '"' + (p.type === 'number' ? ' step="any" inputmode="decimal"' : '') + ' value="' + esc(d.props[p.id] != null ? d.props[p.id] : '') + '">') + '</label>').join('');
   const sb = (ic, label, act, extra) => '<button class="btn sm" data-act="' + act + '"' + (extra || '') + '>' + I(ic) + ' ' + label + '</button>';
-    const sh = openSheet('<div class="cmp"><div class="hero2"><div class="cv' + (src ? '' : ' nocover') + '" id="shCover" data-cvid="' + g.id + '" data-act="shCover"' + (src ? ' style="background-image:url(\'' + bgu(src) + '\')"' : '') + '><button class="cgear" data-act="shCover" aria-label="Cover">' + I('gear') + '</button><button class="cvb l" data-act="shYoutube" title="Search on YouTube" aria-label="Search on YouTube"><svg viewBox="0 0 24 24"><rect x="2.5" y="5.5" width="19" height="13" rx="4" style="fill:#f00;stroke:none"/><path d="M10 9.2v5.6l5-2.8z" style="fill:#fff;stroke:none"/></svg></button><button class="cvb r" data-act="shWiki" title="Search “title wiki” on Google" aria-label="Wiki"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3.2 3.2 3.2 14.8 0 18M12 3c-3.2 3.2-3.2 14.8 0 18"/></svg></button></div><div class="hr"><button class="ib mnb" data-act="shMenu" title="Actions" aria-label="Actions">⋮</button><div class="srcrow2" id="shSrc"></div>'
+    const sh = openSheet('<div class="shbody"><div class="cmp"><div class="hero2"><div class="cv' + (src ? '' : ' nocover') + '" id="shCover" data-cvid="' + g.id + '" data-act="shCover"' + (src ? ' style="background-image:url(\'' + bgu(src) + '\')"' : '') + '><button class="cgear" data-act="shCover" aria-label="Cover">' + I('gear') + '</button><button class="cvb l" data-act="shYoutube" title="Search on YouTube" aria-label="Search on YouTube"><svg viewBox="0 0 24 24"><rect x="2.5" y="5.5" width="19" height="13" rx="4" style="fill:#f00;stroke:none"/><path d="M10 9.2v5.6l5-2.8z" style="fill:#fff;stroke:none"/></svg></button><button class="cvb r" data-act="shWiki" title="Search “title wiki” on Google" aria-label="Wiki"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3.2 3.2 3.2 14.8 0 18M12 3c-3.2 3.2-3.2 14.8 0 18"/></svg></button></div><div class="hr"><button class="ib mnb" data-act="shMenu" title="Actions" aria-label="Actions">⋮</button><div class="srcrow2" id="shSrc"></div>'
     + '<div class="namebox"><span class="nm2" id="shName" data-act="shEditName"></span><button class="pen" data-act="shEditName" aria-label="Edit title">' + I('edit') + '</button></div><input id="f_name" type="hidden" value="' + esc(d.name) + '"><div class="infochips" id="shInfo"></div></div></div>'
     + '<div class="hidden"><input id="f_year" type="number" value="' + (d.year || '') + '"><input id="f_rating" type="number" step="any" value="' + (d.rating || '') + '"><input id="f_time" type="number" step="any" value="' + (d.time || '') + '"><input id="f_series" value="' + esc(d.series) + '"></div>'
     + '<input type="file" id="coverFile" accept="image/*" class="hidden">'
@@ -1457,11 +1475,11 @@ function openGameSheet(id, dir) {
     + '<div class="hdr3"><h3>Platforms</h3><button class="btn" data-act="editPlats" aria-label="Edit platforms">' + I('edit') + '</button></div><div class="chips" id="shPlats"></div>'
     + '<label class="field hidden" id="platsRow"><span>Platforms (comma-separated)</span><input id="f_platforms" value="' + esc(d.platforms.join(', ')) + '"></label>'
     + propInputs + '<h3>Screenshots</h3><div id="shotsSaved"></div><div class="tbar">' + sb('plus', 'Own', 'shotAddFile') + srcs.map(k => sb('img', PROV[k].name, 'loadShots', ' data-rid="' + ridOf(k, g[k + 'Id']) + '" data-save="1"')).join('') + '</div><input type="file" id="shotFile" accept="image/*" multiple class="hidden"><div id="shotsBox"></div></div>'
-    + (d.added ? '<div class="addedAt">Added: ' + fmtTs(d.added) + '</div>' : '')
+    + (d.added ? '<div class="addedAt">Added: ' + fmtTs(d.added) + '</div>' : '') + '</div>'
     + '<div class="sbar"><button class="btn acc" data-act="closeSheet">Done</button><span id="svst" class="sub">Saved automatically</span>'
     + (isNew ? '<span style="width:44px"></span>' : '<button class="ib red" data-act="delGame" title="Delete game" aria-label="Delete game"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button>') + '</div>');
   drawShColls(); drawShGenres(d.genres); drawShPlats(d.platforms); drawShots(); drawShHead(); drawShInfo(); drawShName(); drawShDone(); drawShLine();
-  attachSwipe(sheetEl); if (dir && animOn() && sh.classList) sh.classList.add(dir > 0 ? 'swr' : 'swl');
+  attachSwipe(sheetEl); if (dir) sh.scrollTop = 0; { const bd = dir && animOn() && sh.querySelector ? sh.querySelector('.shbody') : null; if (bd && bd.classList) bd.classList.add(dir > 0 ? 'swr' : 'swl'); }
   $('#f_donedate').onchange = () => { const dd = S.sheet.draft; if ($('#f_donedate').value) dd.done = true; markDirty(); drawShDone(); };
   if (isNew) setTimeout(() => ACT.shEditName(), 60);
   $('#shotFile', sh).onchange = async e => { const files = Array.from(e.target.files || []); e.target.value = ''; if (files.length) await addShotFiles(files); };
@@ -1477,18 +1495,18 @@ function sheetSibling(dir) {
   const n = S.shown[i + dir]; if (!n) { bumpSheet(); return toast(dir > 0 ? 'This is the last game in the list' : 'This is the first game in the list'); }
   openGameSheet(n.id, dir);
 }
-function bumpSheet() { const s = sheetEl && sheetEl.querySelector && sheetEl.querySelector('.sheet'); if (!s || !animOn()) return; const a = s.classList.contains('bump') ? 'bump2' : 'bump'; s.classList.remove('bump', 'bump2'); void s.offsetWidth; s.classList.add(a); }
+function bumpSheet() { const s = sheetEl && sheetEl.querySelector && sheetEl.querySelector('.shbody'); if (!s || !animOn()) return; const a = s.classList.contains('bump') ? 'bump2' : 'bump'; s.classList.remove('bump', 'bump2'); void s.offsetWidth; s.classList.add(a); }
 const sibName = dir => { const sh = S.sheet; if (!sh || sh.isNew || !S.shown) return null; const i = S.shown.findIndex(g => g.id === sh.draft.id); return i < 0 ? null : (S.shown[i + dir] || false); };
 // свайп: карточка едет за пальцем, по краям появляются подсказки (название соседней игры или «край списка»)
 function attachSwipe(el) {
-  if (!el || !el.addEventListener) return; let sx = 0, sy = 0, lx = 0, ly = 0, t0 = 0, ok = false, lock = false, hl = null, hr = null;
-  const sheet = () => el.querySelector('.sheet'), anim = () => animOn();
+  if (!el || !el.addEventListener || el._sw) return; el._sw = true; let sx = 0, sy = 0, lx = 0, ly = 0, t0 = 0, ok = false, lock = false, hl = null, hr = null;
+  const sheet = () => el.querySelector('.shbody'), anim = () => animOn();
   const hints = () => { if (hl) return; hl = document.createElement('div'); hl.className = 'swh l'; hr = document.createElement('div'); hr.className = 'swh r'; el.appendChild(hl); el.appendChild(hr); };
   const drag = dx => {
     const s = sheet(); if (!s || !anim()) return; hints();
     const dir = dx < 0 ? 1 : -1, nb = sibName(dir), k = nb === false ? 0.3 : 1; // у края списка карточка тянется туго
     s.style.transition = 'none'; s.style.transform = 'translateX(' + Math.round(dx * k) + 'px)'; s.style.opacity = String(Math.max(0.35, 1 - Math.abs(dx) * k / 520));
-    const a = Math.min(1, Math.abs(dx) / 70), txt = nb === null ? '' : nb === false ? (dir > 0 ? 'This is the last game' : 'This is the first game') : (dir > 0 ? '' : '‹ ') + nb.name + (dir > 0 ? ' ›' : '');
+    const a = Math.min(1, Math.abs(dx) / 70), txt = nb === null ? '' : nb === false ? (dir > 0 ? 'This is the last game' : 'This is the first game') : (dir > 0 ? '' : '‹ ') + nb.name + (nb.year ? ' (' + nb.year + ')' : '') + (dir > 0 ? ' ›' : '');
     hl.textContent = dir < 0 ? txt : ''; hr.textContent = dir > 0 ? txt : '';
     hl.style.opacity = dir < 0 ? a : 0; hr.style.opacity = dir > 0 ? a : 0; hl.classList.toggle('edge', nb === false); hr.classList.toggle('edge', nb === false);
   };

@@ -164,7 +164,7 @@ const L = require('../www/app.js');
     G.ACT.collMode({ dataset: { v: 'or' } });
     const h = G.libToolsHtml(); if (h.includes('openColls')) throw new Error('кнопки «Коллекции» на панели быть не должно: коллекции есть в фильтрах'); if (!h.includes('cnt')) throw new Error('no counter on filters button');
     { S.set.textWrap = 'wrap'; const a = G.textHtml(S.games.slice(0, 3).map(g => ({ t: 'g', g, x: false })), 3), b = (S.set.textWrap = 'scroll', G.textHtml(S.games.slice(0, 3).map(g => ({ t: 'g', g, x: false })), 3)); S.set.textWrap = 'wrap';
-      if (!a.includes('tlist wr') || !b.includes('tlist sc') || !a.includes('class="tx"><span class="tn">')) throw new Error('текстовый вид: режимы и разметка'); }
+      if (!/tlist z\d wr/.test(a) || !/tlist z\d sc/.test(b) || !a.includes('class="tx"><span class="tn">')) throw new Error('текстовый вид: режимы и разметка'); }
     { S.set.group = 'year'; G.ACT.resetF(); if (S.set.group) throw new Error('«Сбросить» должен убирать и группировку');
       const tx = G.textHtml([{ t: 'g', g: Object.assign({}, S.games[0], { year: 2020, platforms: ['PlayStation 4'], time: 12 }), x: false }], 1);
       if (!tx.includes('class="ty">2020') || !tx.includes('class="tp">') || !tx.includes('class="tt">')) throw new Error('текстовый вид: год, платформы, время'); }

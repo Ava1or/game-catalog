@@ -199,7 +199,8 @@ const L = require('../www/app.js');
     const W = global.window || global;
     S.set.cols.platforms = 1; S.set.view = 'list'; S.tab = 'library'; G.render(); S.set.view = 'grid';
         S.collections.push({ id: 'n1', name: 'Н1', created: 1 }, { id: 'n2', name: 'Н2', created: 2 }, { id: 'n3', name: 'Н3', created: 3 }); const gg = S.games[0]; gg.collections = ['n1', 'n2', 'n3'];
-    S.set.view = 'list'; S.tab = 'library'; G.render(); G.ACT.gameColls({ dataset: { gid: gg.id } }); S.set.view = 'grid';
+    S.set.view = 'list'; S.tab = 'library'; G.render(); { const h1 = G.listHtml([gg]), h2 = (S.expColls.add(gg.id), G.listHtml([gg])); S.expColls.delete(gg.id); if (!h1.includes('>+1<') || h2.includes('>+1<') || !h2.includes('Н3') || !h2.includes('class="open"') || !h2.includes('data-act="toggleColls"')) throw new Error('список: раскрытие коллекций'); }
+    G.ACT.gameColls({ dataset: { gid: gg.id } }); S.set.view = 'grid';
     G.ACT.openFilters(); G.ACT.openFilters();
     const l = S.inbox.lists[0] || { id: 'l1', name: 'Список', created: 1 }; if (!S.inbox.lists.length) S.inbox.lists.push(l);
     const it = { id: 'it1', listId: l.id, text: 'Тестовая игра', done: false, gameId: '', created: 1 }; S.inbox.items.push(it);
@@ -362,6 +363,7 @@ const L = require('../www/app.js');
     G.openGameSheet('sw1'); if (document.querySelector('#shLine').textContent !== 'Swipe One (2000 | PC) – 5 ч') throw new Error('строка-источник в карточке');
     G.sheetSibling(1); if (S.sheet.draft.id !== 'sw2') throw new Error('следующая игра'); G.sheetSibling(1); if (S.sheet.draft.id !== 'sw2') throw new Error('за последней остаёмся');
     G.sheetSibling(-1); if (S.sheet.draft.id !== 'sw1') throw new Error('предыдущая игра');
+    { const nv = document.querySelector('.snav'); if (!nv) throw new Error('кнопки влево/вправо в карточке'); G.ACT.shNav({ dataset: { d: '1' } }); if (S.sheet.draft.id !== 'sw2') throw new Error('кнопка вправо'); G.ACT.shNav({ dataset: { d: '-1' } }); }
     G.ACT.shSrcLine(); if (S.tab !== 'search' || S.search.q !== 'Swipe One' || !S.retGame) throw new Error('поиск по строке ' + S.search.q);
     const ln = G.itemLine({ text: 'Zelda', year: 1998, hours: 0, unk: true, x: { platforms: ['N64', 'Xbox Series X|S'], series: 'Zelda' } }); if (ln !== 'Zelda (1998 | N64, Xbox Series X/S | Zelda) – ? ч') throw new Error('формат строки: ' + ln);
     const g = await G.addFromIgdb('igdb:151', [], { line: ln }); if (!g || g.srcLine !== ln) throw new Error('строка запоминается при создании');

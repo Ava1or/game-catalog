@@ -1065,9 +1065,9 @@ function lineMeta(year, plats, series) {
   const a = [String(year), plats || '', series || '']; while (a.length > 1 && !a[a.length - 1]) a.pop(); return a.join(' | ');
 }
 function gameLine(g) { const m = lineMeta(g.year, platOut((g.platforms || []).map(shortPlat).join(', ')), g.series); return g.name + (m ? ' (' + m + ')' : '') + (g.time ? ' – ' + g.time + ' ч' : ''); }
-function tagsHtml(g) {
+function tagsHtml(g, all) { // в строке списка две коллекции и «+N»; нажатие по ячейке показывает все (строка становится выше), повторное прячет
   const names = (g.collections || []).map(id => collById(id)).filter(Boolean);
-  return names.slice(0, 2).map(c => '<span class="tag"' + (okColor(c.color) ? ' style="color:' + okColor(c.color) + ';border-color:' + okColor(c.color) + '"' : '') + '>' + esc(c.name) + '</span>').join('') + (names.length > 2 ? '<span class="tag m2" data-act="gameColls" data-gid="' + g.id + '">+' + (names.length - 2) + '</span>' : '');
+  return (all ? names : names.slice(0, 2)).map(c => '<span class="tag"' + (okColor(c.color) ? ' style="color:' + okColor(c.color) + ';border-color:' + okColor(c.color) + '"' : '') + '>' + esc(c.name) + '</span>').join('') + (!all && names.length > 2 ? '<span class="tag m2">+' + (names.length - 2) + '</span>' : '');
 }
 const statusTxt = total => 'Игр: ' + total + (S.nExtra ? ' (+' + S.nExtra + ' из серий)' : '');
 const normEnt = items => items.map(e => e && e.t ? e : { t: 'g', g: e, x: false });
@@ -1082,7 +1082,7 @@ function listHtml(items, total) {
   const dk = ck => ck ? ' data-ck="' + ck + '"' : '';
   const sortLink = (t, k) => '<a data-act="sortBy" data-k="' + k + '"' + (t === '✓' ? ' title="Завершено"' : '') + '>' + esc(t) + (f.sort === k ? (f.dir === 'desc' ? ' ▼' : ' ▲') : '') + '</a>';
   const th = (t, k, i, ck) => '<th class="' + cls(i).trim() + '"' + stl(i, ck) + dk(ck) + '>' + (k ? sortLink(t, k) : esc(t)) + (ck ? '<i class="rz" data-rz="' + ck + '"></i>' : '') + '</th>';
-  const td = (ck, inner, cl) => '<td' + (cl ? ' class="' + cl + '"' : '') + dk(ck) + stl(-1, ck) + '>' + inner + '</td>';
+  const td = (ck, inner, cl, ex) => '<td' + (cl ? ' class="' + cl + '"' : '') + dk(ck) + (ex || '') + stl(-1, ck) + '>' + inner + '</td>';
   let h = '<div class="wrap d' + lvl + '"><table><thead><tr>' + (S.selMode ? th('', null, 0) : '') + (c.cover ? th('', null, 1) : '') + th('Название', 'name', 2, 'name')
     + (c.genres ? th('Жанры', null, undefined, 'genres') : '') + (c.platforms ? th('Платформы', null, undefined, 'platforms') : '') + ((c.done || c.doneDate) ? th(c.doneDate ? (c.done ? '✓ Дата' : 'Дата') : '✓', c.doneDate ? 'doneDate' : 'done', undefined, 'doneDate') : '') + (c.year ? th('Год', 'year', undefined, 'year') : '') + (c.rating ? th('Рейтинг', 'rating', undefined, 'rating') : '')
     + (c.time ? th('Время', 'time', undefined, 'time') : '') + (c.series ? th('Серия', 'series', undefined, 'series') : '') + props.map(p => th(p.name, 'prop:' + p.id, undefined, 'p:' + p.id)).join('') + (c.colls ? th('Коллекции', null, undefined, 'colls') : '') + (c.added ? th('Добавлена', 'added', undefined, 'added') : '') + '</tr></thead><tbody>';
@@ -1100,7 +1100,7 @@ function listHtml(items, total) {
       + (c.rating ? td('rating', g.rating ? '<span style="color:#ffa000">★ ' + g.rating + '</span>' : '—') : '') + (c.time ? td('time', g.time ? g.time + ' ч' : '—') : '')
       + (c.series ? td('series', '<div class="scd"' + (cwid.series ? ' style="max-width:none"' : '') + '>' + esc(g.series || '') + '</div>') : '')
       + props.map(p => { const v = g.props && g.props[p.id]; return td('p:' + p.id, hasVal(v) ? esc(v) : '', 'pv'); }).join('')
-      + (c.colls ? td('colls', tagsHtml(g)) : '') + (c.added ? td('added', fmtTs(g.added)) : '') + '</tr>';
+      + (c.colls ? td('colls', tagsHtml(g, S.expColls.has(g.id)), S.expColls.has(g.id) ? 'open' : '', ' data-act="toggleColls" data-gid="' + g.id + '"') : '') + (c.added ? td('added', fmtTs(g.added)) : '') + '</tr>';
   });
   return h + '</tbody></table></div><div class="status">' + statusTxt(total || ents.filter(e => e.t === 'g').length) + '</div>';
 }
@@ -1481,7 +1481,7 @@ function openGameSheet(id, dir) {
     + '<label class="field hidden" id="platsRow"><span>Платформы (через запятую)</span><input id="f_platforms" value="' + esc(d.platforms.join(', ')) + '"></label>'
     + propInputs + '<h3>Скриншоты</h3><div id="shotsSaved"></div><div class="tbar">' + sb('plus', 'Своё', 'shotAddFile') + srcs.map(k => sb('img', PROV[k].name, 'loadShots', ' data-rid="' + ridOf(k, g[k + 'Id']) + '" data-save="1"')).join('') + '</div><input type="file" id="shotFile" accept="image/*" multiple class="hidden"><div id="shotsBox"></div></div>'
     + (d.added ? '<div class="addedAt">Добавлена: ' + fmtTs(d.added) + '</div>' : '') + '</div>'
-    + '<div class="sbar"><button class="btn acc" data-act="closeSheet">Готово</button><span id="svst" class="sub">Сохраняется автоматически</span>'
+    + '<div class="sbar"><button class="btn acc" data-act="closeSheet">Готово</button>' + (() => { const p = sheetPos(); return p ? '<span class="snav"><button class="ib" data-act="shNav" data-d="-1"' + (p.i <= 0 ? ' disabled' : '') + ' aria-label="Предыдущая игра">‹</button><span class="snc">' + (p.i + 1) + '/' + p.n + '</span><button class="ib" data-act="shNav" data-d="1"' + (p.i >= p.n - 1 ? ' disabled' : '') + ' aria-label="Следующая игра">›</button></span>' : ''; })() + '<span id="svst" class="sub">Сохраняется автоматически</span>'
     + (isNew ? '<span style="width:44px"></span>' : '<button class="ib red" data-act="delGame" title="Удалить игру" aria-label="Удалить игру"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button>') + '</div>');
   drawShColls(); drawShGenres(d.genres); drawShPlats(d.platforms); drawShots(); drawShHead(); drawShInfo(); drawShName(); drawShDone(); drawShLine();
   { const p0 = sheetPos(); if (p0) [-1, 1].forEach(k => { const n0 = S.shown[p0.i + k]; if (n0) coverSrc(n0); }); }
@@ -2772,6 +2772,7 @@ function render() {
   else { v.innerHTML = viewSettings(); renderSelBar(); fillEstimate(); fillShotStats(); }
 }
 const lp = { t: null, fired: false, x: 0, y: 0 };
+S.expColls = S.expColls || new Set(); // игры, у которых в списке раскрыты все коллекции
 const ACT = {
   tab: t => { if (t.dataset.tab !== 'search') S.pending = null; else if (S.tab !== 'search') { S.search.src = S.set.mainSrc; Object.assign(S.search.f, { genre: '', genreName: '', platform: '', platformName: '' }); } S.retGame = null; S.inSelMode = false; S.inSel.clear(); S.tab = t.dataset.tab; S.selMode = false; S.sel.clear(); closeSheet(); render(); if (S.tab === 'library') setTimeout(focusLast, 0); $('#view').scrollTop = 0; },
   fab: () => S.tab === 'collections' ? createCollection().then(c => { if (c) render(); }) : S.tab === 'inbox' ? createList() : openGameSheet(null),
@@ -2811,6 +2812,8 @@ const ACT = {
     const v = await askChoose({ title: 'Игр в результате (за один раз)', items: [20, 40, 50, 100, 200].map(n => ({ id: String(n), label: String(n) + (n === (S.set.pageSize || 40) ? ' ✓' : '') })) });
     if (!v) return; S.set.pageSize = +v; saveSet(); openSearchFilters(); runSearch(true);
   },
+  toggleColls: t => { const g = gameById(t.dataset.gid); if (!g) return; const e = S.expColls, on = !e.has(g.id); if (on) e.add(g.id); else e.delete(g.id); t.innerHTML = tagsHtml(g, on); t.classList.toggle('open', on); },
+  shNav: t => sheetSibling(+t.dataset.d),
   gameColls: t => {
     const g = gameById(t.dataset.gid); if (!g) return;
     const cs = (g.collections || []).map(collById).filter(Boolean), m = openModal();

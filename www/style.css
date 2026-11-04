@@ -692,3 +692,14 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .dck{color:var(--green);font-weight:700;margin-right:3px}
 .wrap td[data-ck="doneDate"]{white-space:nowrap}
 .tl .tk{flex:0 0 1.05em;text-align:left}
+
+/* веб-версия без свайпа: мелкие кнопки «‹ ›» с номером игры; на сенсорных экранах их нет */
+.snav{display:inline-flex;align-items:center;gap:2px;flex:0 0 auto}
+.snav .ib{min-width:30px;width:30px;height:30px;padding:0;font-size:20px;line-height:1;border-radius:8px}
+.snav .ib:disabled{opacity:.3;cursor:default}
+.snc{font-size:11px;color:var(--mut);min-width:46px;text-align:center}
+@media (pointer:coarse){.snav{display:none}}
+/* коллекции в списке: нажатие раскрывает все */
+.wrap td[data-ck="colls"]{cursor:pointer}
+.wrap td[data-ck="colls"].open{white-space:normal;min-width:170px}
+.wrap td[data-ck="colls"].open .tag{white-space:nowrap}

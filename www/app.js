@@ -1084,7 +1084,7 @@ function listHtml(items, total) {
   const th = (t, k, i, ck) => '<th class="' + cls(i).trim() + '"' + stl(i, ck) + dk(ck) + '>' + (k ? sortLink(t, k) : esc(t)) + (ck ? '<i class="rz" data-rz="' + ck + '"></i>' : '') + '</th>';
   const td = (ck, inner, cl) => '<td' + (cl ? ' class="' + cl + '"' : '') + dk(ck) + stl(-1, ck) + '>' + inner + '</td>';
   let h = '<div class="wrap d' + lvl + '"><table><thead><tr>' + (S.selMode ? th('', null, 0) : '') + (c.cover ? th('', null, 1) : '') + th('Название', 'name', 2, 'name')
-    + (c.genres ? th('Жанры', null, undefined, 'genres') : '') + (c.platforms ? th('Платформы', null, undefined, 'platforms') : '') + (c.done ? th('✓', 'done').replace('<th class="', '<th class="dn ') : '') + (c.doneDate ? th('Дата', 'doneDate', undefined, 'doneDate') : '') + (c.year ? th('Год', 'year', undefined, 'year') : '') + (c.rating ? th('Рейтинг', 'rating', undefined, 'rating') : '')
+    + (c.genres ? th('Жанры', null, undefined, 'genres') : '') + (c.platforms ? th('Платформы', null, undefined, 'platforms') : '') +  + (c.doneDate ? th('Дата', 'doneDate', undefined, 'doneDate') : '') + (c.year ? th('Год', 'year', undefined, 'year') : '') + (c.rating ? th('Рейтинг', 'rating', undefined, 'rating') : '')
     + (c.time ? th('Время', 'time', undefined, 'time') : '') + (c.series ? th('Серия', 'series', undefined, 'series') : '') + props.map(p => th(p.name, 'prop:' + p.id, undefined, 'p:' + p.id)).join('') + (c.colls ? th('Коллекции', null, undefined, 'colls') : '') + (c.added ? th('Добавлена', 'added', undefined, 'added') : '') + '</tr></thead><tbody>';
   const nc = (h.match(/<th/g) || []).length;
   ents.forEach(e => {
@@ -1093,9 +1093,9 @@ function listHtml(items, total) {
     const rc = [g.done ? 'isdone' : '', e.x ? 'extra' : '', S.sel.has(g.id) ? 'sel' : '', g.id === S.lastGame ? 'last' : ''].filter(Boolean).join(' ');
     h += '<tr data-gid="' + g.id + '"' + (rc ? ' class="' + rc + '"' : '') + '>' + (S.selMode ? '<td class="' + cls(0).trim() + '"' + stl(0) + open + '>' + (S.sel.has(g.id) ? '☑' : '☐') + '</td>' : '')
       + (c.cover ? '<td' + open + '><div class="thumb" data-cvid="' + g.id + '"' + (src ? ' style="background-image:url(\'' + bgu(src) + '\')"' : '') + '></div></td>' : '')
-      + '<td class="nmc' + cls(2) + '"' + stl(2, 'name') + dk('name') + open + '><div class="n">' + (e.x ? '<span class="xs" title="Не из основного списка: игра серии">★</span>' : '') + esc(g.name) + '</div></td>'
+      + '<td class="nmc' + cls(2) + '"' + stl(2, 'name') + dk('name') + open + '><div class="n">' + (c.done && g.done ? '<span class="lck">✓</span>' : '') + (e.x ? '<span class="xs" title="Не из основного списка: игра серии">★</span>' : '') + esc(g.name) + '</div></td>'
       + (c.genres ? td('genres', '<div class="gpt"><span>' + esc((g.genres || []).join(', ')) + '</span></div>', 'gp') : '')
-      + (c.platforms ? td('platforms', '<div class="gpt"><span>' + esc((g.platforms || []).map(shortPlat).join(', ')) + '</span></div>', 'gp') : '') + (c.done ? '<td class="dn">' + (g.done ? '<span style="color:var(--green);font-weight:700">✓</span>' : '') + '</td>' : '')
+      + (c.platforms ? td('platforms', '<div class="gpt"><span>' + esc((g.platforms || []).map(shortPlat).join(', ')) + '</span></div>', 'gp') : '') + 
       + (c.doneDate ? td('doneDate', fmtDate(g.doneDate)) : '') + (c.year ? td('year', g.year || '—') : '')
       + (c.rating ? td('rating', g.rating ? '<span style="color:#ffa000">★ ' + g.rating + '</span>' : '—') : '') + (c.time ? td('time', g.time ? g.time + ' ч' : '—') : '')
       + (c.series ? td('series', '<div class="scd"' + (cwid.series ? ' style="max-width:none"' : '') + '>' + esc(g.series || '') + '</div>') : '')
@@ -1484,7 +1484,8 @@ function openGameSheet(id, dir) {
     + '<div class="sbar"><button class="btn acc" data-act="closeSheet">Готово</button><span id="svst" class="sub">Сохраняется автоматически</span>'
     + (isNew ? '<span style="width:44px"></span>' : '<button class="ib red" data-act="delGame" title="Удалить игру" aria-label="Удалить игру"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button>') + '</div>');
   drawShColls(); drawShGenres(d.genres); drawShPlats(d.platforms); drawShots(); drawShHead(); drawShInfo(); drawShName(); drawShDone(); drawShLine();
-  sh.classList.add('gs'); attachSwipe(sheetEl); if (dir) sh.scrollTop = 0; { const bd = dir && animOn() && sh.querySelector ? sh.querySelector('.shbody') : null; if (bd && bd.classList) bd.classList.add(dir > 0 ? 'swr' : 'swl'); }
+  { const p0 = sheetPos(); if (p0) [-1, 1].forEach(k => { const n0 = S.shown[p0.i + k]; if (n0) coverSrc(n0); }); }
+  sh.classList.add('gs'); attachSwipe(sheetEl); if (dir) sh.scrollTop = 0; { const bd = dir && animOn() && !openGameSheet.noAnim && sh.querySelector ? sh.querySelector('.shbody') : null; if (bd && bd.classList) bd.classList.add(dir > 0 ? 'swr' : 'swl'); }
   $('#f_donedate').onchange = () => { const dd = S.sheet.draft; if ($('#f_donedate').value) dd.done = true; markDirty(); drawShDone(); };
   if (isNew) setTimeout(() => ACT.shEditName(), 60);
   $('#shotFile', sh).onchange = async e => { const files = Array.from(e.target.files || []); e.target.value = ''; if (files.length) await addShotFiles(files); };
@@ -1502,26 +1503,57 @@ function sheetSibling(dir) {
 }
 function bumpSheet() { const s = sheetEl && sheetEl.querySelector && sheetEl.querySelector('.shbody'); if (!s || !animOn()) return; const a = s.classList.contains('bump') ? 'bump2' : 'bump'; s.classList.remove('bump', 'bump2'); void s.offsetWidth; s.classList.add(a); }
 const sibName = dir => { const sh = S.sheet; if (!sh || sh.isNew || !S.shown) return null; const i = S.shown.findIndex(g => g.id === sh.draft.id); return i < 0 ? null : (S.shown[i + dir] || false); };
-// свайп: карточка едет за пальцем, по краям появляются подсказки (название соседней игры или «край списка»)
+// предпросмотр соседней игры: та же вёрстка верхней части карточки, но без полей и обработчиков
+function swipePreview(g) {
+  const src = coverSrc(g), chip = (ic, t) => '<span class="ichip">' + I(ic) + ' ' + t + '</span>';
+  const colls = sortedColls().filter(c => (g.collections || []).includes(c.id)).map(c => '<span class="p on"' + (okColor(c.color) ? ' style="color:' + okColor(c.color) + ';border-color:' + okColor(c.color) + '"' : '') + '>' + esc(c.name) + '</span>').join('');
+  return '<div class="hero2"><div class="cv' + (src ? '' : ' nocover') + '" data-cvid="' + g.id + '"' + (src ? ' style="background-image:url(\'' + bgu(src) + '\')"' : '') + '></div><div class="hr"><div class="namebox"><span class="nm2">' + esc(g.name || '') + '</span></div>'
+    + '<div class="infochips">' + chip('cal', g.year || '—') + chip('star', g.rating ? esc(g.rating) + '/10' : '—') + chip('clock', g.time ? esc(g.time) + ' ч' : '— ч') + '</div></div></div>'
+    + '<div class="donerow"><div class="donecard' + (g.done ? ' on' : '') + '"><div class="dc1">' + I(g.done ? 'checkc' : 'circle') + ' <span>Завершено</span></div></div></div>'
+    + (colls ? '<div class="chips shcolls">' + colls + '</div>' : '')
+    + ((g.genres || []).length ? '<div class="chips">' + g.genres.map(x => '<span class="tag">' + esc(x) + '</span>').join('') + '</div>' : '')
+    + ((g.platforms || []).length ? '<div class="chips">' + g.platforms.map(x => '<span class="tag m2">' + esc(shortPlat(x)) + '</span>').join('') + '</div>' : '');
+}
+// положение открытой игры в текущем списке: номер и сколько всего
+function sheetPos() { const sh = S.sheet; if (!sh || sh.isNew || !S.shown) return null; const i = S.shown.findIndex(g => g.id === sh.draft.id); return i < 0 ? null : { i, n: S.shown.length }; }
+// свайп: как горизонтальная карусель. Рядом с карточкой виден предпросмотр следующей (или предыдущей) игры,
+// внизу маленький индикатор «номер / всего» с полоской
 function attachSwipe(el) {
-  if (!el || !el.addEventListener || el._sw) return; el._sw = true; let sx = 0, sy = 0, lx = 0, ly = 0, t0 = 0, ok = false, lock = false, busy = false, hl = null, hr = null;
-  const sheet = () => el.querySelector('.shbody'), anim = () => animOn();
+  if (!el || !el.addEventListener || el._sw) return; el._sw = true; let sx = 0, sy = 0, lx = 0, ly = 0, t0 = 0, ok = false, lock = false, busy = false, hl = null, hr = null, gh = null, ghDir = 0, pg = null, pgT = 0;
+  const sheet = () => el.querySelector('.shbody'), anim = () => animOn(), box = () => el.querySelector('.sheet');
   const hints = () => { if (hl) return; hl = document.createElement('div'); hl.className = 'swh l'; hr = document.createElement('div'); hr.className = 'swh r'; el.appendChild(hl); el.appendChild(hr); };
+  const prog = (show, i, n) => { // индикатор: полоска и «12 / 340»; через секунду после жеста гаснет
+    if (!pg) { pg = document.createElement('div'); pg.className = 'swp'; pg.innerHTML = '<div class="swpb"><i></i></div><span></span>'; el.appendChild(pg); }
+    if (i != null) { pg.querySelector('span').textContent = (i + 1) + ' / ' + n; pg.querySelector('i').style.width = (n > 0 ? (i + 1) / n * 100 : 0) + '%'; }
+    clearTimeout(pgT); pg.classList.toggle('on', !!show); if (show && show !== 'hold') pgT = setTimeout(() => { if (pg) pg.classList.remove('on'); }, 1100);
+  };
+  const dropGhost = () => { if (gh) { gh.remove(); gh = null; ghDir = 0; } };
+  const mkGhost = dir => { // предпросмотр соседней игры сбоку; создаётся при первом движении в эту сторону
+    if (gh && ghDir === dir) return gh; dropGhost(); const bx = box(), p = sheetPos(), g = p && S.shown[p.i + dir]; if (!bx || !g) return null;
+    gh = document.createElement('div'); gh.className = 'swg'; gh.innerHTML = swipePreview(g); gh.style.top = (bx.scrollTop + 14) + 'px'; ghDir = dir; bx.appendChild(gh); return gh;
+  };
+  const place = dx => { const bx = box(); if (!gh || !bx) return; gh.style.transition = 'none'; gh.style.transform = 'translateX(' + Math.round(dx + (dx < 0 ? 1 : -1) * bx.clientWidth) + 'px)'; };
   const drag = dx => {
     const s = sheet(); if (!s || !anim()) return; hints();
-    const dir = dx < 0 ? 1 : -1, nb = sibName(dir), k = nb === false ? 0.3 : 1; // у края списка карточка тянется туго
-    s.style.transition = 'none'; s.style.transform = 'translateX(' + Math.round(dx * k) + 'px)'; s.style.opacity = String(Math.max(0.35, 1 - Math.abs(dx) * k / 520));
-    const a = Math.min(1, Math.abs(dx) / 70), txt = nb === null ? '' : nb === false ? (dir > 0 ? 'Это последняя игра' : 'Это первая игра') : (dir > 0 ? '' : '‹ ') + nb.name + (nb.year ? ' (' + nb.year + ')' : '') + (dir > 0 ? ' ›' : '');
+    const dir = dx < 0 ? 1 : -1, nb = sibName(dir), k = nb === false ? 0.3 : 1, p = sheetPos(); // у края списка карточка тянется туго
+    s.style.transition = 'none'; s.style.transform = 'translateX(' + Math.round(dx * k) + 'px)'; s.style.opacity = '1';
+    if (nb) { if (mkGhost(dir)) place(dx); } else dropGhost();
+    if (p) prog(true, p.i + (nb && Math.abs(dx) > 70 ? dir : 0), p.n);
+    const a = Math.min(1, Math.abs(dx) / 70), txt = nb === false ? (dir > 0 ? 'Это последняя игра' : 'Это первая игра') : '';
     hl.textContent = dir < 0 ? txt : ''; hr.textContent = dir > 0 ? txt : '';
-    hl.style.opacity = dir < 0 ? a : 0; hr.style.opacity = dir > 0 ? a : 0; hl.classList.toggle('edge', nb === false); hr.classList.toggle('edge', nb === false);
+    hl.style.opacity = dir < 0 && txt ? a : 0; hr.style.opacity = dir > 0 && txt ? a : 0; hl.classList.toggle('edge', nb === false); hr.classList.toggle('edge', nb === false);
   };
-  const reset = (animate) => { const s = sheet(); if (hl) { hl.style.opacity = 0; hr.style.opacity = 0; } if (!s) return; s.style.transition = animate ? 'transform .16s ease-out, opacity .16s' : 'none'; s.style.transform = ''; s.style.opacity = ''; if (animate) setTimeout(() => { s.style.transition = ''; }, 200); };
+  const reset = (animate) => { const s = sheet(); if (hl) { hl.style.opacity = 0; hr.style.opacity = 0; }
+    if (gh) { const g0 = gh, bx = box(); if (animate && bx) { g0.style.transition = 'transform .16s ease-out'; g0.style.transform = 'translateX(' + (ghDir > 0 ? 1 : -1) * bx.clientWidth + 'px)'; gh = null; ghDir = 0; setTimeout(() => g0.remove(), 200); } else dropGhost(); }
+    if (pg && !animate) pg.classList.remove('on'); else if (pg) prog(true);
+    if (!s) return; s.style.transition = animate ? 'transform .16s ease-out, opacity .16s' : 'none'; s.style.transform = ''; s.style.opacity = ''; if (animate) setTimeout(() => { s.style.transition = ''; }, 200); };
   const fin = () => {
     if (!ok) return; ok = false; const dx = lx - sx, dy = ly - sy, dir = dx < 0 ? 1 : -1;
     if (!lock) { reset(false); return; }
-    const commit = Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - t0 < 1200, nb = sibName(dir), s = sheet();
-    if (commit && nb) { // текущая карточка уезжает, следующая приезжает с той же стороны
-      if (s && anim()) { busy = true; s.style.transition = 'transform .1s ease-in, opacity .1s'; s.style.transform = 'translateX(' + (dir > 0 ? '-' : '') + '105%)'; s.style.opacity = '0'; if (hl) { hl.style.opacity = 0; hr.style.opacity = 0; } setTimeout(() => { busy = false; sheetSibling(dir); }, 100); } else sheetSibling(dir);
+    const commit = Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - t0 < 1200, nb = sibName(dir), s = sheet(), bx = box();
+    if (commit && nb) { // текущая карточка уезжает, предпросмотр доезжает на её место, потом содержимое заменяется
+      const done = () => { busy = false; const p = sheetPos(); openGameSheet.noAnim = true; try { sheetSibling(dir); } finally { openGameSheet.noAnim = false; } dropGhost(); const q = sheetPos(); if (q) prog(true, q.i, q.n); };
+      if (s && anim() && bx) { busy = true; const W = bx.clientWidth, t = 'transform .18s ease-out'; s.style.transition = t; s.style.transform = 'translateX(' + (dir > 0 ? -W : W) + 'px)'; if (gh) { gh.style.transition = t; gh.style.transform = 'translateX(0)'; } if (hl) { hl.style.opacity = 0; hr.style.opacity = 0; } setTimeout(done, 185); } else { sheetSibling(dir); dropGhost(); const q = sheetPos(); if (q) prog(true, q.i, q.n); }
     } else { reset(true); if (commit && nb === false) { toast(dir > 0 ? 'Это последняя игра в списке' : 'Это первая игра в списке'); } }
   };
   el.addEventListener('touchstart', e => { const t = e.touches && e.touches[0]; ok = !busy && !!t && e.touches.length === 1 && !(e.target.closest && e.target.closest('input,textarea,select,#shotsSaved,#shotsBox,.chips.scroll')); lock = false; if (ok) { reset(false); sx = lx = t.clientX; sy = ly = t.clientY; t0 = Date.now(); } }, { passive: true });

@@ -22,5 +22,6 @@
  "Закройте то окно или поменяйте": "Close that window or change",
  "в файле config.json.": "in the config.json file.",
  "Сервер работает. Не закрывайте это окно, пока пользуетесь синхронизацией.": "The server is running. Do not close this window while you use sync.",
- "Остановить: закройте окно или нажмите Ctrl+C.": "To stop: close the window or press Ctrl+C."
+ "Остановить: закройте окно или нажмите Ctrl+C.": "To stop: close the window or press Ctrl+C.",
+ "База очищена по запросу устройства": "Database cleared at the device's request"
 }

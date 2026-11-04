@@ -860,5 +860,6 @@
  "на этом устройстве": "on this device",
  "? Это нельзя отменить.": "? This cannot be undone.",
  "Сервер не очищен:": "The server was not cleared:",
- ". Ничего не удалено.": ". Nothing was deleted."
+ ". Ничего не удалено.": ". Nothing was deleted.",
+ "База очищена по запросу устройства": "Database cleared at the device's request"
 }

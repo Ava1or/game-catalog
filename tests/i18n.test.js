@@ -29,3 +29,6 @@ console.log('ok i18n');
   assert.strictEqual(run('en', 'ru').src, 'app.en.js'); assert.strictEqual(run('ru', 'en-US').src, 'app.js'); assert.strictEqual(run('en', 'ru').lang, 'en');
   console.log('ok boot');
 }
+
+// сборка сервера на английском тоже должна иметь полные переводы (иначе падает сборка на GitHub)
+{ const site = fs.mkdtempSync(path.join(os.tmpdir(), 'pack-')); const o = execFileSync('python3', [path.join(root, 'tools/build_server_pack.py'), site], { stdio: 'pipe' }).toString('utf8'); assert.ok(!/Нет перевода/.test(o), 'нет перевода для сервера: ' + o); console.log('# ok server pack i18n'); }

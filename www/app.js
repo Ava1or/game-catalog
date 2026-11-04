@@ -942,6 +942,12 @@ function focusLast() {
   if (r.top < b.top + 30 || r.bottom > b.bottom - 30) el.scrollIntoView({ block: 'center' });
 }
 const animOn = () => S.set.anim !== false;
+// список под карточкой прокручивается к текущей игре (при необходимости подгружая строки)
+function followLast() {
+  if (S.tab !== 'library' || !S.lastGame) return; const q = () => $('tr[data-gid="' + S.lastGame + '"], .card[data-gid="' + S.lastGame + '"], .tl[data-gid="' + S.lastGame + '"]');
+  let el = q(); if (!el) { const b = libBuild(), li = b.entries.findIndex(e => e.t === 'g' && e.g.id === S.lastGame); if (li < 0) return; if (li >= (S.libN || 0)) { S.libN = li + 20; renderLibBody(); } el = q(); }
+  if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: animOn() ? 'smooth' : 'auto' });
+}
 function closeSheet(instant, keep) {
   const sh0 = S.sheet;
   if (sh0 && sh0.dirty && sheetEl) { collectSheet(); sh0.dirty = false; persistDraft(sh0).then(ok => { if (!ok && !sh0.draft.name) toast('Игра не сохранена: не заполнено название'); }); } // список перерисуется, когда запись закончится
@@ -1078,7 +1084,7 @@ function listHtml(items, total) {
   const th = (t, k, i, ck) => '<th class="' + cls(i).trim() + '"' + stl(i, ck) + dk(ck) + '>' + (k ? sortLink(t, k) : esc(t)) + (ck ? '<i class="rz" data-rz="' + ck + '"></i>' : '') + '</th>';
   const td = (ck, inner, cl) => '<td' + (cl ? ' class="' + cl + '"' : '') + dk(ck) + stl(-1, ck) + '>' + inner + '</td>';
   let h = '<div class="wrap d' + lvl + '"><table><thead><tr>' + (S.selMode ? th('', null, 0) : '') + (c.cover ? th('', null, 1) : '') + th('Название', 'name', 2, 'name')
-    + (c.genres ? th('Жанры', null, undefined, 'genres') : '') + (c.platforms ? th('Платформы', null, undefined, 'platforms') : '') + (c.done ? th('✓', 'done') : '') + (c.doneDate ? th('Дата', 'doneDate', undefined, 'doneDate') : '') + (c.year ? th('Год', 'year', undefined, 'year') : '') + (c.rating ? th('Рейтинг', 'rating', undefined, 'rating') : '')
+    + (c.genres ? th('Жанры', null, undefined, 'genres') : '') + (c.platforms ? th('Платформы', null, undefined, 'platforms') : '') + (c.done ? th('✓', 'done').replace('<th class="', '<th class="dn ') : '') + (c.doneDate ? th('Дата', 'doneDate', undefined, 'doneDate') : '') + (c.year ? th('Год', 'year', undefined, 'year') : '') + (c.rating ? th('Рейтинг', 'rating', undefined, 'rating') : '')
     + (c.time ? th('Время', 'time', undefined, 'time') : '') + (c.series ? th('Серия', 'series', undefined, 'series') : '') + props.map(p => th(p.name, 'prop:' + p.id, undefined, 'p:' + p.id)).join('') + (c.colls ? th('Коллекции', null, undefined, 'colls') : '') + (c.added ? th('Добавлена', 'added', undefined, 'added') : '') + '</tr></thead><tbody>';
   const nc = (h.match(/<th/g) || []).length;
   ents.forEach(e => {
@@ -1089,7 +1095,7 @@ function listHtml(items, total) {
       + (c.cover ? '<td' + open + '><div class="thumb" data-cvid="' + g.id + '"' + (src ? ' style="background-image:url(\'' + bgu(src) + '\')"' : '') + '></div></td>' : '')
       + '<td class="nmc' + cls(2) + '"' + stl(2, 'name') + dk('name') + open + '><div class="n">' + (e.x ? '<span class="xs" title="Не из основного списка: игра серии">★</span>' : '') + esc(g.name) + '</div></td>'
       + (c.genres ? td('genres', '<div class="gpt"><span>' + esc((g.genres || []).join(', ')) + '</span></div>', 'gp') : '')
-      + (c.platforms ? td('platforms', '<div class="gpt"><span>' + esc((g.platforms || []).map(shortPlat).join(', ')) + '</span></div>', 'gp') : '') + (c.done ? '<td>' + (g.done ? '<span style="color:var(--green);font-weight:700">✓</span>' : '') + '</td>' : '')
+      + (c.platforms ? td('platforms', '<div class="gpt"><span>' + esc((g.platforms || []).map(shortPlat).join(', ')) + '</span></div>', 'gp') : '') + (c.done ? '<td class="dn">' + (g.done ? '<span style="color:var(--green);font-weight:700">✓</span>' : '') + '</td>' : '')
       + (c.doneDate ? td('doneDate', fmtDate(g.doneDate)) : '') + (c.year ? td('year', g.year || '—') : '')
       + (c.rating ? td('rating', g.rating ? '<span style="color:#ffa000">★ ' + g.rating + '</span>' : '—') : '') + (c.time ? td('time', g.time ? g.time + ' ч' : '—') : '')
       + (c.series ? td('series', '<div class="scd"' + (cwid.series ? ' style="max-width:none"' : '') + '>' + esc(g.series || '') + '</div>') : '')
@@ -1478,7 +1484,7 @@ function openGameSheet(id, dir) {
     + '<div class="sbar"><button class="btn acc" data-act="closeSheet">Готово</button><span id="svst" class="sub">Сохраняется автоматически</span>'
     + (isNew ? '<span style="width:44px"></span>' : '<button class="ib red" data-act="delGame" title="Удалить игру" aria-label="Удалить игру"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button>') + '</div>');
   drawShColls(); drawShGenres(d.genres); drawShPlats(d.platforms); drawShots(); drawShHead(); drawShInfo(); drawShName(); drawShDone(); drawShLine();
-  attachSwipe(sheetEl); if (dir) sh.scrollTop = 0; { const bd = dir && animOn() && sh.querySelector ? sh.querySelector('.shbody') : null; if (bd && bd.classList) bd.classList.add(dir > 0 ? 'swr' : 'swl'); }
+  sh.classList.add('gs'); attachSwipe(sheetEl); if (dir) sh.scrollTop = 0; { const bd = dir && animOn() && sh.querySelector ? sh.querySelector('.shbody') : null; if (bd && bd.classList) bd.classList.add(dir > 0 ? 'swr' : 'swl'); }
   $('#f_donedate').onchange = () => { const dd = S.sheet.draft; if ($('#f_donedate').value) dd.done = true; markDirty(); drawShDone(); };
   if (isNew) setTimeout(() => ACT.shEditName(), 60);
   $('#shotFile', sh).onchange = async e => { const files = Array.from(e.target.files || []); e.target.value = ''; if (files.length) await addShotFiles(files); };
@@ -1492,13 +1498,13 @@ function sheetSibling(dir) {
   const sh = S.sheet; if (!sh || sh.isNew || !S.shown) return;
   const i = S.shown.findIndex(g => g.id === sh.draft.id); if (i < 0) return;
   const n = S.shown[i + dir]; if (!n) { bumpSheet(); return toast(dir > 0 ? 'Это последняя игра в списке' : 'Это первая игра в списке'); }
-  openGameSheet(n.id, dir);
+  openGameSheet(n.id, dir); followLast();
 }
 function bumpSheet() { const s = sheetEl && sheetEl.querySelector && sheetEl.querySelector('.shbody'); if (!s || !animOn()) return; const a = s.classList.contains('bump') ? 'bump2' : 'bump'; s.classList.remove('bump', 'bump2'); void s.offsetWidth; s.classList.add(a); }
 const sibName = dir => { const sh = S.sheet; if (!sh || sh.isNew || !S.shown) return null; const i = S.shown.findIndex(g => g.id === sh.draft.id); return i < 0 ? null : (S.shown[i + dir] || false); };
 // свайп: карточка едет за пальцем, по краям появляются подсказки (название соседней игры или «край списка»)
 function attachSwipe(el) {
-  if (!el || !el.addEventListener || el._sw) return; el._sw = true; let sx = 0, sy = 0, lx = 0, ly = 0, t0 = 0, ok = false, lock = false, hl = null, hr = null;
+  if (!el || !el.addEventListener || el._sw) return; el._sw = true; let sx = 0, sy = 0, lx = 0, ly = 0, t0 = 0, ok = false, lock = false, busy = false, hl = null, hr = null;
   const sheet = () => el.querySelector('.shbody'), anim = () => animOn();
   const hints = () => { if (hl) return; hl = document.createElement('div'); hl.className = 'swh l'; hr = document.createElement('div'); hr.className = 'swh r'; el.appendChild(hl); el.appendChild(hr); };
   const drag = dx => {
@@ -1512,17 +1518,17 @@ function attachSwipe(el) {
   const reset = (animate) => { const s = sheet(); if (hl) { hl.style.opacity = 0; hr.style.opacity = 0; } if (!s) return; s.style.transition = animate ? 'transform .16s ease-out, opacity .16s' : 'none'; s.style.transform = ''; s.style.opacity = ''; if (animate) setTimeout(() => { s.style.transition = ''; }, 200); };
   const fin = () => {
     if (!ok) return; ok = false; const dx = lx - sx, dy = ly - sy, dir = dx < 0 ? 1 : -1;
-    if (!lock && !(Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5)) return;
+    if (!lock) { reset(false); return; }
     const commit = Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - t0 < 1200, nb = sibName(dir), s = sheet();
     if (commit && nb) { // текущая карточка уезжает, следующая приезжает с той же стороны
-      if (s && anim()) { s.style.transition = 'transform .1s ease-in, opacity .1s'; s.style.transform = 'translateX(' + (dir > 0 ? '-' : '') + '105%)'; s.style.opacity = '0'; if (hl) { hl.style.opacity = 0; hr.style.opacity = 0; } setTimeout(() => sheetSibling(dir), 100); } else sheetSibling(dir);
+      if (s && anim()) { busy = true; s.style.transition = 'transform .1s ease-in, opacity .1s'; s.style.transform = 'translateX(' + (dir > 0 ? '-' : '') + '105%)'; s.style.opacity = '0'; if (hl) { hl.style.opacity = 0; hr.style.opacity = 0; } setTimeout(() => { busy = false; sheetSibling(dir); }, 100); } else sheetSibling(dir);
     } else { reset(true); if (commit && nb === false) { toast(dir > 0 ? 'Это последняя игра в списке' : 'Это первая игра в списке'); } }
   };
-  el.addEventListener('touchstart', e => { const t = e.touches && e.touches[0]; ok = !!t && e.touches.length === 1 && !(e.target.closest && e.target.closest('input,textarea,select,#shotsSaved,#shotsBox,.chips.scroll')); lock = false; if (ok) { sx = lx = t.clientX; sy = ly = t.clientY; t0 = Date.now(); } }, { passive: true });
+  el.addEventListener('touchstart', e => { const t = e.touches && e.touches[0]; ok = !busy && !!t && e.touches.length === 1 && !(e.target.closest && e.target.closest('input,textarea,select,#shotsSaved,#shotsBox,.chips.scroll')); lock = false; if (ok) { reset(false); sx = lx = t.clientX; sy = ly = t.clientY; t0 = Date.now(); } }, { passive: true });
   el.addEventListener('touchmove', e => { if (!ok) return; const t = e.touches && e.touches[0]; if (!t) return; lx = t.clientX; ly = t.clientY; const dx = lx - sx, dy = ly - sy;
     if (!lock && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5) lock = true; if (lock) { if (e.cancelable) e.preventDefault(); drag(dx); } }, { passive: false });
   el.addEventListener('touchend', e => { const t = e.changedTouches && e.changedTouches[0]; if (t) { lx = t.clientX; ly = t.clientY; } fin(); }, { passive: true });
-  el.addEventListener('touchcancel', fin, { passive: true });
+  el.addEventListener('touchcancel', () => { if (ok && !lock) { ok = false; reset(false); } else fin(); }, { passive: true });
 }
 function drawShColls() {
   const d = S.sheet.draft;
@@ -3090,8 +3096,13 @@ const ACT = {
   syncToggle: () => { const y = S.set.sync; y.on = y.on === false; saveSet(); render(); if (y.on) syncSoon(500); },
   syScheme: t => { const y = S.set.sync; y.url = addrRead(); y.scheme = t.dataset.v; const a = addrOf(y); if (y.url) y.url = y.scheme + '://' + a.host + (a.port ? ':' + a.port : ''); saveSet(); render(); },
   syncOff: async () => { if (!await confirmBox('Отключить сервер? Данные на устройстве останутся.', 'Отключить')) return; S.set.sync.url = ''; S.set.sync.token = ''; S.set.sync.err = ''; saveSet(); render(); },
-  wipe: async () => { if (!await confirmBox('Удалить ВСЕ игры, коллекции и свойства на этом устройстве?' + (syncOn() ? ' Копия на вашем сервере останется, при следующей синхронизации данные вернутся.' : ''), 'Удалить всё')) return; for (const s of ['games', 'collections', 'props', 'covers', 'shots', 'inboxLists', 'inboxItems', 'trash', 'tomb']) await DB.clearRaw(s); DB.tombs.clear(); // «на этом устройстве»: на сервер удаление не передаётся, при следующей синхронизации данные вернутся с сервера
-     S.trash = []; coverCache.clear(); S.games = []; S.collections = []; S.props = []; S.inbox = { lists: [], items: [] }; S.inboxList = null; S.set.f = clone(DEFAULTS.f); saveSet(); render(); toast('Данные удалены'); }
+  wipe: async () => {
+    const on = syncOn();
+    if (!await confirmBox('Удалить ВСЕ игры, коллекции, свойства, картинки и списки жанров и платформ' + (on ? ' на этом устройстве И на вашем локальном сервере? Другие устройства очистятся при следующей синхронизации' : ' на этом устройстве') + '? Это нельзя отменить.', 'Удалить всё')) return;
+    if (on) { try { await srv('wipe', {}, 60000); } catch (e) { return toast('Сервер не очищен: ' + e.message + '. Ничего не удалено.'); } } // иначе данные вернулись бы с сервера при синхронизации
+    for (const s of ['games', 'collections', 'props', 'covers', 'shots', 'inboxLists', 'inboxItems', 'trash', 'tomb']) await DB.clearRaw(s); DB.tombs.clear();
+    S.trash = []; coverCache.clear(); S.games = []; S.collections = []; S.props = []; S.inbox = { lists: [], items: [] }; S.inboxList = null; S.lastGame = ''; S.set.platDict = {}; S.set.genreDict = {}; S._pi = S._gi = null; S.set.saved = []; S.set.f = clone(DEFAULTS.f); saveSet(); render(); toast('Данные удалены');
+  }
 };
 document.addEventListener('click', e => {
   if (S.selMode && S.tab === 'library') { const r = e.target.closest('tr[data-gid]'); if (r && !e.target.closest('a')) { if (lp.fired) { lp.fired = false; return; } toggleSel(r.dataset.gid); return; } } // в режиме выбора строка отмечается нажатием в любом месте

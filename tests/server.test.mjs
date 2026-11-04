@@ -97,6 +97,16 @@ test('общие списки объединяются', async () => {
   assert.deepEqual(d.plat.PS4.aliases.sort(), ['PS 4', 'Playstation4']); assert.ok(d.genre.RPG);
 });
 
+test('полное удаление: игры, картинки и словари, другие устройства получают удаление', async () => {
+  await call('put', { store: 'games', recs: [{ id: 'gw1', name: 'W', mod: 5 }] });
+  await call('dicts', { plat: { PS4: { long: 'PlayStation 4', aliases: [] } }, genre: {} });
+  assert.equal((await call('wipe', {})).json.ok, true);
+  assert.deepEqual((await call('get', { store: 'games', ids: ['gw1'] })).json.recs, []);
+  const m = await man({ games: { gw1: 5 } }); assert.ok(m.del.games.gw1, 'устройство со старой копией должно удалить игру'); assert.deepEqual(m.pull.games, []);
+  const d = (await call('dicts', { plat: {}, genre: {} })).json; assert.deepEqual([Object.keys(d.plat).length, Object.keys(d.genre).length], [0, 0]);
+  await call('put', { store: 'covers', recs: [{ id: 'g1', mod: Date.now() + 5, data: jpg }] }); // для следующего теста возвращаем обложку
+});
+
 test('данные сохраняются на диск и читаются после перезапуска', async () => {
   srv.flush();
   const again = createServer({ cfg, wwwDir: www, dataDir: path.join(tmp, 'data') });

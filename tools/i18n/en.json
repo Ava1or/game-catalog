@@ -854,5 +854,11 @@
  "Быстрое открытие и закрытие карточки игры, смена карточки свайпом влево и вправо.": "Fast opening and closing of the game card, switching the card by swiping left and right.",
  "– ? ч": "– ? h",
  "Это последняя игра": "This is the last game",
- "Это первая игра": "This is the first game"
+ "Это первая игра": "This is the first game",
+ "Удалить ВСЕ игры, коллекции, свойства, картинки и списки жанров и платформ": "Delete ALL games, collections, properties, images and the genre and platform lists",
+ "на этом устройстве И на вашем локальном сервере? Другие устройства очистятся при следующей синхронизации": "on this device AND on your local server? Other devices will be cleared at their next sync",
+ "на этом устройстве": "on this device",
+ "? Это нельзя отменить.": "? This cannot be undone.",
+ "Сервер не очищен:": "The server was not cleared:",
+ ". Ничего не удалено.": ". Nothing was deleted."
 }

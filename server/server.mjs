@@ -185,6 +185,11 @@ export function createServer(opts) {
         if (!rec.ready && !shotMissing(rec).length) { rec.ready = true; dirty(); }
         return send(res, 200, { ok: true });
       }
+      case 'wipe': { // полное удаление: игры, коллекции, картинки и словари; удаления помечаются, чтобы остальные устройства тоже очистились
+        const t = Date.now(); for (const st of STORES) for (const id of Object.keys(db.items[st])) applyDelete(st, id, t);
+        rm(path.join(blobDir, 'covers')); rm(path.join(blobDir, 'shots')); fs.mkdirSync(path.join(blobDir, 'covers'), { recursive: true }); fs.mkdirSync(path.join(blobDir, 'shots'), { recursive: true });
+        db.dicts = { plat: {}, genre: {} }; dirty(); log('База очищена по запросу устройства'); return send(res, 200, { ok: true });
+      }
       case 'dicts': { const a = mergeDict(db.dicts.plat, body.plat), b = mergeDict(db.dicts.genre, body.genre); if (a || b) dirty(); return send(res, 200, db.dicts); }
       default: return send(res, 404, { error: 'unknown' });
     }

@@ -377,6 +377,8 @@ const L = require('../www/app.js');
     if (html.includes('noplat') || html.includes('npb') || !html.includes('class="gpt"') || html.includes('data-ck="mainPlatform"')) throw new Error('список: колонки жанров/платформ');
     if (!html.includes('data-rz="series"') || !html.includes('width:90px') || !html.includes('Добавлена') || !html.includes('20.10.2026')) throw new Error('список: ! / ширина / дата добавления');
     { const ch = G.cardHtml(Object.assign({}, S.games.find(g => g.id === 'np_a'), { rating: 8.1, year: 2001 })); if (ch.includes('noplat') || !ch.includes('class="rt"') || !ch.includes('<span class="sp">2001</span>') || ch.includes('class="m"')) throw new Error('плитка: рейтинг сверху, год снизу'); }
+    { const dg = Object.assign({}, S.games.find(g => g.id === 'np_a'), { done: true, doneDate: '2026-01-01' }); S.set.cols.done = 1; S.set.cols.doneDate = 1; const lh = G.listHtml([dg]);
+      if (lh.includes('NaN') || !lh.includes('<span class="dck">✓</span>01.01.2026') || lh.includes('class="lck"')) throw new Error('список: колонка ✓ дата / NaN'); }
     S.set.cols.added = 0; S.set.colW = {};
     // платформу при добавлении не спрашиваем: без выбора у игры с несколькими платформами основной нет, заданная заранее ставится
     let asked = false; global.__chooseHook = async () => { asked = true; return null; }; global.__promptHook = async () => { asked = true; return null; };

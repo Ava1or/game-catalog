@@ -1084,7 +1084,7 @@ function listHtml(items, total) {
   const th = (t, k, i, ck) => '<th class="' + cls(i).trim() + '"' + stl(i, ck) + dk(ck) + '>' + (k ? sortLink(t, k) : esc(t)) + (ck ? '<i class="rz" data-rz="' + ck + '"></i>' : '') + '</th>';
   const td = (ck, inner, cl) => '<td' + (cl ? ' class="' + cl + '"' : '') + dk(ck) + stl(-1, ck) + '>' + inner + '</td>';
   let h = '<div class="wrap d' + lvl + '"><table><thead><tr>' + (S.selMode ? th('', null, 0) : '') + (c.cover ? th('', null, 1) : '') + th('Название', 'name', 2, 'name')
-    + (c.genres ? th('Жанры', null, undefined, 'genres') : '') + (c.platforms ? th('Платформы', null, undefined, 'platforms') : '') +  + (c.doneDate ? th('Дата', 'doneDate', undefined, 'doneDate') : '') + (c.year ? th('Год', 'year', undefined, 'year') : '') + (c.rating ? th('Рейтинг', 'rating', undefined, 'rating') : '')
+    + (c.genres ? th('Жанры', null, undefined, 'genres') : '') + (c.platforms ? th('Платформы', null, undefined, 'platforms') : '') + ((c.done || c.doneDate) ? th(c.doneDate ? (c.done ? '✓ Дата' : 'Дата') : '✓', c.doneDate ? 'doneDate' : 'done', undefined, 'doneDate') : '') + (c.year ? th('Год', 'year', undefined, 'year') : '') + (c.rating ? th('Рейтинг', 'rating', undefined, 'rating') : '')
     + (c.time ? th('Время', 'time', undefined, 'time') : '') + (c.series ? th('Серия', 'series', undefined, 'series') : '') + props.map(p => th(p.name, 'prop:' + p.id, undefined, 'p:' + p.id)).join('') + (c.colls ? th('Коллекции', null, undefined, 'colls') : '') + (c.added ? th('Добавлена', 'added', undefined, 'added') : '') + '</tr></thead><tbody>';
   const nc = (h.match(/<th/g) || []).length;
   ents.forEach(e => {
@@ -1093,10 +1093,10 @@ function listHtml(items, total) {
     const rc = [g.done ? 'isdone' : '', e.x ? 'extra' : '', S.sel.has(g.id) ? 'sel' : '', g.id === S.lastGame ? 'last' : ''].filter(Boolean).join(' ');
     h += '<tr data-gid="' + g.id + '"' + (rc ? ' class="' + rc + '"' : '') + '>' + (S.selMode ? '<td class="' + cls(0).trim() + '"' + stl(0) + open + '>' + (S.sel.has(g.id) ? '☑' : '☐') + '</td>' : '')
       + (c.cover ? '<td' + open + '><div class="thumb" data-cvid="' + g.id + '"' + (src ? ' style="background-image:url(\'' + bgu(src) + '\')"' : '') + '></div></td>' : '')
-      + '<td class="nmc' + cls(2) + '"' + stl(2, 'name') + dk('name') + open + '><div class="n">' + (c.done && g.done ? '<span class="lck">✓</span>' : '') + (e.x ? '<span class="xs" title="Не из основного списка: игра серии">★</span>' : '') + esc(g.name) + '</div></td>'
+      + '<td class="nmc' + cls(2) + '"' + stl(2, 'name') + dk('name') + open + '><div class="n">' + (e.x ? '<span class="xs" title="Не из основного списка: игра серии">★</span>' : '') + esc(g.name) + '</div></td>'
       + (c.genres ? td('genres', '<div class="gpt"><span>' + esc((g.genres || []).join(', ')) + '</span></div>', 'gp') : '')
-      + (c.platforms ? td('platforms', '<div class="gpt"><span>' + esc((g.platforms || []).map(shortPlat).join(', ')) + '</span></div>', 'gp') : '') + 
-      + (c.doneDate ? td('doneDate', fmtDate(g.doneDate)) : '') + (c.year ? td('year', g.year || '—') : '')
+      + (c.platforms ? td('platforms', '<div class="gpt"><span>' + esc((g.platforms || []).map(shortPlat).join(', ')) + '</span></div>', 'gp') : '')
+      + ((c.done || c.doneDate) ? td('doneDate', (c.done && g.done ? '<span class="dck">✓</span>' : '') + (c.doneDate ? fmtDate(g.doneDate) : '')) : '') + (c.year ? td('year', g.year || '—') : '')
       + (c.rating ? td('rating', g.rating ? '<span style="color:#ffa000">★ ' + g.rating + '</span>' : '—') : '') + (c.time ? td('time', g.time ? g.time + ' ч' : '—') : '')
       + (c.series ? td('series', '<div class="scd"' + (cwid.series ? ' style="max-width:none"' : '') + '>' + esc(g.series || '') + '</div>') : '')
       + props.map(p => { const v = g.props && g.props[p.id]; return td('p:' + p.id, hasVal(v) ? esc(v) : '', 'pv'); }).join('')
@@ -1116,13 +1116,13 @@ function textLines(items) {
   return lines.join('\n').replace(/^\n/, '') + '\n';
 }
 function textHtml(items, total) {
-  const ents = normEnt(items), tc = textCols();
+  const ents = normEnt(items), tc = textCols(), anyX = ents.some(e => e.t === 'g' && e.x);
   let h = '<div class="tlist z' + colsFor('text') + ' ' + (S.set.textWrap === 'scroll' ? 'sc' : 'wr') + '">';
   ents.forEach(e => {
     if (e.t === 'h') { h += '<div class="gh l' + e.lvl + '">' + esc(e.text) + '<b>' + e.n + '</b></div>'; return; }
     const g = e.g, yr = tc.year && g.year ? g.year : '', pl = tc.platforms && (g.platforms || []).length ? platOut(g.platforms.map(shortPlat).join(', ')) : '', sr = tc.series && g.series ? g.series : '';
     const inP = yr || pl || sr ? '<span class="ti">&nbsp;(' + (yr ? '<span class="ty">' + yr + '</span>' : '') + (yr && (pl || sr) ? ' | ' : '') + (pl ? '<span class="tp">' + esc(pl) + '</span>' : '') + ((pl || yr) && sr ? ' | ' : '') + (sr ? '<span class="ts">' + esc(sr) + '</span>' : '') + ')</span>' : '';
-    const mk = (S.selMode ? '<span class="tsel">' + (S.sel.has(g.id) ? '☑' : '☐') + '</span>' : '') + (tc.done ? '<span class="tk">' + (g.done ? '✓' : '') + '</span>' : '') + (tc.main ? '<span class="tm">' + (e.x ? '*' : '') + '</span>' : '');
+    const mk = (S.selMode ? '<span class="tsel">' + (S.sel.has(g.id) ? '☑' : '☐') + '</span>' : '') + (tc.done ? '<span class="tk">' + (g.done ? '✓' : '') + '</span>' : '') + (tc.main && anyX ? '<span class="tm">' + (e.x ? '*' : '') + '</span>' : '');
     h += '<div class="tl' + (e.x ? ' extra' : '') + (g.done ? ' isdone' : '') + (S.sel.has(g.id) ? ' sel' : '') + (g.id === S.lastGame ? ' last' : '') + '" data-gid="' + g.id + '" data-act="openGame">'
       + (mk ? '<span class="mk">' + mk + '</span>' : '')
       + '<span class="tx"><span class="tn">' + esc(g.name) + '</span>' + inP + (tc.time && g.time ? '<span class="tt">&nbsp;– ' + (LANG === 'en' ? String(g.time) : String(g.time).replace('.', ',')) + ' ч</span>' : '') + '</span></div>';

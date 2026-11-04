@@ -687,3 +687,8 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .swp span{font-size:11px;font-weight:600;color:var(--tx);background:rgba(0,0,0,.55);padding:1px 8px;border-radius:9px}
 .swpb{width:84px;height:3px;border-radius:2px;background:rgba(255,255,255,.25);overflow:hidden}
 .swpb i{display:block;height:100%;background:var(--acc);border-radius:2px;transition:width .12s}
+
+/* колонка «✓ дата» в списке; в текстовом виде название вплотную к галочке */
+.dck{color:var(--green);font-weight:700;margin-right:3px}
+.wrap td[data-ck="doneDate"]{white-space:nowrap}
+.tl .tk{flex:0 0 1.05em;text-align:left}

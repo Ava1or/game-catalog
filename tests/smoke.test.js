@@ -62,6 +62,51 @@ const L = require('../www/app.js');
     G.ACT.shNav({ dataset: { d: '1' } }); if (S.rs.rid !== 'igdb:101') throw new Error('за последним результатом переходить некуда');
     G.ACT.shNav({ dataset: { d: '-1' } }); if (S.rs.rid !== 'igdb:100') throw new Error('кнопка влево в поиске');
   });
+  await step('журнал ошибок: запись, повтор, лимит', async () => {
+    G.ERRLOG.list.length = 0; G.logErr('проба', new Error('сбой 1')); G.logErr('проба', new Error('сбой 1')); G.logErr('другое', 'текст');
+    if (G.ERRLOG.list.length !== 2 || G.ERRLOG.list[0].n !== 2) throw new Error('повторы одной ошибки должны склеиваться');
+    for (let i = 0; i < 130; i++) G.logErr('цикл', 'e' + i);
+    if (G.ERRLOG.list.length !== 100) throw new Error('журнал хранит не больше 100 записей');
+    const er = new Error('уже записано'); er._logged = true; const n0 = G.ERRLOG.list.length; G.logErr('x', er); if (G.ERRLOG.list.length !== n0) throw new Error('помеченная ошибка не пишется второй раз');
+    G.ERRLOG.list.length = 0;
+  });
+  await step('отмена массовой операции: игры, корзина, коллекции, разбор', async () => {
+    const [a, b] = S.games.slice(0, 2); const nameA = a.name, serA = a.series || '', nColl = S.collections.length;
+    const coll = { id: 'undo_c1', name: 'Временная', order: 99 }; S.collections.push(coll); await G.DB.put('collections', coll);
+    const sn = G.takeSnap();
+    a.series = 'Серия для проверки отмены'; a.name = 'Переименована'; await G.DB.put('games', a);
+    await G.removeGame(b.id); S.collections = S.collections.filter(c => c.id !== coll.id); await G.DB.del('collections', coll.id);
+    G.toastUndo('проба', sn); await G.undoLast();
+    const a2 = S.games.find(g => g.id === a.id);
+    if (a2.name !== nameA || (a2.series || '') !== serA) throw new Error('изменённая игра не вернулась');
+    if (!S.games.some(g => g.id === b.id)) throw new Error('удалённая игра не вернулась из корзины');
+    if (!S.collections.some(c => c.id === 'undo_c1')) throw new Error('удалённая коллекция не вернулась');
+    if (G.UNDO.snap) throw new Error('снимок после отмены очищается');
+    S.collections = S.collections.filter(c => c.id !== 'undo_c1'); await G.DB.del('collections', 'undo_c1');
+    await G.undoLast(); // повторная отмена безвредна
+  });
+  await step('карточка поиска: отметки коллекций остаются при листании', async () => {
+    S.tab = 'search'; S.search.results = [{ rid: 'igdb:200', name: 'А', platforms: [], genres: [] }, { rid: 'igdb:201', name: 'Б', platforms: [], genres: [] }];
+    await G.openIgdbSheet('igdb:200'); S.rs.colls = ['__done_marker__', 'c_keep'];
+    G.ACT.shNav({ dataset: { d: '1' } }); if (S.rs.rid !== 'igdb:201' || !S.rs.colls.includes('c_keep')) throw new Error('отметки должны переходить на следующий результат');
+    await G.openIgdbSheet('igdb:200'); if (S.rs.colls.includes('c_keep')) throw new Error('при обычном открытии отметки начинаются заново');
+    await new Promise(r => setTimeout(r, 80)); G.ACT.closeSheet(); // фоновая загрузка деталей не должна сбивать следующие проверки счётчика
+  });
+  await step('карточка поиска: быстрое листание и закрытие не открывают карточки заново', async () => {
+    S.tab = 'search'; S.search.results = [1, 2, 3].map(i => ({ rid: 'igdb:30' + i, name: 'Р' + i, platforms: [], genres: [] }));
+    await G.openIgdbSheet('igdb:301'); G.openIgdbSheet('igdb:302', false, 1); G.openIgdbSheet('igdb:303', false, 1);
+    if (S.rs.rid !== 'igdb:303') throw new Error('последняя открытая карточка должна быть активной');
+    if (!G.sheetOpen()) throw new Error('карточка должна быть открыта');
+    G.ACT.closeSheet(); await new Promise(r => setTimeout(r, 500));
+    if (G.sheetOpen()) throw new Error('после закрытия карточка не должна открываться снова');
+  });
+  await step('прогресс серии в карточке игры', async () => {
+    const mk = (id, y, d) => Object.assign({}, S.games[0], { id, name: 'Сага ' + id, year: y, series: 'Сага проверки', done: d, collections: [], added: 1 });
+    const gs = [mk('ser_a', 2001, true), mk('ser_b', 2005, false), mk('ser_c', 2010, true)]; gs.forEach(g => S.games.push(g));
+    G.openGameSheet('ser_b'); const html = (document.querySelector('#shSerie') || {}).innerHTML || '';
+    if (!html.includes('2 из 3') || !html.includes('завершено 2')) throw new Error('строка серии: ' + html.slice(0, 120));
+    G.ACT.closeSheet(); gs.forEach(g => { S.games.splice(S.games.indexOf(g), 1); });
+  });
   await step('igdb sheet with shots + colls', async () => { S.tab = 'search'; await G.openIgdbSheet('igdb:1'); });
   await step('inbox flow', async () => {
     const l = { id: 'l1', name: 'Steam', created: 1 }; S.inbox.lists.push(l);

@@ -256,7 +256,7 @@ button.tag{cursor:pointer;font-family:inherit}
 .grid.z3 .ok,.grid.z3 .dn{width:19px;height:19px;line-height:19px;font-size:11px}
 .grid.z3 .qa{width:26px;height:26px}
 .grid.z3 .qa svg{width:15px;height:15px}
-.grid.z4 .badge{font-size:9px;padding:0 5px;left:4px;top:4px}
+.grid.z4 .badge{font-size:10px;padding:0 5px;left:4px;top:4px}
 .grid.z4 .ok,.grid.z4 .dn{width:16px;height:16px;line-height:16px;font-size:10px;right:4px;top:4px}
 .grid.z4 .qa{width:21px;height:21px;right:3px;bottom:3px}
 .grid.z4 .qa svg{width:12px;height:12px}
@@ -290,7 +290,7 @@ button.tag{cursor:pointer;font-family:inherit}
 .tiles.z3 .nm{font-size:12px}
 .tiles.z3 .ct{font-size:10px}
 .tiles.z4 .nm{font-size:11px;line-height:14px;padding:4px 5px 0}
-.tiles.z4 .ct{font-size:9px;padding:1px 5px 2px}
+.tiles.z4 .ct{font-size:10px;padding:1px 5px 2px}
 .tiles.z4 .pb{height:2px;margin:0 5px 5px}
 
 /* поиск списком */
@@ -415,11 +415,11 @@ tr.isdone.last td{background-image:linear-gradient(rgba(255,255,255,.055),rgba(2
 
 /* ===== Объединение: узкая подпись строки, закреплённый «Результат», изменяемая ширина ===== */
 .mgt th,.mgt td{position:relative}
-.mgt th.mgl{position:static;min-width:0;width:40px;max-width:52px;padding:3px;font-size:9px;line-height:11px;letter-spacing:0;text-transform:none;font-weight:500;color:var(--mut)}
+.mgt th.mgl{position:static;min-width:0;width:40px;max-width:52px;padding:3px;font-size:10px;line-height:11px;letter-spacing:0;text-transform:none;font-weight:500;color:var(--mut)}
 .mgt th.mgl .btn.sm{padding:1px 5px;font-size:11px;margin-top:2px}
 .mgt th.mgres,.mgt td.mgres{position:sticky;left:0;z-index:3;cursor:pointer;background:linear-gradient(rgba(74,222,128,.14),rgba(74,222,128,.14)),var(--bg2);box-shadow:2px 0 0 var(--bd2)}
 .mgt th.mgres{z-index:4;cursor:default}
-.mgk{display:block;font-size:9px;line-height:11px;color:var(--mut)}
+.mgk{display:block;font-size:10px;line-height:11px;color:var(--mut)}
 .rz{position:absolute;right:-2px;top:0;bottom:0;width:14px;cursor:col-resize;touch-action:none;z-index:6}
 .rz::after{content:'';position:absolute;right:6px;top:22%;bottom:22%;width:2px;border-radius:1px;background:var(--bd2)}
 .wrap th{position:sticky}
@@ -455,7 +455,7 @@ span.tag{cursor:default}
 /* ===== Плитки: платформа и время крупнее ===== */
 .strip{font-size:12px;line-height:15px}
 .strip .sp{font-size:11px}
-.grid.z5 .strip,.grid.z6 .strip{font-size:9px;line-height:12px}
+.grid.z5 .strip,.grid.z6 .strip{font-size:10px;line-height:12px}
 .grid.z5 .strip .sp,.grid.z6 .strip .sp{font-size:8px}
 
 /* ===== Игры серий (не основной список), группы, текстовый вид ===== */
@@ -609,14 +609,14 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 /* ===== Плитка: рейтинг слева вверху, год слева внизу, под картинкой только название ===== */
 .card .cv .rt{position:absolute;left:0;top:0;z-index:2;padding:1px 5px;background:rgba(0,0,0,.66);color:#fff;font-size:10px;line-height:13px;border-bottom-right-radius:8px;pointer-events:none}
 .card .cv .rt i{font-style:normal;color:#ffc107;margin-right:1px}
-.grid.z5 .cv .rt,.grid.z6 .cv .rt{font-size:8px;line-height:11px;padding:0 3px}
+.grid.z5 .cv .rt,.grid.z6 .cv .rt{font-size:9.5px;line-height:11px;padding:0 3px}
 .grid .card .t{min-height:0;margin-top:3px}
 /* ===== Список: жанры и платформы мелко, с переносом; число строк задаёт скрипт по имени игры ===== */
 .wrap tbody tr{content-visibility:visible}
 .wrap td.gp{position:relative;white-space:normal;width:120px;min-width:90px;max-width:170px;padding:0!important}
-.wrap .gpt{position:absolute;left:8px;right:4px;top:0;bottom:0;display:flex;align-items:center;overflow:hidden;font-size:10px;line-height:12px;color:var(--mut)}
+.wrap .gpt{position:absolute;left:8px;right:4px;top:0;bottom:0;display:flex;align-items:center;overflow:hidden;font-size:10.5px;line-height:12.5px;color:var(--mut)}
 .wrap .gpt span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:var(--gl,1);overflow:hidden;overflow-wrap:anywhere}
-.wrap.d1 .gpt{font-size:9px;line-height:11px}
+.wrap.d1 .gpt{font-size:10.5px;line-height:12px}
 
 .tlist .ts{color:#b794f6}
 :root[data-theme="light"] .tlist .ts{color:#7a4fc7}
@@ -630,19 +630,17 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .cvb.l{left:5px}.cvb.r{right:5px}
 .cvb svg{width:20px;height:20px;stroke:#fff;fill:none;stroke-width:1.7}
 .donerow{align-items:stretch}
-.srcline{flex:1;min-width:0;align-self:center;font-size:9px;line-height:10.5px;color:var(--mut);overflow-wrap:anywhere;cursor:pointer}
+.srcline{flex:1;min-width:0;align-self:center;font-size:10.5px;line-height:12.5px;color:var(--mut);overflow-wrap:anywhere;cursor:pointer}
 #shColls{gap:0}
 .shcolls{gap:0}
 .shcolls .p{padding:2px 8px;font-size:11px;border-radius:10px;margin:1px 3px 1px 0}
-.wrap td[data-ck="doneDate"],.wrap td[data-ck="added"],.wrap .scd{font-size:10.5px}
-.wrap.d1 td[data-ck="doneDate"],.wrap.d1 td[data-ck="added"],.wrap.d1 .scd{font-size:9.5px}
+.wrap td[data-ck="doneDate"],.wrap td[data-ck="added"],.wrap .scd{font-size:11px}
+.wrap.d1 td[data-ck="doneDate"],.wrap.d1 td[data-ck="added"],.wrap.d1 .scd{font-size:10.5px}
 @keyframes swr{from{transform:translateX(70px);opacity:.2}to{transform:none;opacity:1}}
 @keyframes swl{from{transform:translateX(-70px);opacity:.2}to{transform:none;opacity:1}}
-@keyframes bump{0%,100%{transform:none}35%{transform:translateX(-16px)}70%{transform:translateX(8px)}}
-@keyframes bump2{0%,100%{transform:none}35%{transform:translateX(-16px)}70%{transform:translateX(8px)}}
 @keyframes dn{from{transform:none;opacity:1}to{transform:translateY(40px);opacity:0}}
 .sheet{touch-action:pan-y}
-.shbody.swr{animation:swr .16s ease-out}.shbody.swl{animation:swl .16s ease-out}.shbody.bump{animation:bump .26s ease-out}.shbody.bump2{animation:bump2 .26s ease-out}
+.shbody.swr{animation:swr .16s ease-out}.shbody.swl{animation:swl .16s ease-out}
 .closing{pointer-events:none}.closing .sheet{animation:dn .14s ease-in forwards}.closing .backdrop{opacity:0;transition:opacity .14s}
 
 
@@ -666,7 +664,6 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .grid:has(.card.last) .card:not(.last):not(.sel) .cv{filter:brightness(.78)}
 
 /* список: галочка рядом с названием, всё сдвинуто влево */
-.lck{display:inline-block;margin-right:4px;width:15px;height:15px;line-height:15px;border-radius:50%;background:var(--green);color:#fff;text-align:center;font-size:10px;font-weight:800;vertical-align:1px}
 .wrap td,.wrap th{padding-left:5px;padding-right:5px}
 .wrap td:first-child,.wrap th:first-child{padding-left:3px}
 /* плитка: размер названия зависит от масштаба, поля не дают скруглению обрезать текст */
@@ -692,8 +689,6 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 
 /* карусель: предпросмотр соседней карточки, красные границы у конца списка, индикатор в нижней панели */
 .swg{position:absolute;z-index:2;pointer-events:none;background:var(--sheet);will-change:transform}
-.swe{position:fixed;z-index:33;width:5px;background:#e5322d;box-shadow:0 0 16px 3px rgba(229,50,45,.75);opacity:0;pointer-events:none;transition:opacity .12s}
-.swe.l{border-radius:0 3px 3px 0}.swe.r{border-radius:3px 0 0 3px}
 .sbar .spb{position:absolute;left:0;right:0;top:-1px;height:2px;background:rgba(255,255,255,.08);pointer-events:none}
 .sbar .spb i{display:block;height:100%;width:0;background:#6b6b75;transition:width .12s,background .25s}
 .sbar.act .spb i{background:var(--acc)}
@@ -706,3 +701,50 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .snav .ib{min-width:30px;width:30px;height:30px;padding:0;font-size:20px;line-height:1;border-radius:8px}
 .snav .ib:disabled{opacity:.3;cursor:default}
 @media (pointer:coarse){.snav{display:none}}
+
+/* зоны нажатия не меньше ~36 px: внешний вид прежний, область нажатия шире невидимой подложкой */
+[data-act="shEditName"],[data-act="shEdit"],[data-act="pickSeries"],[data-act="shNewColl"],[data-act="editGenres"],[data-act="editPlats"],[data-act="shotAddFile"],[data-act="clearQ"],[data-act="clearSQ"],[data-act="sortBy"]{position:relative}
+[data-act="shEditName"]::after,[data-act="shEdit"]::after,[data-act="pickSeries"]::after,[data-act="shNewColl"]::after,[data-act="editGenres"]::after,[data-act="editPlats"]::after,[data-act="shotAddFile"]::after,[data-act="clearQ"]::after,[data-act="clearSQ"]::after,[data-act="shYoutube"]::after,[data-act="shWiki"]::after{content:"";position:absolute;left:-6px;right:-6px;top:-6px;bottom:-6px}
+[data-act="shYoutube"]::after,[data-act="shWiki"]::after{left:-4px;right:-4px;top:-4px;bottom:-4px}
+/* шапка таблицы низкая: нажимаемая область заходит чуть выше и ниже надписи */
+[data-act="sortBy"]::after{content:"";position:absolute;left:-4px;right:-4px;top:-6px;bottom:-9px}
+.sec input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]){min-height:34px;box-sizing:border-box}
+
+/* красные границы у конца списка: мягкая дуга с затенением, середина выпячивается к центру при протягивании */
+.swe{position:fixed;z-index:33;width:0;opacity:0;pointer-events:none;transition:opacity .16s,width .07s}
+.swe.l{background:linear-gradient(to right,rgba(226,76,76,.5),rgba(226,76,76,.16) 62%,rgba(226,76,76,0));border-radius:0 100% 100% 0 / 0 50% 50% 0;filter:blur(.6px)}
+.swe.r{background:linear-gradient(to left,rgba(226,76,76,.5),rgba(226,76,76,.16) 62%,rgba(226,76,76,0));border-radius:100% 0 0 100% / 50% 0 0 50%;filter:blur(.6px)}
+/* карточка поиска: индикатор загрузки подробностей на месте, без смещения содержимого */
+.rsload{min-height:20px;display:flex;align-items:center;gap:8px;margin:4px 0 2px;font-size:12px;color:var(--mut)}
+.rsload:empty{visibility:hidden}
+.spin{width:14px;height:14px;border:2px solid rgba(255,255,255,.22);border-top-color:var(--acc);border-radius:50%;animation:rsspin .8s linear infinite;flex:0 0 auto}
+@keyframes rsspin{to{transform:rotate(360deg)}}
+.rserr{color:var(--red,#e5484d)}
+#rsGen{margin-top:8px}
+.srow.last{background:rgba(255,255,255,.055);border-radius:12px}
+.srow.last .sth{box-shadow:0 0 0 1px rgba(255,255,255,.22)}
+/* счётчик над списком, алфавитная полоса, недавние запросы, серия в карточке */
+.lcount{font-size:10.5px;line-height:14px;color:var(--mut);padding:0 4px 2px}
+.lcount:empty{display:none}
+#libBody tr[data-gid]{scroll-margin-top:32px}
+#libBody .card[data-gid],#libBody .tl[data-gid]{scroll-margin-top:6px}
+#alpha{position:fixed;right:6px;width:22px;z-index:6;background:rgba(11,11,13,.5);display:flex;flex-direction:column;align-items:stretch;justify-content:space-between;touch-action:none;user-select:none;-webkit-user-select:none;padding:2px 0;border-radius:11px}
+#alpha.on{background:rgba(255,255,255,.08)}
+#alpha span{flex:1 1 0;min-height:0;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:600;color:var(--mut);line-height:1}
+#alpha.on span{color:var(--tx)}
+#alpha span.dim{visibility:hidden}
+#alphaBubble{position:fixed;left:50%;top:42%;transform:translate(-50%,-50%) scale(.9);z-index:35;min-width:64px;padding:10px 18px;border-radius:18px;background:rgba(20,20,24,.86);color:var(--acc);font-size:34px;font-weight:700;text-align:center;opacity:0;pointer-events:none;transition:opacity .12s,transform .12s}
+#alphaBubble.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.recent{margin:14px 4px 0}
+.serprog{display:flex;align-items:center;gap:8px;margin:6px 0 2px;font-size:12px;color:var(--mut)}
+.serprog:empty{display:none}
+.serprog .ib{min-width:34px;width:34px;height:30px;padding:0;font-size:20px;line-height:1;border-radius:8px;flex:0 0 auto}
+.serprog .ib:disabled{opacity:.3}
+.spmid{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:4px}
+.spmid b{color:var(--tx)}
+.spbar{height:3px;border-radius:2px;background:rgba(255,255,255,.1);overflow:hidden}
+.spbar i{display:block;height:100%;background:var(--green,#2e9e5b);border-radius:2px}
+
+/* правила #view>* задают ширину и поля всем детям, поэтому для полосы и «пузыря» буквы они переопределяются */
+#view>#alpha,#view.fx>#alpha{width:22px;max-width:22px;margin:0;left:auto;right:6px}
+#view>#alphaBubble,#view.fx>#alphaBubble{width:auto;max-width:none;margin:0;right:auto}

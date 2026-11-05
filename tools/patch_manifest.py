@@ -25,3 +25,11 @@ if 'usesCleartextTraffic' not in s:
         print('::error::В манифесте не найден тег application'); sys.exit(1)
     s = s.replace('<application', '<application android:usesCleartextTraffic="true"', 1)
     open(p, 'w', encoding='utf-8').write(s)
+
+# лёгкая вибрация при смене карточки (navigator.vibrate в WebView работает только при этом разрешении)
+s = open(p, encoding='utf-8').read()
+if 'android.permission.VIBRATE' not in s:
+    if '<application' not in s:
+        print('::error::В манифесте не найден тег application'); sys.exit(1)
+    s = s.replace('<application', '<uses-permission android:name="android.permission.VIBRATE" />\n    <application', 1)
+    open(p, 'w', encoding='utf-8').write(s)

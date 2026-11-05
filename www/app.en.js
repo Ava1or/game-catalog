@@ -1482,7 +1482,7 @@ function openGameSheet(id, dir) {
     + '<label class="field hidden" id="platsRow"><span>Platforms (comma-separated)</span><input id="f_platforms" value="' + esc(d.platforms.join(', ')) + '"></label>'
     + propInputs + '<h3>Screenshots</h3><div id="shotsSaved"></div><div class="tbar">' + sb('plus', 'Own', 'shotAddFile') + srcs.map(k => sb('img', PROV[k].name, 'loadShots', ' data-rid="' + ridOf(k, g[k + 'Id']) + '" data-save="1"')).join('') + '</div><input type="file" id="shotFile" accept="image/*" multiple class="hidden"><div id="shotsBox"></div></div>'
     + (d.added ? '<div class="addedAt">Added: ' + fmtTs(d.added) + '</div>' : '') + '</div>'
-    + '<div class="sbar"><button class="btn acc" data-act="closeSheet">Done</button>' + (() => { const p = sheetPos(); return p ? '<span class="snav"><button class="ib" data-act="shNav" data-d="-1"' + (p.i <= 0 ? ' disabled' : '') + ' aria-label="Previous game">‹</button><span class="snc">' + (p.i + 1) + '/' + p.n + '</span><button class="ib" data-act="shNav" data-d="1"' + (p.i >= p.n - 1 ? ' disabled' : '') + ' aria-label="Next game">›</button></span>' : ''; })() + '<span id="svst" class="sub">Saved automatically</span>'
+    + (() => { const c = libCtx(); return '<div class="sbar' + progCls() + '">' + sheetProgHtml(c) + '<button class="btn acc" data-act="closeSheet">Done</button>' + sheetNavHtml(c) + '<div class="smid"><span id="svst" class="sub">Saved automatically</span>' + sheetCntHtml(c) + '</div>'; })()
     + (isNew ? '<span style="width:44px"></span>' : '<button class="ib red" data-act="delGame" title="Delete game" aria-label="Delete game"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button>') + '</div>');
   drawShColls(); drawShGenres(d.genres); drawShPlats(d.platforms); drawShots(); drawShHead(); drawShInfo(); drawShName(); drawShDone(); drawShLine();
   { const p0 = sheetPos(); if (p0) [-1, 1].forEach(k => { const n0 = S.shown[p0.i + k]; if (n0) coverSrc(n0); }); }
@@ -1499,7 +1499,7 @@ function openGameSheet(id, dir) {
 function sheetSibling(dir) {
   const sh = S.sheet; if (!sh || sh.isNew || !S.shown) return;
   const i = S.shown.findIndex(g => g.id === sh.draft.id); if (i < 0) return;
-  const n = S.shown[i + dir]; if (!n) { bumpSheet(); return toast(dir > 0 ? 'This is the last game in the list' : 'This is the first game in the list'); }
+  const n = S.shown[i + dir]; if (!n) return edgeFlash(dir);
   openGameSheet(n.id, dir); followLast();
 }
 function bumpSheet() { const s = sheetEl && sheetEl.querySelector && sheetEl.querySelector('.shbody'); if (!s || !animOn()) return; const a = s.classList.contains('bump') ? 'bump2' : 'bump'; s.classList.remove('bump', 'bump2'); void s.offsetWidth; s.classList.add(a); }
@@ -1515,47 +1515,83 @@ function swipePreview(g) {
     + ((g.genres || []).length ? '<div class="chips">' + g.genres.map(x => '<span class="tag">' + esc(x) + '</span>').join('') + '</div>' : '')
     + ((g.platforms || []).length ? '<div class="chips">' + g.platforms.map(x => '<span class="tag m2">' + esc(shortPlat(x)) + '</span>').join('') + '</div>' : '');
 }
+// предпросмотр найденной игры из источника (карточка поиска)
+function foundPreview(it) {
+  const cat = gameByRid(it.rid), src = parseRid(it.rid).src;
+  return '<div class="hero"><div class="cv' + (it.cover ? '' : ' nocover') + '"' + (it.cover ? ' style="background-image:url(\'' + bgu(thumbUrl(it.cover)) + '\')"' : '') + '></div><div style="flex:1;min-width:0"><h2>' + esc(it.name || '') + ' <span class="y">' + (it.year || '') + '</span></h2>'
+    + '<div class="m" style="font-size:14px">' + (it.rating ? '<span class="st">★ ' + it.rating + '</span>' : '') + (it.time ? ' · ⏱ ' + it.time + ' h' : '') + '</div></div></div>'
+    + '<div class="chips" style="margin-top:12px">' + (it.genres || []).map(x => '<span class="tag">' + esc(x) + '</span>').join('') + '</div>'
+    + '<div class="chips">' + (it.platforms || []).map(x => '<span class="tag m2">' + esc(x) + '</span>').join('') + '</div>'
+    + '<div class="srcrow">' + srcBadge(src, cat ? cat[src + 'Url'] : '') + (cat ? '<span class="sub">In the catalog</span>' : '') + '</div>';
+}
 // положение открытой игры в текущем списке: номер и сколько всего
 function sheetPos() { const sh = S.sheet; if (!sh || sh.isNew || !S.shown) return null; const i = S.shown.findIndex(g => g.id === sh.draft.id); return i < 0 ? null : { i, n: S.shown.length }; }
-// свайп: как горизонтальная карусель. Рядом с карточкой виден предпросмотр следующей (или предыдущей) игры,
-// внизу маленький индикатор «номер / всего» с полоской
+// контекст карусели: игра каталога (список библиотеки) или найденная игра из источника (результаты поиска).
+// i/n - номер и сколько всего, item(k) - соседняя запись или null, html(запись) - предпросмотр, go(k) - перейти к соседней
+function libCtx() { const p = sheetPos(); return p ? { i: p.i, n: p.n, item: k => S.shown[p.i + k] || null, html: swipePreview, go: k => sheetSibling(k) } : null; }
+function srcCtx() {
+  if (!S.rs) return null; const L = (S.search && S.search.results) || [], i = L.findIndex(x => x.rid === S.rs.rid); if (i < 0) return null;
+  return { i, n: L.length, item: k => L[i + k] || null, html: foundPreview, go: k => { const x = L[i + k]; if (!x) return; openIgdbSheet(x.rid, false, k); const row = $('#srBody .srow[data-rid="' + x.rid + '"]'); if (row && row.scrollIntoView) row.scrollIntoView({ block: 'center', behavior: animOn() ? 'smooth' : 'auto' }); } };
+}
+const carCtx = () => !sheetEl ? null : sheetEl._key === 'igdb' ? srcCtx() : libCtx();
+// нижняя панель: тонкая полоска прогресса сверху, кнопки «‹ ›» (только веб-версия) и «номер/всего»
+let progOn = false, progT = 0;
+const progCls = () => progOn ? ' act' : '';
+const sheetProgHtml = c => c ? '<div class="spb"><i style="width:' + ((c.i + 1) / c.n * 100) + '%"></i></div>' : '';
+const sheetCntHtml = c => c ? '<span class="snc">' + (c.i + 1) + '/' + c.n + '</span>' : '';
+const sheetNavHtml = c => c ? '<span class="snav"><button class="ib" data-act="shNav" data-d="-1"' + (c.i <= 0 ? ' disabled' : '') + ' aria-label="Previous game">‹</button><button class="ib" data-act="shNav" data-d="1"' + (c.i >= c.n - 1 ? ' disabled' : '') + ' aria-label="Next game">›</button></span>' : '';
+// индикатор серый; при свайпе и переходе оранжевый, через секунду после жеста снова серый ('hold' - пока палец на экране)
+function progAct(on, i, n) {
+  const sb = sheetEl && sheetEl.querySelector && sheetEl.querySelector('.sbar'); clearTimeout(progT); progOn = !!on;
+  const apply = b => { if (b && b.classList) b.classList.toggle('act', progOn); };
+  if (sb) { if (i != null) { const c = sb.querySelector('.snc'), f = sb.querySelector('.spb i'); if (c) c.textContent = (i + 1) + '/' + n; if (f) f.style.width = (n > 0 ? (i + 1) / n * 100 : 0) + '%'; } apply(sb); }
+  if (on && on !== 'hold') progT = setTimeout(() => { progOn = false; apply(sheetEl && sheetEl.querySelector && sheetEl.querySelector('.sbar')); }, 1000);
+}
+// красная граница у края карточки: дальше игр нет
+function edgeShow(side, a) {
+  try {
+    const bx = sheetEl && sheetEl.querySelector('.sheet'); if (!bx) return;
+    let e = sheetEl.querySelector('.swe.' + side); if (!e) { e = document.createElement('div'); e.className = 'swe ' + side; sheetEl.appendChild(e); }
+    const r = bx.getBoundingClientRect ? bx.getBoundingClientRect() : { top: 0, height: 0, left: 0, right: 0 }, w = window.innerWidth || 0;
+    e.style.top = r.top + 'px'; e.style.height = r.height + 'px'; e.style[side === 'l' ? 'left' : 'right'] = (side === 'l' ? r.left : w - r.right) + 'px'; e.style.opacity = a;
+  } catch (e) { /* без границы можно обойтись */ }
+}
+const edgeHide = () => { try { sheetEl && sheetEl.querySelectorAll('.swe').forEach(e => { e.style.opacity = 0; }); } catch (e) { /* ignore */ } };
+function edgeFlash(dir) { edgeShow(dir > 0 ? 'r' : 'l', 1); setTimeout(edgeHide, 450); }
+// переход к соседней карточке кнопкой или стрелкой клавиатуры
+function carGo(dir) { const c = carCtx(); if (!c) return; if (c.item(dir)) { c.go(dir); progAct(true); } else edgeFlash(dir); }
+// свайп как горизонтальная карусель: рядом с карточкой виден предпросмотр соседней, у края списка загорается красная граница
 function attachSwipe(el) {
-  if (!el || !el.addEventListener || el._sw) return; el._sw = true; let sx = 0, sy = 0, lx = 0, ly = 0, t0 = 0, ok = false, lock = false, busy = false, hl = null, hr = null, gh = null, ghDir = 0, pg = null, pgT = 0;
+  if (!el || !el.addEventListener || el._sw) return; el._sw = true; let sx = 0, sy = 0, lx = 0, ly = 0, t0 = 0, ok = false, lock = false, busy = false, gh = null, ghDir = 0;
   const sheet = () => el.querySelector('.shbody'), anim = () => animOn(), box = () => el.querySelector('.sheet');
-  const hints = () => { if (hl) return; hl = document.createElement('div'); hl.className = 'swh l'; hr = document.createElement('div'); hr.className = 'swh r'; el.appendChild(hl); el.appendChild(hr); };
-  const prog = (show, i, n) => { // индикатор: полоска и «12 / 340»; через секунду после жеста гаснет
-    if (!pg) { pg = document.createElement('div'); pg.className = 'swp'; pg.innerHTML = '<div class="swpb"><i></i></div><span></span>'; el.appendChild(pg); }
-    if (i != null) { pg.querySelector('span').textContent = (i + 1) + ' / ' + n; pg.querySelector('i').style.width = (n > 0 ? (i + 1) / n * 100 : 0) + '%'; }
-    clearTimeout(pgT); pg.classList.toggle('on', !!show); if (show && show !== 'hold') pgT = setTimeout(() => { if (pg) pg.classList.remove('on'); }, 1100);
-  };
   const dropGhost = () => { if (gh) { gh.remove(); gh = null; ghDir = 0; } };
-  const mkGhost = dir => { // предпросмотр соседней игры сбоку; создаётся при первом движении в эту сторону
-    if (gh && ghDir === dir) return gh; dropGhost(); const bx = box(), p = sheetPos(), g = p && S.shown[p.i + dir]; if (!bx || !g) return null;
-    gh = document.createElement('div'); gh.className = 'swg'; gh.innerHTML = swipePreview(g); gh.style.top = (bx.scrollTop + 14) + 'px'; ghDir = dir; bx.appendChild(gh); return gh;
+  const mkGhost = (dir, c) => { // предпросмотр соседней записи сбоку; ставится ровно на место карточки под серой полоской
+    if (gh && ghDir === dir) return gh; dropGhost(); const bx = box(), s = sheet(), g = c && c.item(dir); if (!bx || !s || !g) return null;
+    gh = document.createElement('div'); gh.className = 'swg'; gh.innerHTML = c.html(g);
+    gh.style.top = ((bx.scrollTop || 0) + s.offsetTop) + 'px'; gh.style.left = s.offsetLeft + 'px'; gh.style.width = s.offsetWidth + 'px'; ghDir = dir; bx.appendChild(gh); return gh;
   };
   const place = dx => { const bx = box(); if (!gh || !bx) return; gh.style.transition = 'none'; gh.style.transform = 'translateX(' + Math.round(dx + (dx < 0 ? 1 : -1) * bx.clientWidth) + 'px)'; };
   const drag = dx => {
-    const s = sheet(); if (!s || !anim()) return; hints();
-    const dir = dx < 0 ? 1 : -1, nb = sibName(dir), k = nb === false ? 0.3 : 1, p = sheetPos(); // у края списка карточка тянется туго
+    const s = sheet(), c = carCtx(); if (!s || !c || !anim()) return;
+    const dir = dx < 0 ? 1 : -1, nb = c.item(dir), k = nb ? 1 : 0.3; // у края списка карточка тянется туго
     s.style.transition = 'none'; s.style.transform = 'translateX(' + Math.round(dx * k) + 'px)'; s.style.opacity = '1';
-    if (nb) { if (mkGhost(dir)) place(dx); } else dropGhost();
-    if (p) prog(true, p.i + (nb && Math.abs(dx) > 70 ? dir : 0), p.n);
-    const a = Math.min(1, Math.abs(dx) / 70), txt = nb === false ? (dir > 0 ? 'This is the last game' : 'This is the first game') : '';
-    hl.textContent = dir < 0 ? txt : ''; hr.textContent = dir > 0 ? txt : '';
-    hl.style.opacity = dir < 0 && txt ? a : 0; hr.style.opacity = dir > 0 && txt ? a : 0; hl.classList.toggle('edge', nb === false); hr.classList.toggle('edge', nb === false);
+    if (nb) { edgeHide(); if (mkGhost(dir, c)) place(dx); } else { dropGhost(); edgeShow(dir > 0 ? 'r' : 'l', Math.min(1, Math.abs(dx) / 60)); }
+    progAct('hold', c.i + (nb && Math.abs(dx) > 70 ? dir : 0), c.n);
   };
-  const reset = (animate) => { const s = sheet(); if (hl) { hl.style.opacity = 0; hr.style.opacity = 0; }
+  const reset = animate => {
+    const s = sheet(); edgeHide();
     if (gh) { const g0 = gh, bx = box(); if (animate && bx) { g0.style.transition = 'transform .16s ease-out'; g0.style.transform = 'translateX(' + (ghDir > 0 ? 1 : -1) * bx.clientWidth + 'px)'; gh = null; ghDir = 0; setTimeout(() => g0.remove(), 200); } else dropGhost(); }
-    if (pg && !animate) pg.classList.remove('on'); else if (pg) prog(true);
-    if (!s) return; s.style.transition = animate ? 'transform .16s ease-out, opacity .16s' : 'none'; s.style.transform = ''; s.style.opacity = ''; if (animate) setTimeout(() => { s.style.transition = ''; }, 200); };
+    if (animate) { const c = carCtx(); progAct(true, c ? c.i : null, c ? c.n : 0); }
+    if (!s) return; s.style.transition = animate ? 'transform .16s ease-out, opacity .16s' : 'none'; s.style.transform = ''; s.style.opacity = ''; if (animate) setTimeout(() => { s.style.transition = ''; }, 200);
+  };
   const fin = () => {
     if (!ok) return; ok = false; const dx = lx - sx, dy = ly - sy, dir = dx < 0 ? 1 : -1;
     if (!lock) { reset(false); return; }
-    const commit = Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - t0 < 1200, nb = sibName(dir), s = sheet(), bx = box();
+    const c = carCtx(), commit = Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - t0 < 1200, nb = c && c.item(dir), s = sheet(), bx = box();
     if (commit && nb) { // текущая карточка уезжает, предпросмотр доезжает на её место, потом содержимое заменяется
-      const done = () => { busy = false; const p = sheetPos(); openGameSheet.noAnim = true; try { sheetSibling(dir); } finally { openGameSheet.noAnim = false; } dropGhost(); const q = sheetPos(); if (q) prog(true, q.i, q.n); };
-      if (s && anim() && bx) { busy = true; const W = bx.clientWidth, t = 'transform .18s ease-out'; s.style.transition = t; s.style.transform = 'translateX(' + (dir > 0 ? -W : W) + 'px)'; if (gh) { gh.style.transition = t; gh.style.transform = 'translateX(0)'; } if (hl) { hl.style.opacity = 0; hr.style.opacity = 0; } setTimeout(done, 185); } else { sheetSibling(dir); dropGhost(); const q = sheetPos(); if (q) prog(true, q.i, q.n); }
-    } else { reset(true); if (commit && nb === false) { toast(dir > 0 ? 'This is the last game in the list' : 'This is the first game in the list'); } }
+      const swap = () => { openGameSheet.noAnim = true; try { c.go(dir); } finally { openGameSheet.noAnim = false; } dropGhost(); const q = carCtx(); progAct(true, q ? q.i : null, q ? q.n : 0); };
+      if (s && anim() && bx) { busy = true; const W = bx.clientWidth, t = 'transform .18s ease-out'; s.style.transition = t; s.style.transform = 'translateX(' + (dir > 0 ? -W : W) + 'px)'; if (gh) { gh.style.transition = t; gh.style.transform = 'translateX(0)'; } setTimeout(() => { busy = false; swap(); }, 185); } else swap();
+    } else reset(true);
   };
   el.addEventListener('touchstart', e => { const t = e.touches && e.touches[0]; ok = !busy && !!t && e.touches.length === 1 && !(e.target.closest && e.target.closest('input,textarea,select,#shotsSaved,#shotsBox,.chips.scroll')); lock = false; if (ok) { reset(false); sx = lx = t.clientX; sy = ly = t.clientY; t0 = Date.now(); } }, { passive: true });
   el.addEventListener('touchmove', e => { if (!ok) return; const t = e.touches && e.touches[0]; if (!t) return; lx = t.clientX; ly = t.clientY; const dx = lx - sx, dy = ly - sy;
@@ -2282,7 +2318,7 @@ async function showSeries(rid, title) {
   } catch (e) { toast(e.message); }
   s.loading = false; renderSearchBody();
 }
-async function openIgdbSheet(rid, keep) {
+async function openIgdbSheet(rid, keep, dir) {
   if (!keep || !S.rs || S.rs.rid !== rid) {
     S.rs = { rid, colls: validAddColls().slice() }; const p0 = pendingItem(); // для строки разбора сразу отмечены коллекции и «Завершено» из настроек списка
     if (p0) { const e = effItem(p0); e.colls.forEach(id => { if (!S.rs.colls.includes(id)) S.rs.colls.push(id); }); if (e.markDone && !S.rs.colls.includes(DONE_ID)) S.rs.colls.push(DONE_ID); }
@@ -2293,7 +2329,7 @@ async function openIgdbSheet(rid, keep) {
     const cat = gameByRid(rid), cover = (d && (d._src === 'rawg' ? d.background_image : coverOf(d, 'cover_big'))) || it.cover;
     const item = d ? mapItem(d) : it;
     const inColls = cat ? cat.collections.map(id => collById(id)).filter(Boolean) : [];
-    sheetKey = 'igdb'; openSheet('<div class="hero"><div class="cv' + (cover ? '' : ' nocover') + '"' + (cover ? ' style="background-image:url(\'' + bgu(thumbUrl(cover)) + '\')"' : '') + '></div><div style="flex:1;min-width:0"><h2>' + esc(item.name) + ' <span class="y">' + (item.year || '') + '</span></h2>'
+    sheetKey = 'igdb'; const sh = openSheet('<div class="shbody"><div class="hero"><div class="cv' + (cover ? '' : ' nocover') + '"' + (cover ? ' style="background-image:url(\'' + bgu(thumbUrl(cover)) + '\')"' : '') + '></div><div style="flex:1;min-width:0"><h2>' + esc(item.name) + ' <span class="y">' + (item.year || '') + '</span></h2>'
       + '<div class="m" style="font-size:14px">' + (item.rating ? '<span class="st">★ ' + item.rating + '</span>' : '') + (item.time ? ' · ⏱ ' + item.time + ' h' : '') + '</div>'
       + (ser && ser.series ? '<div class="sub" style="margin-top:6px">Series: ' + esc(ser.series) + '</div>' : '') + '</div></div>'
       + '<div class="chips" style="margin-top:12px">' + item.genres.map(x => '<span class="tag">' + esc(x) + '</span>').join('') + '</div>'
@@ -2305,7 +2341,10 @@ async function openIgdbSheet(rid, keep) {
       + '<div class="toolbar">' + (cat ? (pit ? '<button class="btn acc" data-act="rsLink" data-rid="' + rid + '">✓ Match with the Inbox row</button>' : '') + '<button class="btn" data-act="openGameFromIgdb" data-id="' + cat.id + '">Open in the catalog</button>'
         : '<button class="btn acc" data-act="rsAdd" data-rid="' + rid + '">' + (pit ? '＋ Add and match' : '＋ Add to the catalog') + '</button>')
       + (ser && ser.count ? '<button class="btn" data-act="rsSeries" data-rid="' + rid + '" data-t="' + esc(ser.series || item.name) + '">Series games (' + ser.count + ')</button>' : '') + '</div>'
-      + '<h3>Screenshots</h3><div id="shotsBox"><button class="btn" data-act="loadShots" data-rid="' + rid + '">View screenshots</button></div>');
+      + '<h3>Screenshots</h3><div id="shotsBox"><button class="btn" data-act="loadShots" data-rid="' + rid + '">View screenshots</button></div></div>'
+      + (() => { const c = srcCtx(); return '<div class="sbar' + progCls() + '">' + sheetProgHtml(c) + '<button class="btn acc" data-act="closeSheet">Done</button>' + sheetNavHtml(c) + '<div class="smid">' + sheetCntHtml(c) + '</div><span style="width:44px"></span></div>'; })());
+    sh.classList.add('gs'); attachSwipe(sheetEl); if (dir) sh.scrollTop = 0;
+    { const bd = dir && animOn() && !openGameSheet.noAnim && sh.querySelector ? sh.querySelector('.shbody') : null; if (bd && bd.classList) bd.classList.add(dir > 0 ? 'swr' : 'swl'); }
   };
   draw(null, null);
   try { const r = await fetchDetails(rid); draw(r.d, { series: r.series, count: r.seriesCount }); } catch (e) { toast(e.message); }
@@ -2814,7 +2853,7 @@ const ACT = {
     if (!v) return; S.set.pageSize = +v; saveSet(); openSearchFilters(); runSearch(true);
   },
   toggleColls: t => { const g = gameById(t.dataset.gid); if (!g) return; const e = S.expColls, on = !e.has(g.id); if (on) e.add(g.id); else e.delete(g.id); t.innerHTML = tagsHtml(g, on); t.classList.toggle('open', on); },
-  shNav: t => sheetSibling(+t.dataset.d),
+  shNav: t => carGo(+t.dataset.d),
   gameColls: t => {
     const g = gameById(t.dataset.gid); if (!g) return;
     const cs = (g.collections || []).map(collById).filter(Boolean), m = openModal();
@@ -3140,6 +3179,12 @@ const ACT = {
     S.trash = []; coverCache.clear(); S.games = []; S.collections = []; S.props = []; S.inbox = { lists: [], items: [] }; S.inboxList = null; S.lastGame = ''; S.set.platDict = {}; S.set.genreDict = {}; S._pi = S._gi = null; S.set.saved = []; S.set.f = clone(DEFAULTS.f); saveSet(); render(); toast('Data deleted');
   }
 };
+// веб-версия: стрелки влево/вправо листают открытые карточки (каталога и поиска)
+document.addEventListener('keydown', e => {
+  if ((e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || !sheetEl || modalEl || lbEl) return;
+  const t = e.target; if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || '') || t.isContentEditable)) return;
+  if (!carCtx()) return; e.preventDefault(); carGo(e.key === 'ArrowRight' ? 1 : -1);
+});
 document.addEventListener('click', e => {
   if (S.selMode && S.tab === 'library') { const r = e.target.closest('tr[data-gid]'); if (r && !e.target.closest('a')) { if (lp.fired) { lp.fired = false; return; } toggleSel(r.dataset.gid); return; } } // в режиме выбора строка отмечается нажатием в любом месте
   if (S.inSelMode && S.tab === 'inbox') { const r = e.target.closest('[data-iid]'); if (r) { if (lp.fired) { lp.fired = false; return; } toggleInSel(r.dataset.iid); return; } }

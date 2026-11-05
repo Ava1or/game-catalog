@@ -645,9 +645,6 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .shbody.swr{animation:swr .16s ease-out}.shbody.swl{animation:swl .16s ease-out}.shbody.bump{animation:bump .26s ease-out}.shbody.bump2{animation:bump2 .26s ease-out}
 .closing{pointer-events:none}.closing .sheet{animation:dn .14s ease-in forwards}.closing .backdrop{opacity:0;transition:opacity .14s}
 
-.swh{position:fixed;top:40%;z-index:33;max-width:44%;padding:9px 13px;border-radius:14px;background:var(--acc);color:#fff;font-weight:700;font-size:14px;line-height:17px;opacity:0;pointer-events:none;box-shadow:0 2px 10px rgba(0,0,0,.5);overflow-wrap:anywhere}
-.swh.l{left:8px}.swh.r{right:8px;text-align:right}.swh.edge{background:#7a1414}
-.swh{text-shadow:0 1px 2px rgba(0,0,0,.4)}
 
 /* текстовый вид: масштаб 1-4 и меньшие отступы внутри строки */
 .tlist .tl{padding:1px 4px;line-height:1.25;font-size:14px}
@@ -681,12 +678,6 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 
 /* свайп-карусель: предпросмотр соседней карточки и индикатор положения */
 .sheet.gs{position:fixed}
-.swg{position:absolute;left:16px;right:16px;z-index:2;pointer-events:none;background:var(--sheet);will-change:transform}
-.swp{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(74px + env(safe-area-inset-bottom));z-index:34;display:flex;flex-direction:column;align-items:center;gap:3px;opacity:0;transition:opacity .25s;pointer-events:none}
-.swp.on{opacity:1}
-.swp span{font-size:11px;font-weight:600;color:var(--tx);background:rgba(0,0,0,.55);padding:1px 8px;border-radius:9px}
-.swpb{width:84px;height:3px;border-radius:2px;background:rgba(255,255,255,.25);overflow:hidden}
-.swpb i{display:block;height:100%;background:var(--acc);border-radius:2px;transition:width .12s}
 
 /* колонка «✓ дата» в списке; в текстовом виде название вплотную к галочке */
 .dck{color:var(--green);font-weight:700;margin-right:3px}
@@ -694,12 +685,24 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .tl .tk{flex:0 0 1.05em;text-align:left}
 
 /* веб-версия без свайпа: мелкие кнопки «‹ ›» с номером игры; на сенсорных экранах их нет */
-.snav{display:inline-flex;align-items:center;gap:2px;flex:0 0 auto}
-.snav .ib{min-width:30px;width:30px;height:30px;padding:0;font-size:20px;line-height:1;border-radius:8px}
-.snav .ib:disabled{opacity:.3;cursor:default}
-.snc{font-size:11px;color:var(--mut);min-width:46px;text-align:center}
-@media (pointer:coarse){.snav{display:none}}
 /* коллекции в списке: нажатие раскрывает все */
 .wrap td[data-ck="colls"]{cursor:pointer}
 .wrap td[data-ck="colls"].open{white-space:normal;min-width:170px}
 .wrap td[data-ck="colls"].open .tag{white-space:nowrap}
+
+/* карусель: предпросмотр соседней карточки, красные границы у конца списка, индикатор в нижней панели */
+.swg{position:absolute;z-index:2;pointer-events:none;background:var(--sheet);will-change:transform}
+.swe{position:fixed;z-index:33;width:5px;background:#e5322d;box-shadow:0 0 16px 3px rgba(229,50,45,.75);opacity:0;pointer-events:none;transition:opacity .12s}
+.swe.l{border-radius:0 3px 3px 0}.swe.r{border-radius:3px 0 0 3px}
+.sbar .spb{position:absolute;left:0;right:0;top:-1px;height:2px;background:rgba(255,255,255,.08);pointer-events:none}
+.sbar .spb i{display:block;height:100%;width:0;background:#6b6b75;transition:width .12s,background .25s}
+.sbar.act .spb i{background:var(--acc)}
+.smid{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:1px}
+.smid .sub{flex:0 0 auto}
+.snc{font-size:10px;line-height:12px;color:var(--mut);transition:color .25s}
+.sbar.act .snc{color:var(--acc)}
+/* кнопки «‹ ›» только для мыши; на сенсорных экранах их нет */
+.snav{display:inline-flex;align-items:center;gap:2px;flex:0 0 auto}
+.snav .ib{min-width:30px;width:30px;height:30px;padding:0;font-size:20px;line-height:1;border-radius:8px}
+.snav .ib:disabled{opacity:.3;cursor:default}
+@media (pointer:coarse){.snav{display:none}}

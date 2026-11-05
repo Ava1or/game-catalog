@@ -55,6 +55,13 @@ const L = require('../www/app.js');
   await step('quick add + render', async () => { await G.addFromIgdb('igdb:101'); G.renderSearchBody(); });
   await step('collections + library', async () => { S.collections.push({ id: 'c1', name: 'Любимые' }); S.games[0].collections.push('c1'); S.tab = 'collections'; G.render(); S.tab = 'library'; G.render(); G.ACT.collChip({ dataset: { id: 'c1' } }); G.ACT.openFilters(); G.ACT.openCols(); G.ACT.toggleView(); G.ACT.fToggle({ dataset: { k: 'genres', v: 'RPG' } }); G.ACT.rmF({ dataset: { k: 'genres', v: 'RPG' } }); G.ACT.resetF(); });
   await step('series tab', async () => { S.tab = 'series'; G.render(); G.ACT.serOpen({ dataset: { name: 'Fallout' } }); if (S.tab !== 'library' || S.set.f.series[0] !== 'Fallout') throw new Error('serOpen'); G.ACT.serOpen({ dataset: { name: '' } }); G.render(); });
+  await step('карточка поиска: соседние результаты, кнопки и границы', async () => {
+    S.tab = 'search'; S.search.results = [{ rid: 'igdb:100', name: 'А', platforms: [], genres: [] }, { rid: 'igdb:101', name: 'Б', platforms: [], genres: [] }];
+    await G.openIgdbSheet('igdb:100'); if (!document.querySelector('.snav')) throw new Error('нет кнопок в карточке поиска');
+    G.ACT.shNav({ dataset: { d: '1' } }); if (S.rs.rid !== 'igdb:101') throw new Error('кнопка вправо в поиске');
+    G.ACT.shNav({ dataset: { d: '1' } }); if (S.rs.rid !== 'igdb:101') throw new Error('за последним результатом переходить некуда');
+    G.ACT.shNav({ dataset: { d: '-1' } }); if (S.rs.rid !== 'igdb:100') throw new Error('кнопка влево в поиске');
+  });
   await step('igdb sheet with shots + colls', async () => { S.tab = 'search'; await G.openIgdbSheet('igdb:1'); });
   await step('inbox flow', async () => {
     const l = { id: 'l1', name: 'Steam', created: 1 }; S.inbox.lists.push(l);

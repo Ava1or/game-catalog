@@ -333,7 +333,7 @@ const S = {
   games: [], collections: [], props: [], set: clone(DEFAULTS), lists: {},
   trash: [], shotUrls: [], igdbShots: [], cFind: '', sFind: '', block: null, inbox: { lists: [], items: [] }, inboxList: null, pending: null, showDone: true,
   tab: 'library', selMode: false, sel: new Set(), shown: [],
-  retGame: null, lastGame: '', inSel: new Set(), inSelMode: false, search: { addColls: [], src: 'igdb', q: '', f: { genre: '', genreName: '', platform: '', platformName: '', year: '', minRating: 0 }, results: [], page: 0, hasMore: false, count: 0, loading: false, token: 0, mode: 'search', title: '', started: false }
+  retGame: null, lastGame: '', inSel: new Set(), inSelMode: false, search: { addColls: [], src: 'igdb', q: '', f: { genres: [], genreNames: [], platforms: [], platformNames: [], years: [], minRating: 0 }, results: [], stack: [], bundle: null, page: 0, hasMore: false, count: 0, loading: false, token: 0, mode: 'search', title: '', started: false }
 };
 const coverCache = new Map();
 let installEvt = null;
@@ -699,8 +699,26 @@ const hoursOf = t => { const sec = t && (t.normally || t.hastily || t.completely
 const PLAT_FIX = { 'PC (Microsoft Windows)': 'PC', 'Mac': 'macOS', 'Xbox Series X|S': 'Xbox Series S/X', 'PlayStation Vita': 'PS Vita', 'PlayStation Portable': 'PSP', 'Super Nintendo Entertainment System': 'SNES', 'Nintendo Entertainment System': 'NES', 'Sega Mega Drive/Genesis': 'SEGA Genesis' };
 const platName = n => PLAT_FIX[n] || n;
 const platC = (n, learn) => canonPlat(platName(n), learn);
-const GAME_TYPES = 'game_type = (0,4,6,8,9,10,11)'; // игра, самостоятельное дополнение, эпизод, ремейк, ремастер, расширенная версия, порт (без DLC, патчей, паков и модов)
-const IGDB_FIELDS = 'name,first_release_date,total_rating,cover.image_id,genres.name,platforms.name';
+const GAME_TYPES = 'game_type = (0,4,6,8,9,10,11)'; // для серий игр: игра, самостоятельное дополнение, эпизод, ремейк, ремастер, расширенная версия, порт (без бандлов, DLC, патчей, паков и модов)
+// типы карточек IGDB (game_type): в поиске показываются все, в фильтрах выбираются нужные (выбор запоминается)
+const IGDB_TYPES = [[0, 'Игра'], [1, 'DLC'], [2, 'Дополнение'], [3, 'Бандл'], [4, 'Автономное дополнение'], [5, 'Мод'], [6, 'Эпизод'], [7, 'Сезон'], [8, 'Ремейк'], [9, 'Ремастер'], [10, 'Расширенная версия'], [11, 'Порт'], [12, 'Форк'], [13, 'Пак'], [14, 'Обновление']];
+const TYPE_CHIP = { 0: 'Игра', 1: 'DLC', 2: 'Доп.', 3: 'Бандл', 4: 'Авт. доп.', 5: 'Мод', 6: 'Эпизод', 7: 'Сезон', 8: 'Ремейк', 9: 'Ремастер', 10: 'Расш.', 11: 'Порт', 12: 'Форк', 13: 'Пак', 14: 'Патч' };
+const TYPE_NAME = {}; IGDB_TYPES.forEach(([i, n]) => { TYPE_NAME[i] = n; });
+const DEF_TYPES = [0, 3, 4, 6, 8, 9, 10, 11]; // по умолчанию: игры, бандлы, самостоятельные дополнения, эпизоды, ремейки, ремастеры, расширенные версии, порты
+const searchTypes = () => { const t = S.set.searchTypes; return Array.isArray(t) && t.length ? t.map(Number) : DEF_TYPES; };
+const typesCustom = () => searchTypes().slice().sort((a, b) => a - b).join() !== DEF_TYPES.join();
+const typeWhere = () => 'game_type = (' + searchTypes().join(',') + ')';
+const typeOf = x => { const t = x && x.game_type; return t && typeof t === 'object' ? t.id : t; };
+const isBundleType = t => t === 3 || t === 13; // бандл и пак: несколько игр в одной карточке
+const looksBundle = n => /\b(collection|collections|trilogy|bundle|compilation|anthology|duology|quadrilogy)\b/i.test(String(n || ''));
+const typeChip = (t, cls) => t != null && TYPE_CHIP[t] ? '<span class="tchip t' + t + (cls ? ' ' + cls : '') + '">' + (cls === 'lg' ? TYPE_NAME[t] : TYPE_CHIP[t]) + '</span>' : '';
+const bbadge = rid => '<button class="bbadge" data-act="bundleOpen" data-rid="' + rid + '" aria-label="Игры бандла" title="Игры бандла">B</button>';
+// фильтры поиска: несколько значений каждого вида
+const fa = (f, k) => Array.isArray(f[k]) ? f[k] : [];
+const fClear = (f, all) => { f.genres = []; f.genreNames = []; f.platforms = []; f.platformNames = []; if (all) { f.years = []; f.minRating = 0; } };
+const hasSearchFilter = f => !!(fa(f, 'genres').length || fa(f, 'platforms').length || fa(f, 'years').length);
+const yearsRange = f => { const ys = fa(f, 'years').map(Number).filter(Boolean); return ys.length ? Math.min(...ys) + '-01-01,' + Math.max(...ys) + '-12-31' : ''; };
+const IGDB_FIELDS = 'name,first_release_date,total_rating,cover.image_id,genres.name,platforms.name,game_type';
 const IGDB_DETAIL = IGDB_FIELDS + ',summary,url,collections.id,collections.name';
 const MAIN_PLATFORMS = '6,14,3,7,8,9,48,167,38,46,11,12,49,169,130,508,5,41,37,20,24,22,33,18,19,4,23,29,32,34,39';
 // время прохождения в IGDB лежит в отдельном разделе: добавляем его к списку игр одним запросом
@@ -720,10 +738,10 @@ async function igdbTimeOf(id) {
 async function fillTimeIgdb(g) { const h = await igdbTimeOf(g.igdbId); if (h > 0 && !g.time) { g.time = h; await saveGame(g); } return h; }
 const igdbQuote = q => String(q).replace(/["\\]/g, ' ').trim();
 async function igdbPage(q, f, page) {
-  const w = [GAME_TYPES], n = S.set.pageSize || 40;
-  if (f.genre) w.push('genres = (' + (+f.genre) + ')');
-  if (f.platform) w.push('platforms = (' + (+f.platform) + ')');
-  if (f.year) w.push('first_release_date >= ' + Date.UTC(+f.year, 0, 1) / 1000 + ' & first_release_date < ' + Date.UTC(+f.year + 1, 0, 1) / 1000);
+  const w = [typeWhere()], n = S.set.pageSize || 40, gs = fa(f, 'genres'), ps = fa(f, 'platforms'), ys = fa(f, 'years');
+  if (gs.length) w.push('genres = (' + gs.map(Number).join(',') + ')');
+  if (ps.length) w.push('platforms = (' + ps.map(Number).join(',') + ')');
+  if (ys.length) w.push('(' + ys.map(y => '(first_release_date >= ' + Date.UTC(+y, 0, 1) / 1000 + ' & first_release_date < ' + Date.UTC(+y + 1, 0, 1) / 1000 + ')').join(' | ') + ')');
   const where = 'where ' + w.join(' & ') + ';', srch = q ? 'search "' + igdbQuote(q) + '"; ' : '';
   const list = await igdb('/games', srch + 'fields ' + IGDB_FIELDS + '; ' + where + (q ? '' : ' sort total_rating_count desc;') + ' limit ' + n + '; offset ' + page * n + ';');
   let count = 0;
@@ -731,9 +749,19 @@ async function igdbPage(q, f, page) {
   list.forEach(x => { x._src = 'igdb'; }); await attachTimes(list);
   return { results: list, count, next: list.length === n };
 }
+// игры внутри бандла: в IGDB у каждой игры есть список бандлов, в которые она входит
+async function bundleGames(id) {
+  const list = await igdb('/games', 'fields ' + IGDB_FIELDS + '; where bundles = (' + (+id) + '); sort first_release_date asc; limit 100;');
+  list.forEach(x => { x._src = 'igdb'; }); await attachTimes(list); return list.map(mapItem);
+}
+// найденная игра - бандл (несколько игр в одной карточке)? Тип «бандл»/«пак» или в названии «collection»/«trilogy» и в IGDB у неё есть хотя бы две входящие игры
+async function isBundleMatch(x) {
+  if (isBundleType(x.type)) return true; if (!looksBundle(x.name)) return false;
+  try { return ((await igdb('/games/count', 'where bundles = (' + parseRid(x.rid).id + ');')).count || 0) >= 2; } catch (e) { if (S.block) throw e; return false; }
+}
 const mapIgdb = x => ({
   src: 'igdb', rid: ridOf('igdb', x.id), name: x.name, year: yearOf(x), rating: x.total_rating ? Math.round(x.total_rating) / 10 : 0,
-  time: x.time || 0, cover: coverOf(x, 'cover_big'), platforms: (x.platforms || []).map(p => platC(p.name)), genres: (x.genres || []).map(g => canonGenre(g.name))
+  time: x.time || 0, cover: coverOf(x, 'cover_big'), platforms: (x.platforms || []).map(p => platC(p.name)), genres: (x.genres || []).map(g => canonGenre(g.name)), type: typeOf(x)
 });
 const mapRawg = x => ({
   src: 'rawg', rid: ridOf('rawg', x.id), name: x.name, year: x.released ? +x.released.slice(0, 4) : 0, rating: x.rating ? Math.round(x.rating * 20) / 10 : 0,
@@ -744,7 +772,7 @@ const mapItem = x => x._src === 'rawg' ? mapRawg(x) : mapIgdb(x);
 async function rawgPage(q, f, page) {
   const n = S.set.pageSize || 40, per = Math.ceil(n / 40), size = Math.ceil(n / per); let results = [], count = 0, next = false;
   for (let j = 0; j < per; j++) {
-    const d = await rawg('/games', { search: q, page: page * per + j + 1, page_size: size, genres: f.genre, platforms: f.platform, dates: f.year ? f.year + '-01-01,' + f.year + '-12-31' : '', ordering: q ? '' : '-added' });
+    const d = await rawg('/games', { search: q, page: page * per + j + 1, page_size: size, genres: fa(f, 'genres').join(','), platforms: fa(f, 'platforms').join(','), dates: yearsRange(f), ordering: q ? '' : '-added' });
     results = results.concat(d.results || []); count = d.count || count; next = !!d.next; if (!d.next) break;
   }
   results.forEach(x => { x._src = 'rawg'; });
@@ -766,9 +794,10 @@ async function fetchDetailsIgdb(id) {
   const [g, tt] = await Promise.all([igdb('/games', 'fields ' + IGDB_DETAIL + '; where id = ' + id + ';'), igdb('/game_time_to_beats', 'fields game_id,hastily,normally,completely; where game_id = ' + id + ';').catch(e => { if (S.block) throw e; return []; })]);
   const d = g[0]; if (!d) throw new Error('Игра не найдена в IGDB'); d._src = 'igdb';
   d.time = hoursOf(tt[0]);
-  const col = (d.collections || [])[0]; let count = 0;
+  const col = (d.collections || [])[0]; let count = 0, bcount = 0;
   if (col) { try { count = Math.min((await igdb('/games/count', 'where collections = (' + col.id + ') & id != ' + id + ' & ' + GAME_TYPES + ';')).count || 0, 40); } catch (e) { if (S.block) throw e; } }
-  return { d, series: col ? col.name : '', seriesCount: count };
+  if (isBundleType(typeOf(d)) || looksBundle(d.name)) { try { bcount = (await igdb('/games/count', 'where bundles = (' + id + ');')).count || 0; } catch (e) { if (S.block) throw e; } }
+  return { d, series: col ? col.name : '', seriesCount: count, bundleCount: bcount };
 }
 function gameFromIgdb(d, series) {
   return {
@@ -960,7 +989,13 @@ function focusLast() {
 }
 const reduceMotion = () => { try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; } };
 const animOn = () => S.set.animSet ? S.set.anim !== false : S.set.anim !== false && !reduceMotion(); // пока выбор не сделан вручную, учитываем системное «уменьшить анимацию»
-const buzz = ms => { try { if (S.set.haptic !== false && typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(ms || 8); } catch (e) { /* не поддерживается */ } };
+const buzz = ms => { // в приложении Android вибрирует мост (не нужен доступ браузера), в браузере navigator.vibrate; короче ~12 мс обычно не чувствуется
+  try {
+    if (S.set.haptic === false) return; const t = Math.max(12, ms || 20), A = typeof window !== 'undefined' && window.AndroidShare;
+    if (A && A.haptic) { A.haptic(t); return; }
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(t);
+  } catch (e) { /* не поддерживается */ }
+};
 // список под карточкой прокручивается к текущей игре (при необходимости подгружая строки)
 function followLast() {
   if (S.tab !== 'library' || !S.lastGame) return; const q = () => $('tr[data-gid="' + S.lastGame + '"], .card[data-gid="' + S.lastGame + '"], .tl[data-gid="' + S.lastGame + '"]');
@@ -1064,7 +1099,7 @@ async function handleShared(text) {
   text = String(text || '').trim(); if (!text) return;
   const lines = text.split(/\r?\n/).filter(l => l.trim()), first = parseLine(lines[0]);
   const r = await askChoose({ title: 'Принят текст', items: [{ id: 'search', label: 'Найти игру в поиске', sub: first ? first.text : lines[0].slice(0, 60), ico: '🔍' }, { id: 'inbox', label: 'Добавить в разбор', sub: 'строк: ' + lines.length, ico: '📋' }] });
-  if (r === 'search') { S.pending = null; Object.assign(S.search, { q: first ? first.text : lines[0], src: S.set.mainSrc }); Object.assign(S.search.f, { genre: '', genreName: '', platform: '', platformName: '' }); S.tab = 'search'; render(); runSearch(true); }
+  if (r === 'search') { S.pending = null; Object.assign(S.search, { q: first ? first.text : lines[0], src: S.set.mainSrc }); fClear(S.search.f); S.tab = 'search'; render(); runSearch(true); }
   else if (r === 'inbox') {
     const lid = await askChoose({ title: 'В какой список', items: S.inbox.lists.map(l => ({ id: l.id, label: l.name, sub: 'строк: ' + itemsOf(l.id).length })).concat([{ id: '__new', label: '＋ Новый список…' }]) }); if (lid === null) return;
     let id = lid;
@@ -1249,7 +1284,7 @@ function renderAlpha() {
   el.style.top = Math.round(r.top + 36) + 'px'; el.style.height = Math.max(140, Math.round(r.height - 190)) + 'px'; v.appendChild(el);
   let last = '';
   const bubble = k => { let b = $('#alphaBubble'); if (!b) { b = document.createElement('div'); b.id = 'alphaBubble'; v.appendChild(b); } b.textContent = k; b.classList.add('show'); };
-  const scrub = e => { const rr = el.getBoundingClientRect(), k = order[Math.min(order.length - 1, Math.max(0, Math.floor((e.clientY - rr.top) / rr.height * order.length)))]; if (!k || k === last) return; last = k; bubble(k); jumpEntry(idx.get(k)); buzz(4); };
+  const scrub = e => { const rr = el.getBoundingClientRect(), k = order[Math.min(order.length - 1, Math.max(0, Math.floor((e.clientY - rr.top) / rr.height * order.length)))]; if (!k || k === last) return; last = k; bubble(k); jumpEntry(idx.get(k)); buzz(12); };
   const end = () => { el.classList.remove('on'); setTimeout(() => { const b = $('#alphaBubble'); if (b) b.classList.remove('show'); }, 500); };
   el.addEventListener('pointerdown', e => { try { el.setPointerCapture(e.pointerId); } catch (x) { /* без захвата */ } el.classList.add('on'); last = ''; scrub(e); e.preventDefault(); });
   el.addEventListener('pointermove', e => { if (el.classList.contains('on')) scrub(e); });
@@ -1553,15 +1588,18 @@ function drawShInfo() {
   drawShSeries();
 }
 // «Серия: 3 из 7 · завершено 2» с переходами к предыдущей и следующей игре серии (порядок: год, дата добавления, название)
-function drawShSeries() {
-  const el = $('#shSerie'); if (!el || !S.sheet) return;
-  const d = S.sheet.draft, nm = ((($('#f_series') || {}).value) || d.series || '').trim(), key = normName(nm); if (!nm) { el.innerHTML = ''; return; }
-  const list = S.games.filter(g => g.id !== d.id && g.series && normName(g.series) === key); list.push(d);
-  if (list.length < 2) { el.innerHTML = ''; return; }
+function serRowHtml(d, nm) {
+  nm = String(nm || '').trim(); if (!nm) return '';
+  const key = normName(nm), list = S.games.filter(g => g.id !== d.id && g.series && normName(g.series) === key); list.push(d);
+  if (list.length < 2) return '';
   list.sort((a, b) => (+a.year || 9999) - (+b.year || 9999) || (a.added || 0) - (b.added || 0) || String(a.name).localeCompare(String(b.name)));
-  const i = list.findIndex(g => g.id === d.id), done = list.filter(g => g.id === d.id ? !!d.done : g.done).length;
+  const i = list.findIndex(g => g.id === d.id), done = list.filter(g => g.done).length;
   const nb = (g, dd, ch) => '<button class="ib" data-act="serNav" data-d="' + dd + '"' + (g ? ' data-id="' + g.id + '" title="' + esc(g.name) + '"' : ' disabled') + ' aria-label="' + (dd < 0 ? 'Предыдущая игра серии' : 'Следующая игра серии') + '">' + ch + '</button>';
-  el.innerHTML = nb(list[i - 1], -1, '‹') + '<div class="spmid"><span>Серия: <b>' + (i + 1) + ' из ' + list.length + '</b> · завершено ' + done + '</span><div class="spbar"><i style="width:' + Math.round(done / list.length * 100) + '%"></i></div></div>' + nb(list[i + 1], 1, '›');
+  return nb(list[i - 1], -1, '‹') + '<div class="spmid"><span>Серия: <b>' + (i + 1) + ' из ' + list.length + '</b> · завершено ' + done + '</span><div class="spbar"><i style="width:' + Math.round(done / list.length * 100) + '%"></i></div></div>' + nb(list[i + 1], 1, '›');
+}
+function drawShSeries() {
+  const el = $('#shSerie'); if (!el || !S.sheet) return; const d = S.sheet.draft;
+  el.innerHTML = serRowHtml(d, (($('#f_series') || {}).value) || d.series || '');
 }
 function markLast(id) { // едва заметная подсветка открытой игры в списке, плитке и тексте сразу, без перерисовки
   $$('#libBody .last').forEach(e => e.classList.remove('last'));
@@ -1612,25 +1650,37 @@ function sheetSibling(dir) {
   const n = S.shown[i + dir]; if (!n) return edgeFlash(dir);
   openGameSheet(n.id, dir); followLast();
 }
-// предпросмотр соседней игры: та же вёрстка верхней части карточки, но без полей и обработчиков
+// предпросмотр соседней игры: та же вёрстка, что у настоящей карточки (источник, название, чипы, серия, «Завершено», коллекции, жанры, платформы),
+// чтобы при смене карточки ничего не сдвигалось; всё без обработчиков
+const CV_YT = '<span class="cvb l"><svg viewBox="0 0 24 24"><rect x="2.5" y="5.5" width="19" height="13" rx="4" style="fill:#f00;stroke:none"/><path d="M10 9.2v5.6l5-2.8z" style="fill:#fff;stroke:none"/></svg></span>';
+const CV_WIKI = '<span class="cvb r"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3.2 3.2 3.2 14.8 0 18M12 3c-3.2 3.2-3.2 14.8 0 18"/></svg></span>';
 function swipePreview(g) {
-  const src = coverSrc(g), chip = (ic, t) => '<span class="ichip">' + I(ic) + ' ' + t + '</span>';
-  const colls = sortedColls().filter(c => (g.collections || []).includes(c.id)).map(c => '<span class="p on"' + (okColor(c.color) ? ' style="color:' + okColor(c.color) + ';border-color:' + okColor(c.color) + '"' : '') + '>' + esc(c.name) + '</span>').join('');
-  return '<div class="hero2"><div class="cv' + (src ? '' : ' nocover') + '" data-cvid="' + g.id + '"' + (src ? ' style="background-image:url(\'' + bgu(src) + '\')"' : '') + '></div><div class="hr"><div class="namebox"><span class="nm2">' + esc(g.name || '') + '</span></div>'
-    + '<div class="infochips">' + chip('cal', g.year || '—') + chip('star', g.rating ? esc(g.rating) + '/10' : '—') + chip('clock', g.time ? esc(g.time) + ' ч' : '— ч') + '</div></div></div>'
-    + '<div class="donerow"><div class="donecard' + (g.done ? ' on' : '') + '"><div class="dc1">' + I(g.done ? 'checkc' : 'circle') + ' <span>Завершено</span></div></div></div>'
-    + (colls ? '<div class="chips shcolls">' + colls + '</div>' : '')
-    + ((g.genres || []).length ? '<div class="chips">' + g.genres.map(x => '<span class="tag">' + esc(x) + '</span>').join('') + '</div>' : '')
-    + ((g.platforms || []).length ? '<div class="chips">' + g.platforms.map(x => '<span class="tag m2">' + esc(shortPlat(x)) + '</span>').join('') + '</div>' : '');
+  const src = coverSrc(g), srcs = srcsOf(g), chip = (ic, t) => '<button class="ichip" tabindex="-1">' + I(ic) + ' ' + t + '</button>';
+  const colls = sortedColls().map(c => '<button class="p' + ((g.collections || []).includes(c.id) ? ' on' : '') + '" tabindex="-1"' + (okColor(c.color) ? ' style="color:' + okColor(c.color) + ';border-color:' + okColor(c.color) + '"' : '') + '>' + esc(c.name) + '</button>').join('') + '<button class="p new" tabindex="-1">＋ новая</button>';
+  const hdr = t => '<div class="hdr3"><h3>' + t + '</h3><button class="btn" tabindex="-1">' + I('edit') + '</button></div>';
+  const dt = g.done && g.doneDate ? new Date(g.doneDate + 'T00:00:00').toLocaleDateString(LOC_DATE, { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+  return '<div class="cmp"><div class="hero2"><div class="cv' + (src ? '' : ' nocover') + '" data-cvid="' + g.id + '"' + (src ? ' style="background-image:url(\'' + bgu(src) + '\')"' : '') + '><span class="cgear">' + I('gear') + '</span>' + CV_YT + CV_WIKI + '</div>'
+    + '<div class="hr"><button class="ib mnb" tabindex="-1">⋮</button><div class="srcrow2">' + (srcs.length ? srcs.map(k => srcBadge(k, g[k + 'Url'])).join('') : '<span class="srcb" style="color:var(--mut);border-color:var(--bd2)">Вручную</span>') + '</div>'
+    + '<div class="namebox"><span class="nm2' + (g.name ? '' : ' ph') + '">' + esc(g.name || 'Название: нажмите, чтобы ввести') + '</span><button class="pen" tabindex="-1">' + I('edit') + '</button></div>'
+    + '<div class="infochips">' + chip('cal', g.year || '—') + chip('star', g.rating ? esc(g.rating) + '/10' : '—') + chip('clock', g.time ? esc(g.time) + ' ч' : '— ч') + '<span class="brk"></span>' + chip('book', g.series ? esc(g.series) : 'Серия') + '</div></div></div>'
+    + '<div class="serprog">' + serRowHtml(g, g.series) + '</div>'
+    + '<div class="donerow"><div class="donecard' + (g.done ? ' on' : '') + '"><div class="dc1">' + I(g.done ? 'checkc' : 'circle') + ' <span>Завершено</span></div><div class="dc2"><span>' + dt + '</span><label class="dpick">' + I('edit') + '</label></div></div>' + (g.srcLine ? '<div class="srcline">' + esc(g.srcLine) + '</div>' : '') + '</div>'
+    + '<h3>Коллекции</h3><div class="chips shcolls" style="gap:0">' + colls + '</div>'
+    + hdr('Жанры') + '<div class="chips">' + ((g.genres || []).length ? g.genres.map(x => '<span class="tag">' + esc(x) + '</span>').join('') : '<span class="sub">Жанры не указаны</span>') + '</div>'
+    + hdr('Платформы') + '<div class="chips">' + ((g.platforms || []).length ? g.platforms.map(x => '<span class="tag m2">' + esc(shortPlat(x)) + '</span>').join('') : '<span class="sub">Платформы не указаны</span>') + '</div></div>';
 }
 // предпросмотр найденной игры из источника (карточка поиска)
 function foundPreview(it) {
-  const cat = gameByRid(it.rid), src = parseRid(it.rid).src;
+  const cat = gameByRid(it.rid), src = parseRid(it.rid).src, on = cat ? cat.done : false;
   return '<div class="hero"><div class="cv' + (it.cover ? '' : ' nocover') + '"' + (it.cover ? ' style="background-image:url(\'' + bgu(thumbUrl(it.cover)) + '\')"' : '') + '></div><div style="flex:1;min-width:0"><h2>' + esc(it.name || '') + ' <span class="y">' + (it.year || '') + '</span></h2>'
-    + '<div class="m" style="font-size:14px">' + (it.rating ? '<span class="st">★ ' + it.rating + '</span>' : '') + (it.time ? ' · ⏱ ' + it.time + ' ч' : '') + '</div></div></div>'
-    + '<div class="chips" style="margin-top:12px">' + (it.genres || []).map(x => '<span class="tag">' + esc(x) + '</span>').join('') + '</div>'
+    + '<div class="m" style="font-size:14px">' + (it.rating ? '<span class="st">★ ' + it.rating + '</span>' : '') + (it.time ? ' · ⏱ ' + it.time + ' ч' : '') + '</div>'
+    + (it.type != null && TYPE_CHIP[it.type] ? '<div style="margin-top:6px">' + typeChip(it.type, 'lg') + '</div>' : '') + '</div></div>'
+    + '<div class="rsload"></div>'
+    + '<div class="chips" style="margin-top:8px">' + (it.genres || []).map(x => '<span class="tag">' + esc(x) + '</span>').join('') + '</div>'
     + '<div class="chips">' + (it.platforms || []).map(x => '<span class="tag m2">' + esc(x) + '</span>').join('') + '</div>'
-    + '<div class="srcrow">' + srcBadge(src, cat ? cat[src + 'Url'] : '') + (cat ? '<span class="sub">В каталоге</span>' : '') + '</div>';
+    + '<div class="srcrow">' + srcBadge(src, cat ? cat[src + 'Url'] : '') + (cat ? '<span class="sub">В каталоге</span>' : '') + '</div>'
+    + '<h3>Коллекции</h3><div class="chips"><button class="p' + (on ? ' on' : '') + '" tabindex="-1">' + (on ? '✓ ' : '') + 'Завершено</button>'
+    + sortedColls().map(k => '<button class="p' + ((cat ? cat.collections : []).includes(k.id) ? ' on' : '') + '" tabindex="-1">' + esc(k.name) + '</button>').join('') + '<button class="p new" tabindex="-1">＋ новая</button></div>';
 }
 // положение открытой игры в текущем списке: номер и сколько всего
 function sheetPos() { const sh = S.sheet; if (!sh || sh.isNew || !S.shown) return null; const i = S.shown.findIndex(g => g.id === sh.draft.id); return i < 0 ? null : { i, n: S.shown.length }; }
@@ -1666,9 +1716,9 @@ function edgeShow(side, a) {
   } catch (e) { /* без границы можно обойтись */ }
 }
 const edgeHide = () => { try { sheetEl && sheetEl.querySelectorAll('.swe').forEach(e => { e.style.opacity = 0; e.style.width = '0px'; }); } catch (e) { /* ignore */ } };
-function edgeFlash(dir) { edgeShow(dir > 0 ? 'r' : 'l', 0.8); buzz(16); setTimeout(edgeHide, 450); }
+function edgeFlash(dir) { edgeShow(dir > 0 ? 'r' : 'l', 0.8); buzz(30); setTimeout(edgeHide, 450); }
 // переход к соседней карточке кнопкой или стрелкой клавиатуры
-function carGo(dir) { const c = carCtx(); if (!c) return; if (c.item(dir)) { buzz(8); c.go(dir); progAct(true); } else edgeFlash(dir); }
+function carGo(dir) { const c = carCtx(); if (!c) return; if (c.item(dir)) { buzz(20); c.go(dir); progAct(true); } else edgeFlash(dir); }
 // свайп как горизонтальная карусель: рядом с карточкой виден предпросмотр соседней, у края списка загорается красная граница
 function attachSwipe(el) {
   if (!el || !el.addEventListener || el._sw) return; el._sw = true; let sx = 0, sy = 0, lx = 0, ly = 0, t0 = 0, ok = false, lock = false, busy = false, gh = null, ghDir = 0, edgeBuz = false;
@@ -1684,7 +1734,7 @@ function attachSwipe(el) {
     const s = sheet(), c = carCtx(); if (!s || !c || !anim()) return;
     const dir = dx < 0 ? 1 : -1, nb = c.item(dir), k = nb ? 1 : 0.3; // у края списка карточка тянется туго
     s.style.transition = 'none'; s.style.transform = 'translateX(' + Math.round(dx * k) + 'px)'; s.style.opacity = '1';
-    if (nb) { edgeHide(); if (mkGhost(dir, c)) place(dx); } else { dropGhost(); const am = Math.min(1, Math.abs(dx) / 90); edgeShow(dir > 0 ? 'r' : 'l', am); if (am >= 0.66 && !edgeBuz) { edgeBuz = true; buzz(14); } }
+    if (nb) { edgeHide(); if (mkGhost(dir, c)) place(dx); } else { dropGhost(); const am = Math.min(1, Math.abs(dx) / 90); edgeShow(dir > 0 ? 'r' : 'l', am); if (am >= 0.66 && !edgeBuz) { edgeBuz = true; buzz(26); } }
     progAct('hold', c.i + (nb && Math.abs(dx) > 70 ? dir : 0), c.n);
   };
   const reset = animate => {
@@ -1698,7 +1748,7 @@ function attachSwipe(el) {
     if (!lock) { reset(false); return; }
     const c = carCtx(), commit = Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - t0 < 1200, nb = c && c.item(dir), s = sheet(), bx = box();
     if (commit && nb) { // текущая карточка уезжает, предпросмотр доезжает на её место, потом содержимое заменяется
-      const swap = () => { buzz(8); openGameSheet.noAnim = true; try { c.go(dir); } finally { openGameSheet.noAnim = false; } dropGhost(); const q = carCtx(); progAct(true, q ? q.i : null, q ? q.n : 0); };
+      const swap = () => { buzz(20); openGameSheet.noAnim = true; try { c.go(dir); } finally { openGameSheet.noAnim = false; } dropGhost(); const q = carCtx(); progAct(true, q ? q.i : null, q ? q.n : 0); };
       if (s && anim() && bx) { busy = true; const W = bx.clientWidth, t = 'transform .18s ease-out'; s.style.transition = t; s.style.transform = 'translateX(' + (dir > 0 ? -W : W) + 'px)'; if (gh) { gh.style.transition = t; gh.style.transform = 'translateX(0)'; } setTimeout(() => { busy = false; swap(); }, 185); } else swap();
     } else reset(true);
   };
@@ -2040,12 +2090,13 @@ function viewInbox() {
     return '<div class="hdr2"><h2>Разобрать</h2></div>' + (cards || '<p class="hint">Здесь живут списки игр, которые нужно разобрать: вставьте названия из заметок или Steam, а потом по очереди находите их в IGDB.<br>Нажмите «+», чтобы создать список.</p>');
   }
   const l = S.inbox.lists.find(x => x.id === S.inboxList), all = itemsOf(l.id), left = all.filter(i => !i.done).length, nChk = all.filter(i => !i.done && (i.rev || i.doubt)).length;
-  const list = S.showDone ? all : all.filter(i => !i.done);
+  const nBun = all.filter(i => !i.done && i.bundle).length; if (!nBun) S.inBundleOnly = false;
+  const list = (S.showDone ? all : all.filter(i => !i.done)).filter(i => !S.inBundleOnly || i.bundle);
   const row = i => {
     const g = i.done ? gameById(i.gameId) : null;
     return '<div class="it' + (i.done ? ' done' : '') + (!i.done && (i.rev || i.doubt) ? ' chkrow' : '') + (S.inSel.has(i.id) ? ' isel' : '') + '"' + (i.done ? '' : ' data-iid="' + i.id + '" data-lpm="item"') + '><div class="tx" data-act="itOpen" data-id="' + i.id + '">' + (S.inSelMode && !i.done ? '<span class="ichk">' + (S.inSel.has(i.id) ? '✓' : '') + '</span>' : '') + (i.done ? '<span class="okc">✓</span> ' : '') + esc(i.text)
-      + (i.done ? '<div class="sub">→ ' + (g ? esc(g.name) : 'игра удалена из каталога') + '</div>' : (() => { const e = effItem(i), parts = [i.year || '', i.hours ? i.hours + ' ч' : i.unk ? '? ч' : '', i.x && i.x.series ? '📚 ' + i.x.series : '', i.failed ? '⚠ не распознано' : '', i.rev ? '≈ ' + i.rev.pct + '%: в каталоге «' + ((gameById(i.rev.gid) || {}).name || '?') + '», проверьте' : '', i.doubt ? '≈ найдено в источнике не точно (' + ((i.cands && i.cands[0] && i.cands[0].pct) || '') + '%), проверьте' : '', collNames(e.colls), e.markDone ? '✓ завершено' : ''].filter(Boolean); return parts.length ? '<div class="sub">' + esc(parts.join(' · ')) + '</div>' : ''; })()) + '</div><div class="ia">'
-      + (i.done ? '' : (i.doubt ? '<button data-act="itPick" data-id="' + i.id + '" title="Выбрать из вариантов">≈</button>' : '') + (i.rev ? '<button data-act="itRev" data-id="' + i.id + '" title="Проверить совпадение с каталогом">≈</button>' : '') + '<button data-act="itOpts" data-id="' + i.id + '" title="Коллекции и «Завершено» для этой строки">⚙</button><button data-act="itMatch" data-id="' + i.id + '" title="Сопоставить с игрой из каталога">🔗</button><button data-act="itEdit" data-id="' + i.id + '" title="Изменить">✎</button>')
+      + (i.done ? '<div class="sub">→ ' + (g ? esc(g.name) : 'игра удалена из каталога') + '</div>' : (() => { const e = effItem(i), parts = [i.year || '', i.hours ? i.hours + ' ч' : i.unk ? '? ч' : '', i.x && i.x.series ? '📚 ' + i.x.series : '', i.failed ? '⚠ не распознано' : '', i.bundle ? '📦 бандл «' + i.bundle.name + '»: несколько игр' : '', i.rev ? '≈ ' + i.rev.pct + '%: в каталоге «' + ((gameById(i.rev.gid) || {}).name || '?') + '», проверьте' : '', i.doubt ? '≈ найдено в источнике не точно (' + ((i.cands && i.cands[0] && i.cands[0].pct) || '') + '%), проверьте' : '', collNames(e.colls), e.markDone ? '✓ завершено' : ''].filter(Boolean); return parts.length ? '<div class="sub">' + esc(parts.join(' · ')) + '</div>' : ''; })()) + '</div><div class="ia">'
+      + (i.done ? '' : (i.bundle ? '<button data-act="itBundle" data-id="' + i.id + '" title="Игры бандла: добавить каждую отдельно">B</button>' : '') + (i.doubt ? '<button data-act="itPick" data-id="' + i.id + '" title="Выбрать из вариантов">≈</button>' : '') + (i.rev ? '<button data-act="itRev" data-id="' + i.id + '" title="Проверить совпадение с каталогом">≈</button>' : '') + '<button data-act="itOpts" data-id="' + i.id + '" title="Коллекции и «Завершено» для этой строки">⚙</button><button data-act="itMatch" data-id="' + i.id + '" title="Сопоставить с игрой из каталога">🔗</button><button data-act="itEdit" data-id="' + i.id + '" title="Изменить">✎</button>')
       + '<button data-act="itDel" data-id="' + i.id + '" title="Удалить">🗑</button></div></div>';
   };
   return '<div class="hdr2"><div style="display:flex;align-items:center;gap:10px;min-width:0"><button class="btn" data-act="listBack">←</button><h2 style="font-size:19px">' + esc(l.name) + '</h2></div><span class="sub">осталось ' + left + ' из ' + all.length + '</span></div>'
@@ -2053,7 +2104,7 @@ function viewInbox() {
     + '<div class="lrw"><span>Коллекции</span><button class="btn" data-act="lstColls">' + esc(collNames((l.colls || []).filter(id => collById(id))) || 'не выбраны') + '</button></div>'
     + '<div class="lrw"><span>Завершено</span><button class="p' + (l.markDone ? ' on' : '') + '" data-act="lstDone">' + (l.markDone ? '✓ да' : 'нет') + '</button></div></div>'
     + '<div class="addrow"><input id="itNew" placeholder="Название игры…"><button class="btn acc" data-act="itAdd">Добавить</button></div>'
-    + '<div class="toolbar"><button class="btn acc" data-act="itAuto">⚡ Разобрать автоматически</button>' + (nChk ? '<button class="btn warn" data-act="itReview">≈ Обработать несовпадения (' + nChk + ')</button>' : '') + '<button class="btn" data-act="itPaste">Вставить список…</button><button class="btn" data-act="itToggleDone">' + (S.showDone ? 'Скрыть разобранные' : 'Показать разобранные') + '</button></div>'
+    + '<div class="toolbar"><button class="btn acc" data-act="itAuto">⚡ Разобрать автоматически</button>' + (nChk ? '<button class="btn warn" data-act="itReview">≈ Обработать несовпадения (' + nChk + ')</button>' : '') + (nBun ? '<button class="btn' + (S.inBundleOnly ? ' acc' : '') + '" data-act="itBundleFilter">B Бандлы (' + nBun + ')</button>' : '') + '<button class="btn" data-act="itPaste">Вставить список…</button><button class="btn" data-act="itToggleDone">' + (S.showDone ? 'Скрыть разобранные' : 'Показать разобранные') + '</button></div>'
     + '<div class="sec" style="padding:4px 12px">' + (list.map(row).join('') || '<p class="sub" style="padding:14px">Список пуст.</p>') + '</div><p class="sub">Нажмите на название, чтобы найти игру в источнике поиска. 🔗 - сопоставить с игрой, которая уже есть в каталоге. Долгое нажатие на строку включает выбор строк: можно сразу задать коллекции и «Завершено» для нескольких.</p>';
 }
 async function createList() {
@@ -2137,8 +2188,12 @@ function matchDialog(cfg, srcName) {
 // поиск строки в источнике (IGDB/RAWG): 'added' - найдена точно (от верхнего порога) и добавлена, 'doubt' - нужна проверка вручную, 'skipped', 'failed'
 async function sourceResolve(it, cfg, after) {
   const src = S.set.mainSrc;
-  const found = src === 'rawg' ? (await rawg('/games', { search: it.text, page_size: 5 })).results.map(x => Object.assign(x, { _src: 'rawg' })) : (await igdb('/games', 'search "' + igdbQuote(it.text) + '"; fields ' + IGDB_FIELDS + '; where ' + GAME_TYPES + '; limit 5;')).map(x => Object.assign(x, { _src: 'igdb' }));
+  const found = src === 'rawg' ? (await rawg('/games', { search: it.text, page_size: 5 })).results.map(x => Object.assign(x, { _src: 'rawg' })) : (await igdb('/games', 'search "' + igdbQuote(it.text) + '"; fields ' + IGDB_FIELDS + '; where ' + typeWhere() + '; limit 5;')).map(x => Object.assign(x, { _src: 'igdb' }));
   const ranked = found.map(mapItem).map(x => ({ x, sc: similarity(it.text, x.name) + (it.year && x.year ? (Math.abs(it.year - x.year) <= 1 ? 0.04 : -0.2) : 0) })).sort((a, b) => b.sc - a.sc), best = ranked[0];
+  delete it.bundle;
+  if (src === 'igdb' && best && pct(best.sc) >= cfg.sLow && await isBundleMatch(best.x)) { // это бандл: несколько игр в одной строке - не добавляем автоматически, строка получает пометку B
+    it.bundle = { rid: best.x.rid, name: best.x.name, year: best.x.year }; it.doubt = false; it.failed = false; delete it.rev; delete it.cands; await DB.put('inboxItems', it); return 'bundle';
+  }
   if (best && pct(best.sc) >= cfg.sHigh) { const gg = await addFromIgdb(best.x.rid, [], itemAddOpts(it)); if (after) after(); if (gg) { linkItem(it, gg, true); return 'added'; } if (gg === false) return 'skipped'; }
   if (best && pct(best.sc) >= cfg.sLow) { // игра нашлась, но совпадение неполное: строка получает пометку «проверить» и разбирается вручную
     it.doubt = true; it.failed = false; delete it.rev; it.cands = ranked.filter(r => r.sc >= 0.5).slice(0, 5).map(r => ({ rid: r.x.rid, name: r.x.name, year: r.x.year, pct: pct(r.sc), platforms: r.x.platforms.slice(0, 3) })); await DB.put('inboxItems', it); return 'doubt';
@@ -2152,7 +2207,7 @@ async function autoResolve(listId) {
   const ch = await matchDialog(cfg0, canSrc ? srcName : '');
   if (!ch) return; const cfg = ch.cfg; if (lst) { lst.match = cfg; await DB.put('inboxLists', lst); }
   let useIgdb = canSrc && ch.src;
-  let nCat = 0, nRaw = 0, nDoubt = 0, nRev = 0, skipped = 0, stop = false; const bad = [];
+  let nCat = 0, nRaw = 0, nDoubt = 0, nRev = 0, nBundle = 0, skipped = 0, stop = false; const bad = [];
   const showProg = () => { const m = openModal(); m.innerHTML = '<h4>Разбираю список…</h4><p class="sub" id="apTxt">0 из ' + items.length + '</p><div class="acts"><span data-x="stop">Остановить</span></div>'; m.onclick = e => { if (e.target.closest('[data-x]')) stop = true; }; modalCancel = () => { stop = true; }; };
   showProg(); // окно выбора платформы закрывает это окно, поэтому после него оно открывается заново
   for (let k = 0; k < items.length && !stop; k++) {
@@ -2169,6 +2224,7 @@ async function autoResolve(listId) {
         const st = await sourceResolve(it, cfg, () => { if (!modalEl) showProg(); });
         if (st === 'added') { nRaw++; await new Promise(r => setTimeout(r, 300)); continue; }
         if (st === 'doubt') { nDoubt++; await new Promise(r => setTimeout(r, 300)); continue; }
+        if (st === 'bundle') { nBundle++; await new Promise(r => setTimeout(r, 300)); continue; }
         if (st === 'skipped') { skipped++; continue; }
       } catch (e) { if (blockFor(S.set.mainSrc)) useIgdb = false; }
       await new Promise(r => setTimeout(r, 300));
@@ -2177,7 +2233,7 @@ async function autoResolve(listId) {
   }
   closeModal();
   const r = openModal();
-  r.innerHTML = '<h4>Разбор завершён</h4><p class="sub">Из каталога: <b>' + nCat + '</b>, добавлено из IGDB: <b>' + nRaw + '</b>, не распознано: <b>' + bad.length + '</b>' + (nRev ? ', совпали в каталоге не точно: <b>' + nRev + '</b>' : '') + (nDoubt ? ', найдены в источнике не точно: <b>' + nDoubt + '</b>' : '') + (nRev + nDoubt ? ' (отмечены ≈, нажмите «Обработать несовпадения»)' : '') + (skipped ? ', пропущено без платформы: <b>' + skipped + '</b>' : '') + (stop ? ' (остановлено)' : '') + '</p>'
+  r.innerHTML = '<h4>Разбор завершён</h4><p class="sub">Из каталога: <b>' + nCat + '</b>, добавлено из IGDB: <b>' + nRaw + '</b>, не распознано: <b>' + bad.length + '</b>' + (nRev ? ', совпали в каталоге не точно: <b>' + nRev + '</b>' : '') + (nDoubt ? ', найдены в источнике не точно: <b>' + nDoubt + '</b>' : '') + (nBundle ? ', бандлы (несколько игр в строке): <b>' + nBundle + '</b>' : '') + (nRev + nDoubt ? ' (отмечены ≈, нажмите «Обработать несовпадения»)' : '') + (skipped ? ', пропущено без платформы: <b>' + skipped + '</b>' : '') + (stop ? ' (остановлено)' : '') + '</p>'
     + (bad.length ? '<div class="sub" style="max-height:200px;overflow:auto;white-space:pre-wrap">' + esc(bad.slice(0, 40).join('\n')) + (bad.length > 40 ? '\n…' : '') + '</div><p class="sub">Эти строки остались в списке с пометкой ⚠: разберите их вручную (нажмите на название) или исправьте текст.</p>' : '')
     + '<div class="acts"><span data-x="ok">OK</span></div>';
   modalCancel = () => closeModal(); r.onclick = e => { if (e.target.closest('[data-x]')) closeModal(); };
@@ -2255,7 +2311,7 @@ function restoreInbox(p) {
   const row = p.itemId ? $('[data-id="' + p.itemId + '"]') : null; if (row && row.scrollIntoView) row.scrollIntoView({ block: 'center' });
 }
 function backToInbox() { const p = S.pending; S.pending = null; S.tab = 'inbox'; render(); restoreInbox(p); }
-function tryLinkPending(g) { const it = pendingItem(); if (!it) return false; linkItem(it, g); return true; }
+function tryLinkPending(g) { const it = pendingItem(); if (!it) return false; if (bundleMode()) { const p = S.pending; (p.added || (p.added = [])).push(g.id); renderSearchBody(); return false; } linkItem(it, g); return true; } // в бандле игры добавляются по одной, строка закрывается кнопкой «Строка разобрана»
 
 /* ====================== Статистика ====================== */
 // часы по годам и платформам, самые долгие игры, остаток; чистая функция для проверки
@@ -2325,7 +2381,7 @@ async function serMenu(name) {
 }
 
 /* ====================== Поиск IGDB ====================== */
-function searchFilterCount() { const f = S.search.f; return (f.genre ? 1 : 0) + (f.platform ? 1 : 0) + (f.year ? 1 : 0) + (f.minRating ? 1 : 0); }
+function searchFilterCount() { const f = S.search.f; return (fa(f, 'genres').length ? 1 : 0) + (fa(f, 'platforms').length ? 1 : 0) + (fa(f, 'years').length ? 1 : 0) + (f.minRating ? 1 : 0) + (S.search.src === 'igdb' && typesCustom() ? 1 : 0); }
 const validAddColls = () => (S.search.addColls = S.search.addColls.filter(id => id === DONE_ID || collById(id)));
 const SEARCH_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>';
 // метка источника: цветная рамка, со ссылкой на страницу игры, если она известна
@@ -2344,9 +2400,10 @@ function renderSearchHead() {
   const s = S.search, f = s.f, chips = [], ac = validAddColls(), fc = searchFilterCount();
   const t = $('#sTools'); if (t) t.innerHTML = '<button class="ib srcsw" data-act="sSrcSwitch" title="Переключить источник поиска" style="color:' + PROV[s.src].color + ';border-color:' + PROV[s.src].color + '"><b>' + PROV[s.src].name + '</b></button>' + ib('sFilters', 'filter', 'Фильтры', fc > 0, fc ? '<span class="cnt">' + fc + '</span>' : '') + ib('openAddColls', 'coll', 'Добавлять в…', ac.length > 0, ac.length ? '<span class="cnt">' + ac.length + '</span>' : '') + ib('vmode', vmodeOf('search') === 'list' ? 'grid' : 'list', vmodeOf('search') === 'list' ? 'Плитка' : 'Список', false, '', ' data-k="search"') + (vmodeOf('search') === 'tiles' ? zoomBtn('search') : '');
   if (ac.length) chips.push('<span class="sub" style="align-self:center">Добавлять в:</span>' + ac.map(id => '<button class="chip green" data-act="acRm" data-id="' + id + '">' + esc(id === DONE_ID ? 'Завершено' : collById(id).name) + ' ✕</button>').join(''));
-  if (f.genre) chips.push('<button class="chip" data-act="sRm" data-k="genre">' + esc(f.genreName) + ' ✕</button>');
-  if (f.platform) chips.push('<button class="chip" data-act="sRm" data-k="platform">' + esc(f.platformName) + ' ✕</button>');
-  if (f.year) chips.push('<button class="chip" data-act="sRm" data-k="year">' + f.year + ' ✕</button>');
+  fa(f, 'genres').forEach((id, i) => chips.push('<button class="chip" data-act="sRm" data-k="genres" data-v="' + esc(id) + '">' + esc((f.genreNames || [])[i] || id) + ' ✕</button>'));
+  fa(f, 'platforms').forEach((id, i) => chips.push('<button class="chip" data-act="sRm" data-k="platforms" data-v="' + esc(id) + '">' + esc((f.platformNames || [])[i] || id) + ' ✕</button>'));
+  fa(f, 'years').forEach(y => chips.push('<button class="chip" data-act="sRm" data-k="years" data-v="' + esc(y) + '">' + esc(y) + ' ✕</button>'));
+  if (s.src === 'igdb' && typesCustom()) chips.push('<button class="chip" data-act="sRm" data-k="types">Типы: ' + searchTypes().length + ' ✕</button>');
   if (f.minRating) chips.push('<button class="chip" data-act="sRm" data-k="minRating">от ★' + f.minRating + ' ✕</button>');
   const a = $('#sActive'); if (a) a.innerHTML = chips.join('');
 }
@@ -2364,7 +2421,7 @@ async function quickTap(rid, ids) {
   if (quickBusy.has(rid)) return; quickBusy.add(rid);
   const card = $('[data-act="igdbTap"][data-rid="' + rid + '"]'); if (card && card.classList) card.classList.add('busy');
   try {
-    const pit = pendingItem(), g = await addFromIgdb(rid, ids, itemAddOpts(pit));
+    const pit = pendingItem(), g = await addFromIgdb(rid, ids, itemAddOpts(bundleMode() ? null : pit));
     if (g) { toast('Добавлено: ' + g.name + (ids.length ? ' → ' + ids.map(id => id === DONE_ID ? 'Завершено' : (collById(id) || {}).name).join(', ') : '')); if (tryLinkPending(g)) return; }
   } catch (e) { toast(e.message); } finally { quickBusy.delete(rid); }
   renderSearchBody();
@@ -2374,6 +2431,12 @@ function renderSearchBody() {
   renderSearchHead();
   let h = '';
   if (s.mode === 'series') h += '<div class="hdr2"><h2 style="font-size:17px">Игры серии: ' + esc(s.title) + '</h2><button class="btn" data-act="sBack">← Назад</button></div>';
+  if (s.mode === 'bundle') {
+    const pi = S.pending && pendingItem(), na = pi ? ((S.pending.added || []).length) : 0;
+    h += '<div class="hdr2"><h2 style="font-size:17px">Бандл: ' + esc(s.title) + '</h2><button class="btn" data-act="sBack">← Назад</button></div><p class="sub" style="margin:0 2px 8px">'
+      + (s.loading ? 'Загружаю состав…' : s.results.length > 1 ? 'Игр в составе: ' + (s.results.length - 1) + '. Первым идёт сам бандл. Каждую карточку можно открыть, листать свайпом и добавить отдельно.' : 'В IGDB не указан состав этого бандла.') + '</p>'
+      + (pi ? '<div class="toolbar"><button class="btn acc" data-act="bundleDone">✓ Строка разобрана' + (na ? ' (добавлено: ' + na + ')' : '') + '</button></div>' : '');
+  }
   if (blockFor(s.src)) h += blockBanner(true, s.src);
   else if (!PROV[s.src].ready()) h += '<div class="hint">' + PROV[s.src].noKeys + '<br><br><button class="btn acc" data-act="tab" data-tab="settings">Открыть настройки</button></div>';
   else if (!s.results.length && !s.loading) h += '<div class="hint">' + (s.started ? 'Ничего не найдено в ' + PROV[s.src].name + '.<br><br><button class="btn" data-act="sSrcSwitch">Искать в ' + PROV[otherSrc(s.src)].name + '</button>' : 'Введите название игры или выберите фильтры') + '</div>' + (s.started ? '' : recentHtml());
@@ -2381,11 +2444,11 @@ function renderSearchBody() {
     const row = vmodeOf('search') === 'list';
     h += row ? '<div class="srl">' + s.results.map(it => {
       const inCat = !!gameByRid(it.rid);
-      return '<div class="srow' + (it.rid === s.lastRid ? ' last' : '') + '" data-act="igdbTap" data-rid="' + it.rid + '"><div class="sth"' + (it.cover ? ' style="background-image:url(\'' + bgu(thumbUrl(it.cover)) + '\')"' : '') + '></div><div class="sm"><div class="nm">' + esc(it.name) + '</div><div class="m">' + meta(it) + (it.time ? ' · ⏱ ' + it.time + 'ч' : '') + '</div></div>' + (inCat ? '<span class="ok2">✓</span>' : '') + '<button class="qa" data-act="openIgdb" data-rid="' + it.rid + '" aria-label="Подробнее">' + SEARCH_SVG + '</button></div>';
+      return '<div class="srow' + (it.rid === s.lastRid ? ' last' : '') + '" data-act="igdbTap" data-rid="' + it.rid + '"><div class="sth"' + (it.cover ? ' style="background-image:url(\'' + bgu(thumbUrl(it.cover)) + '\')"' : '') + '></div><div class="sm"><div class="nm">' + esc(it.name) + '</div><div class="m">' + typeChip(it.type) + meta(it) + (it.time ? ' · ⏱ ' + it.time + 'ч' : '') + '</div></div>' + (inCat ? '<span class="ok2">✓</span>' : '') + (isBundleType(it.type) ? bbadge(it.rid) : '') + '<button class="qa" data-act="openIgdb" data-rid="' + it.rid + '" aria-label="Подробнее">' + SEARCH_SVG + '</button></div>';
     }).join('') + '</div>' : '<div class="grid z' + colsFor('search') + '" style="--cols:' + colsFor('search') + '">' + s.results.map(it => {
       const inCat = !!gameByRid(it.rid);
       return '<div class="card' + (it.rid === s.lastRid ? ' last' : '') + '" data-act="igdbTap" data-rid="' + it.rid + '"><div class="cv' + (it.cover ? '' : ' nocover') + '"' + (it.cover ? ' style="background-image:url(\'' + bgu(thumbUrl(it.cover)) + '\')"' : '') + '>'
-        + (it.time ? '<span class="badge">⏱ ' + it.time + 'ч</span>' : '') + (inCat ? '<span class="ok">✓</span>' : '') + '<button class="qa" data-act="openIgdb" data-rid="' + it.rid + '" aria-label="Подробнее">' + SEARCH_SVG + '</button>' + '</div><div class="t">' + esc(it.name) + '</div><div class="m">' + meta(it) + '</div></div>';
+        + typeChip(it.type) + (it.time ? '<span class="badge">⏱ ' + it.time + 'ч</span>' : '') + (isBundleType(it.type) ? bbadge(it.rid) : '') + (inCat ? '<span class="ok">✓</span>' : '') + '<button class="qa" data-act="openIgdb" data-rid="' + it.rid + '" aria-label="Подробнее">' + SEARCH_SVG + '</button>' + '</div><div class="t">' + esc(it.name) + '</div><div class="m">' + meta(it) + '</div></div>';
     }).join('') + '</div>';
     h += '<div class="status">' + (s.loading ? 'Загрузка…' : (s.count ? 'Найдено: ' + s.count + ', показано: ' + s.results.length : '')) + '</div>';
     if (s.hasMore && !s.loading) h += '<div class="status"><button class="btn" data-act="sMore">Показать ещё</button></div><div id="sentinel" style="height:2px"></div>';
@@ -2402,10 +2465,10 @@ function recentHtml() {
 function pushRecent(q) { const r = (S.set.recentQ || []).filter(x => x.toLowerCase() !== q.toLowerCase()); r.unshift(q); S.set.recentQ = r.slice(0, 8); saveSet(); }
 async function runSearch(reset) {
   const s = S.search;
-  if (reset) { s.results = []; s.lastRid = ''; s.page = 0; s.hasMore = true; s.count = 0; s.token++; s.loading = false; s.mode = 'search'; const sb = $('#srBody'); if (sb) sb.scrollTop = 0; }
+  if (reset) { s.stack = []; s.bundle = null; s.results = []; s.lastRid = ''; s.page = 0; s.hasMore = true; s.count = 0; s.token++; s.loading = false; s.mode = 'search'; const sb = $('#srBody'); if (sb) sb.scrollTop = 0; }
   if (s.loading || !s.hasMore) return;
   const f = s.f;
-  if (!s.q.trim() && !f.genre && !f.platform && !f.year) { s.started = false; s.results = []; renderSearchBody(); return; }
+  if (!s.q.trim() && !hasSearchFilter(f)) { s.started = false; s.results = []; renderSearchBody(); return; }
   if (!PROV[s.src].ready()) { renderSearchBody(); return; }
   const token = s.token; s.loading = true; s.started = true; renderSearchBody();
   try {
@@ -2414,14 +2477,40 @@ async function runSearch(reset) {
       const d = await (s.src === 'rawg' ? rawgPage : igdbPage)(s.q.trim(), f, s.page);
       if (token !== s.token) return;
       s.count = d.count || s.count; s.page++; s.hasMore = !!d.next;
-      const items = d.results.map(mapItem).filter(x => x.rating >= f.minRating); s.results.push(...items); added += items.length; tries++;
+      const ysf = fa(f, 'years').map(Number), items = d.results.map(mapItem).filter(x => x.rating >= f.minRating && (!ysf.length || !x.year || ysf.includes(x.year))); s.results.push(...items); added += items.length; tries++;
     } while (f.minRating && added < 12 && s.hasMore && tries < 5);
     if (token === s.token && s.q.trim().length >= 2 && s.results.length) pushRecent(s.q.trim());
   } catch (e) { if (token === s.token) { toast(e.message); s.hasMore = false; } }
   finally { if (token === s.token) { s.loading = false; renderSearchBody(); } }
 }
+// перед входом в серию или бандл запоминаем результаты, положение и подсветку: «назад» возвращает основной поиск без нового запроса
+function pushSearchState() {
+  const s = S.search, sb = $('#srBody'); if (!s.started && !s.results.length) return false;
+  (s.stack || (s.stack = [])).push({ mode: s.mode, title: s.title, bundle: s.bundle, q: s.q, src: s.src, results: s.results, count: s.count, hasMore: s.hasMore, page: s.page, started: s.started, lastRid: s.lastRid, scroll: sb ? sb.scrollTop : 0 });
+  return true;
+}
+function popSearchState() {
+  const s = S.search, st = s.stack && s.stack.pop(); if (!st) return false;
+  s.token++; s.loading = false; const sc = st.scroll; delete st.scroll; Object.assign(s, st); S.tab = 'search'; closeSheet(); render();
+  const sb = $('#srBody'); if (sb) sb.scrollTop = sc || 0; if (s.lastRid) markFoundLast(s.lastRid, false);
+  return true;
+}
+const bundleMode = () => S.search.mode === 'bundle';
+// экран бандла: сам бандл и игры внутри него в обычном списке поиска (карточки, свайп, добавление), «назад» возвращает основной поиск
+async function showBundle(rid, title, fresh) {
+  const s = S.search, { id } = parseRid(rid); if (fresh) s.stack = []; else if (pushSearchState()) s.stack[s.stack.length - 1].lastRid = rid; // после «назад» бандл подсвечен в списке
+  const hit = detFresh(rid), first = s.results.find(x => x.rid === rid) || (hit ? mapItem(hit.d) : null);
+  s.src = 'igdb'; s.token++; const token = s.token; s.mode = 'bundle'; s.title = title; s.bundle = { rid, name: title }; s.results = first ? [first] : []; s.hasMore = false; s.loading = true; s.started = true; s.count = 0; s.lastRid = rid; S.tab = 'search'; closeSheet(); render();
+  try {
+    const [list, self] = await Promise.all([bundleGames(id), first ? Promise.resolve(first) : igdb('/games', 'fields ' + IGDB_FIELDS + '; where id = ' + (+id) + ';').then(r => { r.forEach(x => { x._src = 'igdb'; }); return r[0] ? mapItem(r[0]) : null; })]);
+    if (token !== s.token) return;
+    s.results = (self ? [self] : []).concat(list.filter(x => x.rid !== rid)); s.count = s.results.length;
+  } catch (e) { logErr('состав бандла', e); if (token === s.token) toast(e.message); }
+  if (token === s.token) { s.loading = false; renderSearchBody(); }
+}
 async function showSeries(rid, title) {
-  const s = S.search, { src, id } = parseRid(rid); s.src = src; s.token++; s.mode = 'series'; s.title = title; s.results = []; s.hasMore = false; s.loading = true; s.started = true; S.tab = 'search'; closeSheet(); render();
+  if (!S.retGame && pushSearchState()) S.search.stack[S.search.stack.length - 1].lastRid = rid;
+  const s = S.search, { src, id } = parseRid(rid); s.bundle = null; s.src = src; s.token++; s.mode = 'series'; s.title = title; s.results = []; s.hasMore = false; s.loading = true; s.started = true; S.tab = 'search'; closeSheet(); render();
   try {
     if (src === 'rawg') { const d = await rawg('/games/' + id + '/game-series', { page_size: 40 }); d.results.forEach(x => { x._src = 'rawg'; }); s.results = d.results.map(mapItem); s.count = d.count; }
     else {
@@ -2451,18 +2540,20 @@ async function openIgdbSheet(rid, keep, dir) {
   }
   markFoundLast(rid, !!dir);
   const it = S.search.results.find(x => x.rid === rid) || { rid, src: parseRid(rid).src, name: '', platforms: [], genres: [] };
-  const pit = pendingItem(), cat = () => gameByRid(rid), shown = {};
+  const pit = bundleMode() ? null : pendingItem(), cat = () => gameByRid(rid), shown = {};
   const stale = () => tok !== rsTok || !sheetEl || sheetEl._key !== 'igdb' || !S.rs || S.rs.rid !== rid; // карточку уже закрыли или открыли другую
   const parts = (d, ser) => { // изменяемые части карточки: после загрузки подробностей заменяются на месте, без повторного открытия
     const c = cat(), cover = (d && (d._src === 'rawg' ? d.background_image : coverOf(d, 'cover_big'))) || it.cover, item = d ? mapItem(d) : it;
     return {
       hero: '<div class="cv' + (cover ? '' : ' nocover') + '"' + (cover ? ' style="background-image:url(\'' + bgu(thumbUrl(cover)) + '\')"' : '') + '></div><div style="flex:1;min-width:0"><h2>' + esc(item.name) + ' <span class="y">' + (item.year || '') + '</span></h2>'
         + '<div class="m" style="font-size:14px">' + (item.rating ? '<span class="st">★ ' + item.rating + '</span>' : '') + (item.time ? ' · ⏱ ' + item.time + ' ч' : '') + '</div>'
+        + (item.type != null && TYPE_CHIP[item.type] ? '<div style="margin-top:6px">' + typeChip(item.type, 'lg') + '</div>' : '')
         + (ser && ser.series ? '<div class="sub" style="margin-top:6px">Серия: ' + esc(ser.series) + '</div>' : '') + '</div>',
       gen: (item.genres || []).map(x => '<span class="tag">' + esc(x) + '</span>').join(''),
       pl: (item.platforms || []).map(x => '<span class="tag m2">' + esc(x) + '</span>').join(''),
       tb: (c ? (pit ? '<button class="btn acc" data-act="rsLink" data-rid="' + rid + '">✓ Сопоставить с разбором</button>' : '') + '<button class="btn" data-act="openGameFromIgdb" data-id="' + c.id + '">Открыть в каталоге</button>'
         : '<button class="btn acc" data-act="rsAdd" data-rid="' + rid + '">' + (pit ? '＋ Добавить и сопоставить' : '＋ Добавить в каталог') + '</button>')
+        + (isBundleType(item.type) || (ser && ser.bundle > 0) ? '<button class="btn" data-act="bundleOpen" data-rid="' + rid + '" data-t="' + esc(item.name) + '">Игры бандла' + (ser && ser.bundle ? ' (' + ser.bundle + ')' : '') + '</button>' : '')
         + (ser && ser.count ? '<button class="btn" data-act="rsSeries" data-rid="' + rid + '" data-t="' + esc(ser.series || item.name) + '">Игры серии (' + ser.count + ')</button>' : '')
     };
   };
@@ -2483,12 +2574,12 @@ async function openIgdbSheet(rid, keep, dir) {
     { const bd = dir && animOn() && !openGameSheet.noAnim && sh.querySelector ? sh.querySelector('.shbody') : null; if (bd && bd.classList) bd.classList.add(dir > 0 ? 'swr' : 'swl'); }
   };
   const apply = r => { // подробности пришли: меняем только изменившиеся части
-    if (stale()) return; const P = parts(r.d, { series: r.series, count: r.seriesCount });
+    if (stale()) return; const P = parts(r.d, { series: r.series, count: r.seriesCount, bundle: r.bundleCount });
     [['rsHero', 'hero'], ['rsGen', 'gen'], ['rsPl', 'pl'], ['rsTb', 'tb']].forEach(([id, k]) => { const e = $('#' + id); if (e && shown[k] !== P[k]) { e.innerHTML = P[k]; shown[k] = P[k]; } });
     const l = $('#rsLoad'); if (l) l.innerHTML = '';
   };
   const hit = detFresh(rid);
-  if (hit) { draw(hit.d, { series: hit.series, count: hit.seriesCount }, false); return; }
+  if (hit) { draw(hit.d, { series: hit.series, count: hit.seriesCount, bundle: hit.bundleCount }, false); return; }
   draw(null, null, true);
   try {
     if (dir) { await new Promise(r => setTimeout(r, 250)); if (stale()) return; } // при быстром листании запрос уходит только для карточки, на которой остановились
@@ -2509,7 +2600,7 @@ async function loadShots(rid, save) {
 }
 async function openSearchFilters() {
   const f = S.search.f, row = (label, val, act) => '<div class="row" data-act="' + act + '"><span>' + label + '</span><span style="color:var(--mut)">' + (val || 'Все') + ' ›</span></div>';
-  openSheet('<div class="hdr2"><h2>Фильтры поиска</h2><button class="btn" data-act="sReset">Сбросить</button></div>' + row('Жанр', f.genreName, 'sfGenre') + row('Платформа', f.platformName, 'sfPlatform') + row('Год', f.year, 'sfYear') + row('Мин. рейтинг (из 10)', f.minRating ? '★' + f.minRating : '', 'sfRating') + row('Игр в результате', String(S.set.pageSize || 40), 'sfPageSize')
+  openSheet('<div class="hdr2"><h2>Фильтры поиска</h2><button class="btn" data-act="sReset">Сбросить</button></div>' + row('Жанры', fa(f, 'genreNames').join(', '), 'sfGenre') + row('Платформы', fa(f, 'platformNames').join(', '), 'sfPlatform') + row('Годы', fa(f, 'years').join(', '), 'sfYear') + (S.search.src === 'igdb' ? row('Типы карточек IGDB', typesCustom() ? 'выбрано ' + searchTypes().length + ' из ' + IGDB_TYPES.length : 'основные', 'sfTypes') : '') + row('Мин. рейтинг (из 10)', f.minRating ? '★' + f.minRating : '', 'sfRating') + row('Игр в результате', String(S.set.pageSize || 40), 'sfPageSize')
     + '<button class="btn acc" style="width:100%;margin-top:14px" data-act="closeSheet">Готово</button>');
 }
 
@@ -2966,7 +3057,7 @@ function render() {
 const lp = { t: null, fired: false, x: 0, y: 0 };
 S.expColls = S.expColls || new Set(); // игры, у которых в списке раскрыты все коллекции
 const ACT = {
-  tab: t => { saveScroll(); if (t.dataset.tab !== 'search') S.pending = null; else if (S.tab !== 'search') { S.search.src = S.set.mainSrc; Object.assign(S.search.f, { genre: '', genreName: '', platform: '', platformName: '' }); } S.retGame = null; S.inSelMode = false; S.inSel.clear(); S.tab = t.dataset.tab; S.selMode = false; S.sel.clear(); closeSheet(); render(); if (S.tab === 'library') setTimeout(focusLast, 0); restoreScroll(S.tab); },
+  tab: t => { saveScroll(); if (t.dataset.tab !== 'search') S.pending = null; else if (S.tab !== 'search') { S.search.src = S.set.mainSrc; fClear(S.search.f); } S.retGame = null; S.inSelMode = false; S.inSel.clear(); S.tab = t.dataset.tab; S.selMode = false; S.sel.clear(); closeSheet(); render(); if (S.tab === 'library') setTimeout(focusLast, 0); restoreScroll(S.tab); },
   fab: () => S.tab === 'collections' ? createCollection().then(c => { if (c) render(); }) : S.tab === 'inbox' ? createList() : openGameSheet(null),
   closeSheet: () => closeSheet(),
   clearQ: () => { S.set.f.q = ''; saveSet(); if (S.tab === 'library') { const q = $('#q'); if (q) q.value = ''; libRefilter(); if (sheetEl) openFilters(); } },
@@ -3062,28 +3153,33 @@ const ACT = {
     try { const h = await igdbTimeOf(d.igdbId); if (!h) return toast('В IGDB нет времени для этой игры'); $('#f_time').value = String(h); markDirty(); toast('Время из IGDB: ' + h + ' ч'); } catch (e) { toast(e.message); }
   },
   refreshIgdb: t => refreshFromIgdb(S.sheet.draft.id, t.dataset.src),
-  findIgdb: t => { const n = $('#f_name').value; S.retGame = { id: S.sheet.draft.id, tab: S.tab }; closeSheet(); S.search.q = n; S.search.src = t.dataset.src || S.set.mainSrc; Object.assign(S.search.f, { genre: '', genreName: '', platform: '', platformName: '' }); S.tab = 'search'; render(); runSearch(true); },
+  findIgdb: t => { const n = $('#f_name').value; S.retGame = { id: S.sheet.draft.id, tab: S.tab }; closeSheet(); S.search.q = n; S.search.src = t.dataset.src || S.set.mainSrc; fClear(S.search.f); S.tab = 'search'; render(); runSearch(true); },
   seriesCatalog: () => { const s = $('#f_series').value.trim(); closeSheet(); S.set.f.series = [s]; S.set.f.collections = []; saveSet(); S.tab = 'library'; render(); },
   seriesIgdb: t => { const d = S.sheet.draft, src = t.dataset.src; S.retGame = { id: d.id, tab: S.tab }; showSeries(ridOf(src, d[src + 'Id']), d.series || d.name); },
   sFilters: () => openSearchFilters(),
-  sReset: () => { Object.assign(S.search.f, { genre: '', genreName: '', platform: '', platformName: '', year: '', minRating: 0 }); closeSheet(); renderSearchBody(); runSearch(true); },
-  sRm: t => { const f = S.search.f, k = t.dataset.k; f[k] = k === 'minRating' ? 0 : ''; if (k === 'genre') f.genreName = ''; if (k === 'platform') f.platformName = ''; runSearch(true); },
-  sBack: () => { S.search.mode = 'search'; runSearch(true); },
+  sReset: () => { fClear(S.search.f, true); closeSheet(); renderSearchBody(); runSearch(true); },
+  sRm: t => { const f = S.search.f, k = t.dataset.k, v = t.dataset.v; if (k === 'minRating') f.minRating = 0; else if (k === 'types') { delete S.set.searchTypes; saveSet(); } else { const arr = fa(f, k).slice(), i = arr.map(String).indexOf(String(v)), nk = k === 'genres' ? 'genreNames' : k === 'platforms' ? 'platformNames' : ''; if (i >= 0) { arr.splice(i, 1); if (nk) { const nm = (f[nk] || []).slice(); nm.splice(i, 1); f[nk] = nm; } } f[k] = arr; } runSearch(true); },
+  sBack: () => { if (popSearchState()) return; if (bundleMode() && S.pending) return backToInbox(); S.search.mode = 'search'; runSearch(true); },
+  bundleOpen: t => { const rid = t.dataset.rid; showBundle(rid, t.dataset.t || (S.search.results.find(x => x.rid === rid) || {}).name || '', false); },
+  bundleDone: () => { const it = pendingItem(), p = S.pending; if (!it) return; const g = gameById(((p && p.added) || [])[0]); if (!g) return toast('Сначала добавьте хотя бы одну игру из бандла'); linkItem(it, g); },
+  itBundle: t => { const it = S.inbox.items.find(i => i.id === t.dataset.id); if (!it || !it.bundle) return; S.pending = { itemId: it.id, scroll: $('#view').scrollTop, added: [] }; Object.assign(S.search, { q: it.text, src: 'igdb' }); fClear(S.search.f); S.retGame = null; showBundle(it.bundle.rid, it.bundle.name, true); },
+  itBundleFilter: () => { S.inBundleOnly = !S.inBundleOnly; render(); },
   sMore: () => runSearch(false),
-  sfGenre: async () => { try { const l = await loadLists(); const r = await choose({ title: 'Выбрать жанр', items: [{ id: '', label: 'Все' }].concat(l.genres.map(x => ({ id: x.id, label: x.name }))) }); if (r !== null) { const g = l.genres.find(x => String(x.id) === r); Object.assign(S.search.f, { genre: r, genreName: g ? g.name : '' }); closeSheet(); renderSearchBody(); runSearch(true); } } catch (e) { toast(e.message); } },
-  sfPlatform: async () => { try { const l = await loadLists(); const r = await choose({ title: 'Выбрать платформу', items: [{ id: '', label: 'Все' }].concat(l.platforms.map(x => ({ id: x.id, label: x.name }))) }); if (r !== null) { const p = l.platforms.find(x => String(x.id) === r); Object.assign(S.search.f, { platform: r, platformName: p ? p.name : '' }); closeSheet(); renderSearchBody(); runSearch(true); } } catch (e) { toast(e.message); } },
-  sfYear: async () => { const y = new Date().getFullYear(), items = [{ id: '', label: 'Все' }]; for (let i = y + 1; i >= 1975; i--) items.push({ id: i, label: String(i) }); const r = await choose({ title: 'Год выпуска', items }); if (r !== null) { S.search.f.year = r; closeSheet(); renderSearchBody(); runSearch(true); } },
+  sfGenre: async () => { try { const l = await loadLists(), f = S.search.f, r = await choose({ title: 'Выбрать жанры', multi: true, search: true, selected: fa(f, 'genres'), items: l.genres.map(x => ({ id: x.id, label: x.name })) }); if (r !== null) { f.genres = r; f.genreNames = r.map(id => (l.genres.find(x => String(x.id) === String(id)) || {}).name || id); closeSheet(); renderSearchBody(); runSearch(true); } } catch (e) { toast(e.message); } },
+  sfPlatform: async () => { try { const l = await loadLists(), f = S.search.f, r = await choose({ title: 'Выбрать платформы', multi: true, search: true, selected: fa(f, 'platforms'), items: l.platforms.map(x => ({ id: x.id, label: x.name })) }); if (r !== null) { f.platforms = r; f.platformNames = r.map(id => (l.platforms.find(x => String(x.id) === String(id)) || {}).name || id); closeSheet(); renderSearchBody(); runSearch(true); } } catch (e) { toast(e.message); } },
+  sfYear: async () => { const y = new Date().getFullYear(), items = []; for (let i = y + 1; i >= 1975; i--) items.push({ id: i, label: String(i) }); const f = S.search.f, r = await choose({ title: 'Годы выпуска', multi: true, search: true, selected: fa(f, 'years'), items }); if (r !== null) { f.years = r.map(Number).sort((a, b) => b - a); closeSheet(); renderSearchBody(); runSearch(true); } },
+  sfTypes: async () => { const r = await choose({ title: 'Типы карточек IGDB', multi: true, selected: searchTypes(), items: IGDB_TYPES.map(([id, label]) => ({ id, label, sub: isBundleType(id) ? 'несколько игр в одной карточке' : '' })) }); if (r === null) return; if (!r.length) return toast('Выберите хотя бы один тип'); const t = r.map(Number).sort((a, b) => a - b); if (t.join() === DEF_TYPES.join()) delete S.set.searchTypes; else S.set.searchTypes = t; saveSet(); closeSheet(); renderSearchBody(); runSearch(true); },
   sfRating: async () => { const r = await choose({ title: 'Минимальный рейтинг', items: [{ id: 0, label: 'Все' }, { id: 5, label: '★ 5+' }, { id: 6, label: '★ 6+' }, { id: 7, label: '★ 7+' }, { id: 8, label: '★ 8+' }, { id: 9, label: '★ 9+' }] }); if (r !== null) { S.search.f.minRating = +r; closeSheet(); renderSearchBody(); runSearch(true); } },
   openIgdb: t => openIgdbSheet(t.dataset.rid),
   openUrl: t => openExternal(t.dataset.u),
-  sSrcSwitch: () => { const s = S.search; s.src = otherSrc(s.src); Object.assign(s.f, { genre: '', genreName: '', platform: '', platformName: '' }); s.token++; render(); runSearch(true); },
+  sSrcSwitch: () => { const s = S.search; s.src = otherSrc(s.src); fClear(S.search.f); s.token++; render(); runSearch(true); },
   igdbTap: t => { const rid = t.dataset.rid, ac = validAddColls(); if (ac.length) quickTap(rid, ac); else openIgdbSheet(rid); },
   openAddColls: () => openAddCollSheet(),
   acChip: t => { const a = S.search.addColls, i = a.indexOf(t.dataset.id); i < 0 ? a.push(t.dataset.id) : a.splice(i, 1); if (t.classList) t.classList.toggle('on', i < 0); renderSearchHead(); },
   acClear: () => { S.search.addColls = []; renderSearchHead(); openAddCollSheet(); },
   acRm: t => { S.search.addColls = S.search.addColls.filter(id => id !== t.dataset.id); renderSearchHead(); },
   acNew: async () => { const c = await createCollection(); if (c) { S.search.addColls.push(c.id); renderSearchHead(); openAddCollSheet(); } },
-  rsAdd: async t => { const rid = t.dataset.rid; t.textContent = '…'; try { const pit = pendingItem(), g = await addFromIgdb(rid, (S.rs ? S.rs.colls : []).slice(), itemAddOpts(pit)); if (g) { toast('Добавлено'); if (tryLinkPending(g)) { closeSheet(); return; } } } catch (er) { toast(er.message); } openIgdbSheet(rid, true); renderSearchBody(); },
+  rsAdd: async t => { const rid = t.dataset.rid; t.textContent = '…'; try { const pit = pendingItem(), g = await addFromIgdb(rid, (S.rs ? S.rs.colls : []).slice(), itemAddOpts(bundleMode() ? null : pit)); if (g) { toast('Добавлено'); if (tryLinkPending(g)) { closeSheet(); return; } } } catch (er) { toast(er.message); } openIgdbSheet(rid, true); renderSearchBody(); },
   rsChip: async t => {
     const rid = S.rs.rid, id = t.dataset.id, cat = gameByRid(rid); let on;
     if (cat) { if (id === DONE_ID) { cat.done = !cat.done; cat.doneDate = cat.done ? todayStr() : ''; on = cat.done; } else { const i = cat.collections.indexOf(id); i < 0 ? cat.collections.push(id) : cat.collections.splice(i, 1); on = i < 0; } await saveGame(cat); }
@@ -3123,8 +3219,8 @@ const ACT = {
     if (!await confirmBox('Удалить все скриншоты из базы (' + st.reduce((a, x) => a + x.n, 0) + ' шт, ' + fmtSize(st.reduce((a, x) => a + x.size, 0)) + ')? Игры останутся.', 'Удалить все')) return; await delShots(st.map(x => x.id)); render();
   },
   gotoGenre: t => { const v = t.dataset.v; closeSheet(); Object.assign(S.set.f, { q: '', years: [], genres: [v], platforms: [], series: [], collections: [], props: [], addedFrom: '', addedTo: '', seriesMode: '', maxTime: 0, done: '', minRating: 0 }); saveSet(); S.tab = 'library'; render(); },
-  rsGenre: async t => { try { const src = parseRid(S.rs.rid).src; S.search.src = src; const l = await loadLists(src), g = l.genres.find(x => x.name === t.dataset.v || canonGenre(x.name) === t.dataset.v); if (!g) return toast('Жанр не найден в списке ' + PROV[src].name); Object.assign(S.search.f, { genre: String(g.id), genreName: g.name }); closeSheet(); S.tab = 'search'; render(); runSearch(true); } catch (e) { toast(e.message); } },
-  rsPlat: async t => { try { const src = parseRid(S.rs.rid).src; S.search.src = src; const l = await loadLists(src), p = l.platforms.find(x => x.name === t.dataset.v || canonPlat(x.name) === t.dataset.v); if (!p) return toast('Платформа не найдена в списке ' + PROV[src].name); Object.assign(S.search.f, { platform: String(p.id), platformName: p.name }); closeSheet(); S.tab = 'search'; render(); runSearch(true); } catch (e) { toast(e.message); } },
+  rsGenre: async t => { try { const src = parseRid(S.rs.rid).src; S.search.src = src; const l = await loadLists(src), g = l.genres.find(x => x.name === t.dataset.v || canonGenre(x.name) === t.dataset.v); if (!g) return toast('Жанр не найден в списке ' + PROV[src].name); Object.assign(S.search.f, { genres: [String(g.id)], genreNames: [g.name] }); closeSheet(); S.tab = 'search'; render(); runSearch(true); } catch (e) { toast(e.message); } },
+  rsPlat: async t => { try { const src = parseRid(S.rs.rid).src; S.search.src = src; const l = await loadLists(src), p = l.platforms.find(x => x.name === t.dataset.v || canonPlat(x.name) === t.dataset.v); if (!p) return toast('Платформа не найдена в списке ' + PROV[src].name); Object.assign(S.search.f, { platforms: [String(p.id)], platformNames: [p.name] }); closeSheet(); S.tab = 'search'; render(); runSearch(true); } catch (e) { toast(e.message); } },
   backupNow: async () => { await exportData(true); renderLibHead(); },
   backupLater: () => { S.set.lastRemind = Date.now(); saveSet(); renderLibHead(); },
   backupFreq: async () => {
@@ -3221,9 +3317,9 @@ const ACT = {
     const r = await askChoose({ title: 'YouTube: что искать', items: [{ id: '0', label: qs[0], sub: 'просто название', ico: '▶' }, { id: '1', label: qs[1], ico: '▶' }, { id: '2', label: qs[2], ico: '▶' }] });
     if (r === null) return; openYoutube(qs[+r] || n);
   },
-  shSrcLine: () => { const d = S.sheet && S.sheet.draft; if (!d || !d.srcLine) return; const pr = parseLine(d.srcLine); S.retGame = { id: d.id, tab: S.tab }; closeSheet(); S.pending = null; S.search.q = pr ? pr.text : d.srcLine; S.search.src = S.set.mainSrc; S.search.mode = 'search'; Object.assign(S.search.f, { genre: '', genreName: '', platform: '', platformName: '' }); S.tab = 'search'; render(); runSearch(true); },
+  shSrcLine: () => { const d = S.sheet && S.sheet.draft; if (!d || !d.srcLine) return; const pr = parseLine(d.srcLine); S.retGame = { id: d.id, tab: S.tab }; closeSheet(); S.pending = null; S.search.q = pr ? pr.text : d.srcLine; S.search.src = S.set.mainSrc; S.search.mode = 'search'; fClear(S.search.f); S.tab = 'search'; render(); runSearch(true); },
   animToggle: () => { S.set.anim = !animOn(); S.set.animSet = true; saveSet(); render(); },
-  hapticToggle: () => { S.set.haptic = S.set.haptic === false; saveSet(); if (S.set.haptic) buzz(12); render(); },
+  hapticToggle: () => { S.set.haptic = S.set.haptic === false; saveSet(); if (S.set.haptic) buzz(30); render(); },
   shWiki: () => { const n = (($('#f_name') || {}).value || '').trim(); if (!n) return toast('Сначала введите название'); openExternal('https://www.google.com/search?q=' + encodeURIComponent(n + ' wiki')); },
   mgDo: () => openMergePreview(),
   mgGo: async () => { const n = S.mg.ids.filter(i => !String(i).startsWith('virt_')).length - 1; const snap = takeSnap(); try { await applyMerge(S.mg); } catch (e) { return toast(e.message); } const rf = S.mgRefresh; S.mg = null; S.mgRefresh = false; S.mgVirt = null; closeSheet(); toastUndo(rf ? 'Данные применены' : 'Объединено, удалено карточек: ' + n, snap); renderKeep(); },
@@ -3432,7 +3528,7 @@ function applyTheme() {
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
   const m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', dark ? '#0b0b0d' : '#f2f3f6');
 }
-window.__GC = { sheetOpen: () => !!sheetEl, logErr, ERRLOG, takeSnap, undoLast, UNDO, toastUndo, removeGame, sheetSibling, itemLine, animOn, reviewOne, catalogMatch, matchCfg, reviewItems, autoResolve, ipMask, addrOf, textLines, syncNow, SY, DB, reloadData, nextPool, PRESETS, applyFilterSet, withSeries, buildEntries, groupGames, textHtml, listHtml, cardHtml, openYoutube, canonPlat, canonGenre, canonAll, dictMerge, dictRename, dictRewrite, openDict, mergeGroups, openMergeCompare, applyMerge, mgBase, renderKeep, toggleInSel, handleShared, applyExtra, addParsed, openExport, exportText, copyText, gameLine, zipBuild, zipRead, shotStats, delShots, rawgQuotaTick, refreshOne, rawg, effItem, applyDefaults, linkItem, itemOpts, viewInbox, quickTap, bulkMore, openAddCollSheet, openLb, libToolsHtml: () => { renderLibHead(); return $('#libTools').innerHTML; }, filterGames, getShots, putShots, collTilesHtml, seriesTilesHtml, viewCollections, viewSeries, DONE_ID, autoResolve, viewStats, restoreGames, removeGame, canonSeries, findDupes, mergeAllDupes, collectSheet, persistDraft, closeSheet, S, ACT, bump, igdb, hltbFind, sgdbAuto, openSgdb, applyTheme, colsFor, usageHtml, serMenu, viewInbox, addItems, linkItem, createList, pendingItem, render, runSearch, addFromIgdb, importData, openIgdbSheet, openGameSheet, openFilters, openCols, selectionAction, loadAll, renderSearchBody };
+window.__GC = { showBundle, popSearchState, sourceResolve, searchTypes, sheetOpen: () => !!sheetEl, logErr, ERRLOG, takeSnap, undoLast, UNDO, toastUndo, removeGame, sheetSibling, itemLine, animOn, reviewOne, catalogMatch, matchCfg, reviewItems, autoResolve, ipMask, addrOf, textLines, syncNow, SY, DB, reloadData, nextPool, PRESETS, applyFilterSet, withSeries, buildEntries, groupGames, textHtml, listHtml, cardHtml, openYoutube, canonPlat, canonGenre, canonAll, dictMerge, dictRename, dictRewrite, openDict, mergeGroups, openMergeCompare, applyMerge, mgBase, renderKeep, toggleInSel, handleShared, applyExtra, addParsed, openExport, exportText, copyText, gameLine, zipBuild, zipRead, shotStats, delShots, rawgQuotaTick, refreshOne, rawg, effItem, applyDefaults, linkItem, itemOpts, viewInbox, quickTap, bulkMore, openAddCollSheet, openLb, libToolsHtml: () => { renderLibHead(); return $('#libTools').innerHTML; }, filterGames, getShots, putShots, collTilesHtml, seriesTilesHtml, viewCollections, viewSeries, DONE_ID, autoResolve, viewStats, restoreGames, removeGame, canonSeries, findDupes, mergeAllDupes, collectSheet, persistDraft, closeSheet, S, ACT, bump, igdb, hltbFind, sgdbAuto, openSgdb, applyTheme, colsFor, usageHtml, serMenu, viewInbox, addItems, linkItem, createList, pendingItem, render, runSearch, addFromIgdb, importData, openIgdbSheet, openGameSheet, openFilters, openCols, selectionAction, loadAll, renderSearchBody };
 (async () => {
   try {
     await loadAll();
@@ -3449,7 +3545,7 @@ window.__GC = { sheetOpen: () => !!sheetEl, logErr, ERRLOG, takeSnap, undoLast, 
     if (!isNative() && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
     const A = plug('App');
     if (isNative() && A) A.addListener('backButton', () => {
-      if (lbEl) closeLb(); else if (modalEl && modalCancel) modalCancel(); else if (sheetEl) closeSheet(); else if (S.selMode) { S.selMode = false; S.sel.clear(); renderLibrary(); $('#fab').classList.remove('hidden'); } else if (S.inSelMode) { S.inSelMode = false; S.inSel.clear(); rerenderInbox(); } else if (S.tab === 'inbox' && S.inboxList) { S.inboxList = null; render(); } else if (S.pending) backToInbox(); else if (S.retGame && S.tab === 'search') ACT.retGame(); else if (S.tab !== 'library') { S.tab = 'library'; render(); } else A.exitApp();
+      if (lbEl) closeLb(); else if (modalEl && modalCancel) modalCancel(); else if (sheetEl) closeSheet(); else if (S.selMode) { S.selMode = false; S.sel.clear(); renderLibrary(); $('#fab').classList.remove('hidden'); } else if (S.inSelMode) { S.inSelMode = false; S.inSel.clear(); rerenderInbox(); } else if (S.tab === 'inbox' && S.inboxList) { S.inboxList = null; render(); } else if (S.tab === 'search' && S.search.stack && S.search.stack.length) popSearchState(); else if (S.pending) backToInbox(); else if (S.retGame && S.tab === 'search') ACT.retGame(); else if (S.tab !== 'library') { S.tab = 'library'; render(); } else A.exitApp();
     });
     if (isNative() && A && A.addListener) A.addListener('resume', checkShared);
     const q = new URLSearchParams(location.search), tabs = ['library', 'collections', 'series', 'inbox', 'search', 'settings'];

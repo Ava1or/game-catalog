@@ -18,11 +18,13 @@ global.__gateMs = 0;
 const FNV = { id: 1, name: 'Fallout: New Vegas', first_release_date: Date.UTC(2010, 9, 19) / 1000, total_rating: 86, summary: 'desc', genres: [{ name: 'RPG' }], platforms: [{ name: 'PC (Microsoft Windows)' }], cover: { image_id: 'abc' }, collections: [{ id: 77, name: 'Fallout' }] };
 const igdbData = (ep, body) => {
   if (ep === '/game_time_to_beats') { const ids = (body.match(/\d+/g) || []).map(Number); return ids.map(i => ({ game_id: i, normally: (i === 1 ? 30 : 10) * 3600 })); }
-  if (ep === '/games/count') return { count: body.includes('collections') ? 2 : 120 };
+  if (ep === '/games/count') return { count: body.includes('bundles') ? 2 : body.includes('collections') ? 2 : 120 };
   if (ep === '/genres') return [{ id: 5, name: 'RPG' }];
   if (ep === '/platforms') return [{ id: 6, name: 'PC (Microsoft Windows)' }];
   if (ep === '/screenshots') return [{ image_id: 's1' }, { image_id: 's2' }];
   if (body.includes('collections = (')) return [{ id: 2, name: 'Fallout 4' }, { id: 3, name: 'Fallout 3' }];
+  if (body.includes('bundles = (')) return [{ id: 901, name: 'Devil May Cry', game_type: 0, first_release_date: Date.UTC(2001, 0, 1) / 1000, platforms: [{ name: 'PlayStation 2' }], genres: [{ name: 'RPG' }] }, { id: 902, name: 'Devil May Cry 2', game_type: 0, first_release_date: Date.UTC(2003, 0, 1) / 1000, platforms: [{ name: 'PlayStation 2' }], genres: [{ name: 'RPG' }] }];
+  if (body.includes('search "devil')) return [{ id: 900, name: 'Devil May Cry HD Collection', game_type: 3, first_release_date: Date.UTC(2012, 0, 1) / 1000, platforms: [{ name: 'PC (Microsoft Windows)' }], genres: [{ name: 'RPG' }] }, { id: 901, name: 'Devil May Cry', game_type: 0, first_release_date: Date.UTC(2001, 0, 1) / 1000, platforms: [{ name: 'PlayStation 2' }], genres: [{ name: 'RPG' }] }];
   if (/where id = \d+/.test(body)) return [FNV];
   return Array.from({ length: 40 }, (_, i) => ({ id: 100 + i, name: 'Fallout ' + i, first_release_date: Date.UTC(2000, 0, 1) / 1000, total_rating: 80, platforms: [{ name: 'PlayStation 4' }], genres: [{ name: 'RPG' }], cover: { image_id: 'x' + i } }));
 };
@@ -106,6 +108,30 @@ const L = require('../www/app.js');
     G.openGameSheet('ser_b'); const html = (document.querySelector('#shSerie') || {}).innerHTML || '';
     if (!html.includes('2 из 3') || !html.includes('завершено 2')) throw new Error('строка серии: ' + html.slice(0, 120));
     G.ACT.closeSheet(); gs.forEach(g => { S.games.splice(S.games.indexOf(g), 1); });
+  });
+  await step('бандлы: тип карточки, состав, возврат в основной поиск без нового запроса', async () => {
+    const fClearTest = () => { const f = S.search.f; f.genres = []; f.genreNames = []; f.platforms = []; f.platformNames = []; f.years = []; f.minRating = 0; };
+    S.tab = 'search'; S.search.src = 'igdb'; S.search.q = 'devil may cry'; S.set.mainSrc = 'igdb'; delete S.set.searchTypes; fClearTest(); global.__bodies = [];
+    await G.runSearch(true);
+    const res = S.search.results; if (res.length !== 2 || res[0].type !== 3 || res[1].type !== 0) throw new Error('у результатов должен быть тип карточки IGDB');
+    await G.showBundle(res[0].rid, res[0].name, false);
+    if (S.search.mode !== 'bundle' || S.search.results.length !== 3 || S.search.results[0].rid !== res[0].rid) throw new Error('экран бандла: сам бандл первым и его игры');
+    const n = global.__bodies.length; if (!G.popSearchState()) throw new Error('нет сохранённого основного поиска');
+    if (S.search.mode !== 'search' || S.search.results !== res || S.search.lastRid !== res[0].rid) throw new Error('основной поиск должен вернуться как был');
+    if (global.__bodies.length !== n) throw new Error('возврат не должен обращаться к IGDB');
+    if (G.popSearchState()) throw new Error('стек пуст');
+  });
+  await step('типы карточек и несколько значений фильтров в запросе IGDB', async () => {
+    const fClearTest = () => { const f = S.search.f; f.genres = []; f.genreNames = []; f.platforms = []; f.platformNames = []; f.years = []; f.minRating = 0; };
+    S.set.searchTypes = [0, 3, 13]; Object.assign(S.search.f, { genres: ['4', '31'], genreNames: ['A', 'B'], platforms: ['6', '48'], platformNames: ['x', 'y'], years: [2012, 2005] }); S.search.q = 'devil may cry'; global.__bodies = [];
+    await G.runSearch(true); const b = global.__bodies.find(x => x.includes('search "devil')) || '';
+    if (!b.includes('game_type = (0,3,13)') || !b.includes('genres = (4,31)') || !b.includes('platforms = (6,48)') || (b.match(/first_release_date >=/g) || []).length !== 2 || !b.includes(' | ')) throw new Error('запрос: ' + b);
+    delete S.set.searchTypes; fClearTest(); if (G.searchTypes().join() !== '0,3,4,6,8,9,10,11') throw new Error('типы по умолчанию');
+  });
+  await step('разбор: строка-бандл не добавляется автоматически, а получает пометку', async () => {
+    const it = { id: 'bund_it', listId: 'x', text: 'devil may cry hd collection', order: 1 }; const n0 = S.games.length;
+    const st = await G.sourceResolve(it, G.matchCfg(null));
+    if (st !== 'bundle' || !it.bundle || it.bundle.rid !== 'igdb:900' || S.games.length !== n0) throw new Error('бандл: ' + st + ' ' + JSON.stringify(it.bundle));
   });
   await step('igdb sheet with shots + colls', async () => { S.tab = 'search'; await G.openIgdbSheet('igdb:1'); });
   await step('inbox flow', async () => {
@@ -268,7 +294,7 @@ const L = require('../www/app.js');
   await step('IGDB: типы игр, количество в результате, поиск списком, возврат в разбор', async () => {
     S.tab = 'search'; G.render(); S.search.q = 'fallout'; S.set.pageSize = 20; global.__bodies = [];
     await G.runSearch(true);
-    const gb = global.__bodies.filter(b => b.includes('search "fallout"')); if (!gb.length || !gb.every(b => b.includes('game_type = (0,4,6,8,9,10,11)'))) throw new Error('game types filter');
+    const gb = global.__bodies.filter(b => b.includes('search "fallout"')); if (!gb.length || !gb.every(b => b.includes('game_type = (0,3,4,6,8,9,10,11)'))) throw new Error('game types filter');
     if (!gb[0].includes('limit 20;')) throw new Error('page size ' + gb[0]);
     S.set.vmode.search = 'list'; G.renderSearchBody(); const html = document.querySelector('#srBody').innerHTML; if (!html.includes('class="srow"') || !html.includes('openIgdb')) throw new Error('search list view');
     G.ACT.vmode({ dataset: { k: 'search' } }); if (S.set.vmode.search !== 'tiles') throw new Error('vmode toggle'); S.set.pageSize = 40;
@@ -278,7 +304,7 @@ const L = require('../www/app.js');
     S.inboxList = null; S.tab = 'library'; G.render();
   });
   await step('RAWG как второй источник, основной поиск, лимит, архив, скриншоты', async () => {
-    S.set.rawgKey = 'RK'; S.set.mainSrc = 'rawg'; S.search.src = 'rawg'; S.tab = 'search'; S.search.q = 'rawg game'; S.search.f = { genre: '', genreName: '', platform: '', platformName: '', year: '', minRating: 0 };
+    S.set.rawgKey = 'RK'; S.set.mainSrc = 'rawg'; S.search.src = 'rawg'; S.tab = 'search'; S.search.q = 'rawg game'; S.search.f = { genres: [], genreNames: [], platforms: [], platformNames: [], years: [], minRating: 0 };
     await G.runSearch(true); if (!S.search.results.length || S.search.results[0].rid !== 'rawg:500') throw new Error('rawg search');
     if (!document.querySelector('#sTools').innerHTML.includes('RAWG')) throw new Error('source button');
     const left0 = S.set.rawgQuota.left, g = await G.addFromIgdb('rawg:500', []); if (!g || g.rawgId !== 500 || !g.rawgUrl.includes('rawg-game')) throw new Error('add from rawg');

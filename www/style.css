@@ -712,8 +712,8 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 
 /* красные границы у конца списка: мягкая дуга с затенением, середина выпячивается к центру при протягивании */
 .swe{position:fixed;z-index:33;width:0;opacity:0;pointer-events:none;transition:opacity .16s,width .07s}
-.swe.l{background:linear-gradient(to right,rgba(226,76,76,.5),rgba(226,76,76,.16) 62%,rgba(226,76,76,0));border-radius:0 100% 100% 0 / 0 50% 50% 0;filter:blur(.6px)}
-.swe.r{background:linear-gradient(to left,rgba(226,76,76,.5),rgba(226,76,76,.16) 62%,rgba(226,76,76,0));border-radius:100% 0 0 100% / 50% 0 0 50%;filter:blur(.6px)}
+.swe.l{background:linear-gradient(to right,rgba(255,122,26,.5),rgba(255,122,26,.16) 62%,rgba(255,122,26,0));border-radius:0 100% 100% 0 / 0 50% 50% 0;filter:blur(.6px)}
+.swe.r{background:linear-gradient(to left,rgba(255,122,26,.5),rgba(255,122,26,.16) 62%,rgba(255,122,26,0));border-radius:100% 0 0 100% / 50% 0 0 50%;filter:blur(.6px)}
 /* карточка поиска: индикатор загрузки подробностей на месте, без смещения содержимого */
 .rsload{min-height:20px;display:flex;align-items:center;gap:8px;margin:4px 0 2px;font-size:12px;color:var(--mut)}
 .rsload:empty{visibility:hidden}
@@ -748,3 +748,26 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 /* правила #view>* задают ширину и поля всем детям, поэтому для полосы и «пузыря» буквы они переопределяются */
 #view>#alpha,#view.fx>#alpha{width:22px;max-width:22px;margin:0;left:auto;right:6px}
 #view>#alphaBubble,#view.fx>#alphaBubble{width:auto;max-width:none;margin:0;right:auto}
+
+/* граница конца списка оранжевая, как основной цвет темы */
+@supports (color:color-mix(in srgb,red,blue)){
+.swe.l{background:linear-gradient(to right,color-mix(in srgb,var(--acc) 52%,transparent),color-mix(in srgb,var(--acc) 16%,transparent) 62%,transparent)}
+.swe.r{background:linear-gradient(to left,color-mix(in srgb,var(--acc) 52%,transparent),color-mix(in srgb,var(--acc) 16%,transparent) 62%,transparent)}
+}
+/* у завершённой игры в списке зелёным подсвечивается и закреплённая колонка названия (у неё свой сплошной фон) */
+.wrap tr.isdone td.pc{background-image:linear-gradient(rgba(74,222,128,.10),rgba(74,222,128,.10))}
+.wrap tr.isdone.last td.pc{background-image:linear-gradient(rgba(255,255,255,.055),rgba(255,255,255,.055)),linear-gradient(rgba(74,222,128,.10),rgba(74,222,128,.10))}
+
+/* тип карточки IGDB (чип) и значок B у бандла */
+.tchip{display:inline-block;font-size:10px;line-height:1;padding:2px 5px;border-radius:7px;background:rgba(0,0,0,.62);color:#e8e8ee;border:1px solid rgba(255,255,255,.2);white-space:nowrap;vertical-align:middle;font-weight:600}
+.tchip.t3,.tchip.t13{color:var(--acc);border-color:var(--acc)}
+.tchip.lg{font-size:12px;padding:3px 8px;border-radius:9px}
+.card .cv>.tchip{position:absolute;left:5px;top:5px;z-index:2}
+.srow .m .tchip{margin-right:5px}
+.bbadge{width:24px;height:24px;border-radius:50%;background:var(--acc);color:#111;font-weight:800;font-size:13px;line-height:1;padding:0;border:0;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
+.card .cv>.bbadge{position:absolute;right:5px;top:5px;z-index:3}
+.card .cv>.bbadge ~ .ok{right:34px}
+.srow .bbadge{margin-right:2px}
+.grid.z4 .tchip,.grid.z5 .tchip,.grid.z6 .tchip{font-size:9px;padding:1px 3px;left:3px;top:3px}
+.grid.z5 .bbadge,.grid.z6 .bbadge{width:17px;height:17px;font-size:10px;right:3px;top:3px}
+.grid.z5 .cv>.bbadge ~ .ok,.grid.z6 .cv>.bbadge ~ .ok{right:23px}

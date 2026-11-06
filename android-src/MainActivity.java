@@ -1,8 +1,13 @@
 package com.example.gamecatalog;
 
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+import android.view.HapticFeedbackConstants;
 import android.webkit.JavascriptInterface;
 import java.util.Locale;
 import com.getcapacitor.BridgeActivity;
@@ -36,6 +41,32 @@ public class MainActivity extends BridgeActivity {
                 } catch (Exception e) {
                     return false;
                 }
+            }
+
+            // лёгкая вибрация при смене карточки; без разрешения или вибромотора - системная тактильная отдача экрана
+            @JavascriptInterface
+            public void haptic(final int ms) {
+                MainActivity.this.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            Vibrator v = (Vibrator) MainActivity.this.getSystemService(Context.VIBRATOR_SERVICE);
+                            int t = Math.max(10, Math.min(ms, 80));
+                            if (v != null && v.hasVibrator()) {
+                                if (Build.VERSION.SDK_INT >= 26) v.vibrate(VibrationEffect.createOneShot(t, VibrationEffect.DEFAULT_AMPLITUDE));
+                                else v.vibrate(t);
+                                return;
+                            }
+                        } catch (Throwable e) {
+                            // нет разрешения или устройства: пробуем запасной путь
+                        }
+                        try {
+                            getBridge().getWebView().performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+                        } catch (Throwable e) {
+                            // тактильная отдача недоступна
+                        }
+                    }
+                });
             }
         }, "AndroidShare");
     }

@@ -541,13 +541,13 @@ const L = require('../www/app.js');
   });
   await step('серии: проверка полноты, типы, скрытые, добавление, поиск серий', async () => {
     const need = (c, m) => { if (!c) throw new Error(m); };
-    S.set.serTypes = undefined; S.set.serFuture = false; S.set.serChk = {}; S.set.serCol = {}; S.set.serIgnore = {};
+    S.set.serTypes = undefined; S.set.serFuture = false; S.set.serChk = {}; S.set.serCol = {}; S.set.serIgnore = {}; S.set.serOk = {};
     need(S.games.some(g => g.series === 'Fallout' && g.igdbId === 1), 'в каталоге должна быть игра серии Fallout из IGDB');
     let an = await G.serCheck('Fallout');
     need(an && an.col.id === 7, 'серия IGDB не определена по играм каталога');
     need(an.total === 3 && an.haveN === 1 && an.miss === 2, 'по умолчанию игры, ремейки, ремастеры без порта, бандла и неизданной: ' + JSON.stringify([an.total, an.haveN, an.miss]));
     need(an.future === 1, 'неизданная игра должна считаться отдельно');
-    need(G.serMiss('Fallout') === 2 && /ещё 2/.test(G.serBadge('Fallout')), 'бейдж неполной серии');
+    need(G.serMiss('Fallout') === 2 && /⚠ 2/.test(G.serBadge('Fallout')) && !/IGDB/.test(G.serBadge('Fallout').replace(/title="[^"]*"/, '')), 'бейдж неполной серии');
     S.set.serTypes = [0, 8, 9, 11]; an = G.serAnalyze(await G.collGames(7), 'Fallout'); need(an.total === 4, 'с портами 4 игры, а не ' + an.total);
     S.set.serTypes = undefined;
     // экран серии, выбор и скрытие
@@ -560,10 +560,21 @@ const L = require('../www/app.js');
     await G.ACT.serAddSel();
     need(S.games.some(g => g.igdbId === 201 || g.name === 'Fallout 3') || S.games.length > 0, 'добавление выбранных');
     G.renderSearchBody();
+    // ручная отметка «серия полная» и полноэкранный экран серии
+    need(/serbd ok/.test((G.ACT.serMark(), G.serBadge('Fallout'))) && G.serMiss('Fallout') === 0, 'отметка серии полной');
+    need(!/data-act="sq"|id="sq"/.test(G.viewSearch()) && (G.viewSearch().match(/data-act="sBack"/g) || []).length === 1 && !/id="sTools"/.test(G.viewSearch()), 'экран серии без строки поиска и с одной кнопкой возврата');
+    G.ACT.serMark(); need(G.serMiss('Fallout') > 0, 'отметка снимается');
+    // чипы типов: название и число игр; в серии включают/выключают тип, в поиске фильтруют список
+    const tc = G.typeCountsHtml(); need(/Игра <b>3<\/b>/.test(tc) && /Ремейк <b>1<\/b>/.test(tc) && /Порт <b>1<\/b>/.test(tc) && /Бандл <b>1<\/b>/.test(tc), 'чипы типов серии: ' + tc);
     // поиск серий
     S.search.kind = 'series'; S.search.q = 'fallout'; await G.runColSearch();
     need(S.search.cols.length >= 1 && S.search.cols[0].id === 7, 'поиск серии по названию');
-    G.renderSearchBody(); S.search.kind = 'games'; S.search.cols = []; S.search.chk = null; S.search.mode = 'search';
+    G.renderSearchBody(); S.search.kind = 'games'; S.search.mode = 'search'; S.search.chk = null; S.search.src = 'igdb'; S.search.tf = [];
+    S.search.results = [{ rid: 'igdb:1', name: 'A', type: 0 }, { rid: 'igdb:2', name: 'B', type: 8 }, { rid: 'igdb:3', name: 'C', type: 8 }, { rid: 'igdb:4', name: 'D', type: 14 }];
+    need(/Ремейк <b>2<\/b>/.test(G.typeCountsHtml()) && /Обновление <b>1<\/b>/.test(G.typeCountsHtml()), 'чипы типов поиска');
+    G.ACT.tfChip({ dataset: { v: '8' } }); need(G.viewRes().length === 2 && /p xs on/.test(G.typeCountsHtml()), 'нажатие на чип фильтрует список');
+    G.ACT.tfChip({ dataset: { v: '8' } }); need(G.viewRes().length === 4, 'повторное нажатие снимает фильтр'); S.search.results = [];
+    S.search.kind = 'games'; S.search.cols = []; S.search.chk = null; S.search.mode = 'search';
     // вкладка серий: кнопка проверки и бейджи
     S.tab = 'series'; G.render(); need(G.seriesTilesHtml().includes('serbd'), 'бейдж на плитке серии');
     await G.serCheckAll(); S.tab = 'library'; G.render();

@@ -792,15 +792,25 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .added{display:inline-flex;align-items:center;color:var(--green);font-weight:700;font-size:13px;padding:0 4px}
 
 /* серии: проверка полноты, поиск серий */
-.serbd{border:1px solid var(--mut);background:transparent;border-radius:10px;padding:2px 8px;font-size:11px;line-height:1.4;color:var(--mut);margin:0 8px 8px;min-height:24px}
-.serbd.warn{color:#f0a030;border-color:#f0a030;background:rgba(240,160,48,.12)}
+.serbd{border:1px solid var(--mut);background:transparent;border-radius:9px;padding:0 6px;font-size:11px;line-height:18px;height:20px;color:var(--mut);white-space:nowrap}
+.serbd.warn{color:#f0a030;border-color:#f0a030;background:rgba(240,160,48,.14)}
 .serbd.ok{color:var(--green);border-color:var(--green)}
-.lrow .sbw .serbd,.spmid .serbd{margin:2px 0 0;align-self:flex-start}
-.tile .sbw{display:flex}
+.tile .sbw{position:absolute;right:6px;top:8px;z-index:2}
+.tile .sbw .serbd{background:rgba(20,20,20,.82)}
+.lrow{position:relative}.lrow .sbw{position:absolute;right:10px;top:8px}.lrow.hasbd .nm{padding-right:46px}
+.spmid .serbd{align-self:flex-start;margin-top:2px}
+.p.sm,.chips.sm .p{padding:4px 10px;font-size:12px}
+.chips.sm{gap:6px;margin-bottom:6px}
+.p.ic{display:inline-flex;align-items:center;gap:4px}
+.icx{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .srow.pick,.card.pick{outline:2px solid var(--acc);outline-offset:-2px;background:rgba(255,165,0,.14)}
-.srow .selck,.card .selck{position:absolute;display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--acc);color:#111;font-weight:800;font-size:13px;z-index:4}
-.card{position:relative}.card .selck{left:6px;top:6px}
-.srow{position:relative}.srow .selck{position:static;flex:0 0 22px}
+.srow .selck,.card .selck{display:flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--acc);color:#111;font-weight:800;font-size:13px;z-index:4}
+.card{position:relative}.card .selck{position:absolute;left:6px;top:6px}
+.srow{position:relative}.srow .selck{flex:0 0 22px}
 .dim{opacity:.5}
-.kindsw b{color:var(--acc)}
 .srow.colrow{padding:12px 12px;min-height:44px}
+
+#sTypes{display:flex;gap:5px;overflow-x:auto;flex-wrap:nowrap;margin:2px 0 4px;scrollbar-width:none}
+#sTypes::-webkit-scrollbar{display:none}
+#sTypes .p,.p.xs{flex:0 0 auto;padding:2px 8px;font-size:11px;line-height:1.5}
+.p.xs b{font-weight:700;opacity:.85}

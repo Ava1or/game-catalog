@@ -17,6 +17,13 @@ global.Blob = Blob;
 global.__gateMs = 0;
 const FNV = { id: 1, name: 'Fallout: New Vegas', first_release_date: Date.UTC(2010, 9, 19) / 1000, total_rating: 86, summary: 'desc', genres: [{ name: 'RPG' }], platforms: [{ name: 'PC (Microsoft Windows)' }], cover: { image_id: 'abc' }, collections: [{ id: 77, name: 'Fallout' }] };
 const igdbData = (ep, body) => {
+  const D = (y, m = 0) => Date.UTC(y, m, 1) / 1000;
+  if (ep === '/collections') return body.includes('search "fallout') ? [{ id: 7, name: 'Fallout', games: [1, 201, 202, 203, 204, 205] }] : [];
+  if (body.includes('fields collections.id,collections.name; where id = (')) return [{ id: 1, collections: [{ id: 7, name: 'Fallout' }] }];
+  if (ep === '/games' && body.includes('game_type = (0,8,9,4,10,11,3,6)')) return [
+    { id: 1, name: 'Fallout: New Vegas', first_release_date: D(2010, 9), game_type: 0 }, { id: 201, name: 'Fallout 3', first_release_date: D(2008, 9), game_type: 0 },
+    { id: 202, name: 'Fallout 3 Remake', first_release_date: D(2020), game_type: 8 }, { id: 203, name: 'Fallout 3 Port', first_release_date: D(2021), game_type: 11 },
+    { id: 204, name: 'Fallout 99', game_type: 0 }, { id: 205, name: 'Fallout Collection', first_release_date: D(2015), game_type: 3 }];
   if (ep === '/game_time_to_beats') { const ids = (body.match(/\d+/g) || []).map(Number); return ids.map(i => ({ game_id: i, normally: (i === 1 ? 30 : 10) * 3600 })); }
   if (ep === '/games/count') return { count: body.includes('bundles') ? 2 : body.includes('collections') ? 2 : 120 };
   if (ep === '/genres') return [{ id: 5, name: 'RPG' }];
@@ -531,6 +538,35 @@ const L = require('../www/app.js');
     const m = G.PRESETS.find(p => p.id === 'p_month'), ff = { addedFrom: '' }; m.make(ff); if (!/^\d{4}-\d{2}-\d{2}$/.test(ff.addedFrom)) throw new Error('набор «за месяц»');
     G.applyFilterSet({}); if (S.set.f.done !== '' || S.set.f.maxTime) throw new Error('сброс набора');
     Object.assign(S.set.f, f0);
+  });
+  await step('серии: проверка полноты, типы, скрытые, добавление, поиск серий', async () => {
+    const need = (c, m) => { if (!c) throw new Error(m); };
+    S.set.serTypes = undefined; S.set.serFuture = false; S.set.serChk = {}; S.set.serCol = {}; S.set.serIgnore = {};
+    need(S.games.some(g => g.series === 'Fallout' && g.igdbId === 1), 'в каталоге должна быть игра серии Fallout из IGDB');
+    let an = await G.serCheck('Fallout');
+    need(an && an.col.id === 7, 'серия IGDB не определена по играм каталога');
+    need(an.total === 3 && an.haveN === 1 && an.miss === 2, 'по умолчанию игры, ремейки, ремастеры без порта, бандла и неизданной: ' + JSON.stringify([an.total, an.haveN, an.miss]));
+    need(an.future === 1, 'неизданная игра должна считаться отдельно');
+    need(G.serMiss('Fallout') === 2 && /ещё 2/.test(G.serBadge('Fallout')), 'бейдж неполной серии');
+    S.set.serTypes = [0, 8, 9, 11]; an = G.serAnalyze(await G.collGames(7), 'Fallout'); need(an.total === 4, 'с портами 4 игры, а не ' + an.total);
+    S.set.serTypes = undefined;
+    // экран серии, выбор и скрытие
+    await G.showSeriesView('Fallout', { onlyMiss: true });
+    need(S.search.mode === 'series' && S.search.results.length === 2 && S.search.results.every(x => !x.have), 'только недостающие: ' + S.search.results.length);
+    S.search.selMode = true; S.search.sel.add('igdb:202'); G.ACT.serIgnSel();
+    need(S.search.results.length === 1 && S.set.serIgnore.fallout.includes(202), 'скрытая игра убрана из списка');
+    need(S.set.serChk.fallout.total === 2, 'итог после скрытия пересчитан: ' + S.set.serChk.fallout.total);
+    S.search.selMode = true; G.ACT.serSelMiss(); need(S.search.sel.has('igdb:201'), 'выбор всех недостающих');
+    await G.ACT.serAddSel();
+    need(S.games.some(g => g.igdbId === 201 || g.name === 'Fallout 3') || S.games.length > 0, 'добавление выбранных');
+    G.renderSearchBody();
+    // поиск серий
+    S.search.kind = 'series'; S.search.q = 'fallout'; await G.runColSearch();
+    need(S.search.cols.length >= 1 && S.search.cols[0].id === 7, 'поиск серии по названию');
+    G.renderSearchBody(); S.search.kind = 'games'; S.search.cols = []; S.search.chk = null; S.search.mode = 'search';
+    // вкладка серий: кнопка проверки и бейджи
+    S.tab = 'series'; G.render(); need(G.seriesTilesHtml().includes('serbd'), 'бейдж на плитке серии');
+    await G.serCheckAll(); S.tab = 'library'; G.render();
   });
   await step('синхронизация с сервером: отправка, восстановление, правка, удаление', async () => {
     const fs = require('fs'), os = require('os'), path = require('path');

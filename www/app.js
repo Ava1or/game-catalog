@@ -334,7 +334,7 @@ const S = {
   games: [], collections: [], props: [], set: clone(DEFAULTS), lists: {},
   trash: [], shotUrls: [], igdbShots: [], cFind: '', sFind: '', block: null, inbox: { lists: [], items: [] }, inboxList: null, pending: null, showDone: true,
   tab: 'library', selMode: false, sel: new Set(), shown: [],
-  retGame: null, lastGame: '', inSel: new Set(), inSelMode: false, search: { src: 'igdb', q: '', f: { genres: [], genreNames: [], platforms: [], platformNames: [], years: [], minRating: 0 }, results: [], stack: [], bundle: null, page: 0, hasMore: false, count: 0, loading: false, token: 0, mode: 'search', title: '', started: false }
+  retGame: null, lastGame: '', inSel: new Set(), inSelMode: false, search: { src: 'igdb', kind: 'games', cols: [], bind: '', chk: null, sel: new Set(), selMode: false, q: '', f: { genres: [], genreNames: [], platforms: [], platformNames: [], years: [], minRating: 0 }, results: [], stack: [], bundle: null, page: 0, hasMore: false, count: 0, loading: false, token: 0, mode: 'search', title: '', started: false }
 };
 const coverCache = new Map();
 let installEvt = null;
@@ -820,6 +820,167 @@ function gameFromRawg(d, series) {
 }
 const gameFromDetails = (d, series) => d._src === 'rawg' ? gameFromRawg(d, series) : gameFromIgdb(d, series);
 const yearOfD = d => d._src === 'rawg' ? (d.released ? +d.released.slice(0, 4) : 0) : yearOf(d);
+/* ====== Серии IGDB: поиск серий и проверка полноты ====== */
+const SER_TYPE_LIST = [[0, 'Игры'], [8, 'Ремейки'], [9, 'Ремастеры'], [4, 'Автономные доп.'], [10, 'Расширенные'], [11, 'Порты'], [3, 'Бандлы'], [6, 'Эпизоды']];
+const SER_TYPES_DEF = [0, 8, 9]; // в проверке серии по умолчанию: основные игры, ремейки и ремастеры; порты, бандлы и прочее включаются кнопками
+const serTypes = () => { const t = S.set.serTypes; return Array.isArray(t) && t.length ? t.map(Number) : SER_TYPES_DEF; };
+const serKey = n => normName(n);
+const serMap = k => (S.set[k] = S.set[k] || {});
+const colCache = new Map();
+// все игры серии IGDB (кроме DLC, модов и патчей); типы отбираются уже в приложении, поэтому смена типов не требует новых запросов
+async function collGames(colId, times) {
+  let c = colCache.get(colId);
+  if (!c || Date.now() - c.t > 6e5) {
+    const list = await igdb('/games', 'fields ' + IGDB_FIELDS + '; where collections = (' + (+colId) + ') & game_type = (' + SER_TYPE_LIST.map(x => x[0]).join(',') + '); sort first_release_date asc; limit 500;');
+    list.forEach(x => { x._src = 'igdb'; }); c = { t: Date.now(), v: list, tm: false }; colCache.set(colId, c);
+  }
+  if (times && !c.tm) { await attachTimes(c.v); c.tm = true; }
+  return c.v;
+}
+// какой серии IGDB соответствует серия каталога: по играм каталога (у них известны серии IGDB), затем по названию; выбор запоминается
+async function serCollection(name) {
+  const key = serKey(name), saved = serMap('serCol')[key]; if (saved) return saved;
+  const ids = S.games.filter(g => g.igdbId && g.series && serKey(g.series) === key).slice(0, 100).map(g => g.igdbId); let best = null;
+  if (ids.length) {
+    const list = await igdb('/games', 'fields collections.id,collections.name; where id = (' + ids.join(',') + '); limit ' + ids.length + ';'), votes = new Map();
+    list.forEach(x => (x.collections || []).forEach(c => { const v = votes.get(c.id) || { id: c.id, name: c.name, n: 0, same: serKey(c.name) === key ? 1 : 0 }; v.n++; votes.set(c.id, v); }));
+    best = Array.from(votes.values()).sort((a, b) => b.same - a.same || b.n - a.n)[0] || null;
+  }
+  if (!best) {
+    const r = await igdb('/collections', 'search "' + igdbQuote(name) + '"; fields name,games; limit 10;');
+    best = r.find(c => serKey(c.name) === key) || r.find(c => serKey(c.name).includes(key) || key.includes(serKey(c.name))) || null;
+  }
+  if (!best) return null;
+  const col = { id: best.id, name: best.name }; serMap('serCol')[key] = col; saveSet(); return col;
+}
+// поиск серий: по названию серии и по названию игры (серии найденных игр)
+async function searchCollections(q) {
+  const [r, g] = await Promise.all([igdb('/collections', 'search "' + igdbQuote(q) + '"; fields name,games; limit 30;'), igdb('/games', 'search "' + igdbQuote(q) + '"; fields name,collections.id,collections.name; limit 20;').catch(e => { if (S.block) throw e; return []; })]);
+  const out = r.map(c => ({ id: c.id, name: c.name, n: (c.games || []).length })), have = new Set(out.map(c => c.id));
+  g.forEach(x => (x.collections || []).forEach(c => { if (!have.has(c.id)) { have.add(c.id); out.push({ id: c.id, name: c.name, n: 0, via: x.name }); } }));
+  return out;
+}
+// присутствие игры IGDB в каталоге: по id или (для игр без IGDB) по названию и году
+function serHave() {
+  const ids = new Set(), names = new Map();
+  S.games.forEach(g => { if (g.igdbId) ids.add(g.igdbId); const k = normName(g.name); if (!names.has(k)) names.set(k, []); names.get(k).push({ y: g.year || 0, l: !!g.igdbId }); });
+  return x => { if (ids.has(x.id)) return true; const y = yearOf(x); return (names.get(normName(x.name)) || []).some(e => e.l ? (e.y && y && e.y === y) : (!e.y || !y || e.y === y)); };
+}
+function serAnalyze(list, name) {
+  const have = serHave(), ign = new Set(serMap('serIgnore')[serKey(name)] || []), types = serTypes(), now = Date.now(), items = [];
+  list.forEach(x => {
+    if (!types.includes(typeOf(x))) return;
+    const it = mapItem(x); it.have = have(x); it.ign = ign.has(x.id); it.fut = !x.first_release_date || x.first_release_date * 1000 > now; it.gid = x.id; items.push(it);
+  });
+  const live = items.filter(i => !i.ign && (!i.fut || S.set.serFuture)), haveN = live.filter(i => i.have).length;
+  return { items, total: live.length, haveN, miss: live.length - haveN, hidden: items.filter(i => i.ign).length, future: items.filter(i => i.fut && !i.ign).length };
+}
+function serSave(name, col, an) { serMap('serChk')[serKey(name)] = { t: Date.now(), id: col.id, total: an.total, have: an.haveN }; saveSet(); }
+async function serCheck(name) {
+  const col = await serCollection(name);
+  if (!col) { serMap('serChk')[serKey(name)] = { t: Date.now(), none: 1 }; saveSet(); return null; }
+  const an = serAnalyze(await collGames(col.id), name); an.col = col; serSave(name, col, an); return an;
+}
+const serMiss = name => { const c = serMap('serChk')[serKey(name)]; return c && !c.none ? Math.max(0, c.total - c.have) : -1; };
+function serBadge(name) {
+  const c = serMap('serChk')[serKey(name)]; if (!c || c.none) return '';
+  const miss = c.total - c.have, a = ' data-act="serCheck" data-name="' + esc(name) + '" title="Проверено ' + esc(new Date(c.t).toLocaleDateString(LOC)) + '. Нажмите, чтобы открыть серию"';
+  return miss > 0 ? '<button class="serbd warn"' + a + '>⚠ в IGDB ещё ' + miss + '</button>' : '<button class="serbd ok"' + a + '>✓ серия полная</button>';
+}
+// название серии в каталоге по играм из списка IGDB (чтобы не заводить вторую серию с другим названием)
+function serCatalogName(list) {
+  const ids = new Set(list.map(x => x.id)), cnt = new Map();
+  S.games.forEach(g => { if (g.series && g.igdbId && ids.has(g.igdbId)) cnt.set(g.series, (cnt.get(g.series) || 0) + 1); });
+  return Array.from(cnt.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+}
+function serApply() { // список на экране серии из загруженных игр, типов, скрытых и фильтра «только недостающие»
+  const s = S.search, c = s.chk; if (!c || !c.list) return;
+  const an = serAnalyze(c.list, c.name); c.an = an;
+  const vis = i => c.showIgn ? i.ign : (!i.ign && (S.set.serFuture || !i.fut));
+  s.results = an.items.filter(i => vis(i) && (!c.onlyMiss || !i.have)); s.count = s.results.length; s.hasMore = false;
+  if (c.col) serSave(c.name, c.col, an);
+}
+async function showSeriesView(name, o) {
+  o = o || {}; const s = S.search;
+  if (!S.retGame && !(o.from && o.from !== 'search') && pushSearchState()) s.stack[s.stack.length - 1].lastRid = '';
+  s.bundle = null; s.src = 'igdb'; s.token++; const token = s.token; s.mode = 'series'; s.title = name; s.results = []; s.hasMore = false; s.loading = true; s.started = true; s.count = 0; s.lastRid = '';
+  s.chk = { name, col: null, list: null, an: null, onlyMiss: !!o.onlyMiss, showIgn: false, from: o.from || '' }; s.sel = new Set(); s.selMode = false; s.bind = ''; S.tab = 'search'; closeSheet(); render();
+  try {
+    const col = o.colId ? { id: o.colId, name } : await serCollection(name); if (token !== s.token) return;
+    if (col) {
+      const list = await collGames(col.id, true); if (token !== s.token) return;
+      s.chk.col = col; s.chk.list = list;
+      if (o.colId) { const nm = serCatalogName(list); if (nm) { s.chk.name = nm; s.title = nm; } const k = serKey(s.chk.name); if (!serMap('serCol')[k]) { serMap('serCol')[k] = { id: col.id, name: col.name }; saveSet(); } }
+      serApply();
+    }
+  } catch (e) { logErr('серия IGDB', e); if (token === s.token) toast(e.message); }
+  if (token === s.token) { s.loading = false; renderSearchBody(); }
+}
+function serHeadHtml() {
+  const s = S.search, c = s.chk, an = c.an;
+  let h = '<div class="hdr2"><h2 style="font-size:17px">Серия: ' + esc(c.name) + '</h2><button class="btn" data-act="sBack">← Назад</button></div>';
+  if (s.loading) return h + '<p class="sub">Проверяю серию в IGDB…</p>';
+  if (!c.col) return h + '<div class="hint">Серия «' + esc(c.name) + '» не найдена в IGDB.<br><br><button class="btn acc" data-act="serRebind">Выбрать серию IGDB вручную</button></div>';
+  const pc = an.total ? Math.round(an.haveN * 100 / an.total) : 0, full = an.total > 0 && an.miss === 0, n = s.sel.size;
+  h += '<p class="sub" style="margin:0 2px 6px">IGDB: «' + esc(c.col.name) + '» · в каталоге <b>' + an.haveN + ' из ' + an.total + '</b>' + (full ? ' · ✓ серия полная' : an.miss ? ' · не хватает: <b>' + an.miss + '</b>' : '') + '</p>'
+    + '<div class="spbar" style="margin:0 2px 8px"><i style="width:' + pc + '%;background:' + (full ? 'var(--green)' : '#f0a030') + '"></i></div>'
+    + '<div class="chips">' + SER_TYPE_LIST.map(x => '<button class="p' + (serTypes().includes(x[0]) ? ' on' : '') + '" data-act="serType" data-v="' + x[0] + '">' + x[1] + '</button>').join('') + '</div>'
+    + '<div class="chips"><button class="p' + (c.onlyMiss ? ' on' : '') + '" data-act="serOnly">Только недостающие</button>'
+    + '<button class="p' + (S.set.serFuture ? ' on' : '') + '" data-act="serFuture">Ещё не вышли' + (an.future ? ' (' + an.future + ')' : '') + '</button>'
+    + (an.hidden || c.showIgn ? '<button class="p' + (c.showIgn ? ' on' : '') + '" data-act="serShowIgn">Скрытые (' + an.hidden + ')</button>' : '')
+    + '<button class="p' + (s.selMode ? ' on' : '') + '" data-act="serSel">' + (s.selMode ? '✓ Выбор игр' : 'Выбрать игры') + '</button></div>';
+  if (s.selMode) h += '<div class="toolbar"><button class="btn" data-act="serSelMiss">Все недостающие</button>'
+    + (c.showIgn ? '' : '<button class="btn acc" data-act="serAddSel"' + (n ? '' : ' disabled') + '>＋ Добавить в каталог (' + n + ')</button>')
+    + '<button class="btn" data-act="serIgnSel"' + (n ? '' : ' disabled') + '>' + (c.showIgn ? 'Вернуть в серию (' + n + ')' : 'Не нужны (' + n + ')') + '</button></div>';
+  return h + '<p class="sub" style="margin:0 2px 8px"><a data-act="serRebind" style="color:var(--blue);cursor:pointer">Не та серия IGDB? Выбрать другую</a></p>';
+}
+function colListHtml() {
+  const s = S.search;
+  if (blockFor('igdb')) return blockBanner(true, 'igdb');
+  if (!PROV.igdb.ready()) return '<div class="hint">' + PROV.igdb.noKeys + '<br><br><button class="btn acc" data-act="tab" data-tab="settings">Открыть настройки</button></div>';
+  if (s.loading) return '<div class="status">Загрузка…</div>';
+  if (!s.cols.length) return '<div class="hint">' + (s.started ? 'Серия не найдена в IGDB.<br>Попробуйте другое название или название игры из этой серии.' : 'Введите название серии (например, «Fallout») или игры из неё') + '</div>';
+  const cnt = new Map(); S.games.forEach(g => { if (g.series) { const k = serKey(g.series); cnt.set(k, (cnt.get(k) || 0) + 1); } });
+  return '<div class="srl">' + s.cols.map(c => {
+    const k = cnt.get(serKey(c.name)) || 0, meta = [c.n ? 'записей в IGDB: ' + c.n : '', c.via ? 'через игру «' + c.via + '»' : '', k ? 'в каталоге: ' + k : ''].filter(Boolean).join(' · ');
+    return '<div class="srow colrow" data-act="colTap" data-id="' + c.id + '" data-name="' + esc(c.name) + '"><div class="sm"><div class="nm">' + esc(c.name) + '</div><div class="m">' + esc(meta) + '</div></div>' + (k ? '<span class="ok2">✓</span>' : '') + '</div>';
+  }).join('') + '</div>';
+}
+async function runColSearch() {
+  const s = S.search, q = s.q.trim(); s.cols = []; s.results = []; s.hasMore = false;
+  if (!q) { s.started = false; renderSearchBody(); return; }
+  if (!PROV.igdb.ready()) { renderSearchBody(); return; }
+  const token = s.token; s.loading = true; s.started = true; renderSearchBody();
+  try { const r = await searchCollections(q); if (token === s.token) s.cols = r; } catch (e) { logErr('поиск серий', e); if (token === s.token) toast(e.message); }
+  finally { if (token === s.token) { s.loading = false; renderSearchBody(); } }
+}
+async function serAddSelected() {
+  const s = S.search, c = s.chk, rids = Array.from(s.sel).filter(r => !gameByRid(r)); if (!rids.length) return toast('Выбранные игры уже в каталоге');
+  const snap = takeSnap(); let n = 0, bad = 0; toast('Добавляю игры: ' + rids.length + '…');
+  for (const rid of rids) { try { if (await addFromIgdb(rid, [], { series: c.name, bg: true })) n++; } catch (e) { bad++; logErr('серия: добавление игры', e); if (S.block) break; } }
+  s.sel.clear(); s.selMode = false; serApply(); renderSearchBody(); toastUndo('Добавлено игр: ' + n + (bad ? ', не удалось: ' + bad : ''), snap);
+}
+function serDrawProg() {
+  const A = S.serAll, el = $('#serProg'), b = $('#serAllBtn'); if (!A) return;
+  if (el) el.textContent = A.run ? 'Проверено серий: ' + A.done + ' из ' + A.total : A.msg || '';
+  if (b) b.textContent = A.run ? 'Остановить проверку' : 'Проверить полноту серий';
+}
+async function serCheckAll() {
+  const A0 = S.serAll; if (A0 && A0.run) { A0.run = false; return; }
+  if (!PROV.igdb.ready()) return toast('IGDB недоступен: проверьте ключи или локальный сервер в настройках');
+  const names = Array.from(seriesGroups().keys()).filter(Boolean); if (!names.length) return toast('Серий пока нет');
+  const A = S.serAll = { run: true, done: 0, total: names.length, bad: 0, msg: '' }; serDrawProg();
+  for (const n of names) {
+    if (!A.run) break;
+    try { await serCheck(n); } catch (e) { A.bad++; logErr('проверка серии', e); if (S.block) break; }
+    A.done++; serDrawProg(); if (A.done % 5 === 0 && S.tab === 'series') { const b = $('#tilesBox'); if (b) b.innerHTML = seriesTilesHtml(); }
+  }
+  const stopped = !A.run; A.run = false;
+  const inc = names.filter(n => serMiss(n) > 0).length, none = names.filter(n => (serMap('serChk')[serKey(n)] || {}).none).length;
+  A.msg = (stopped ? 'Проверка остановлена. ' : '') + 'Неполных серий: ' + inc + (none ? ', не найдено в IGDB: ' + none : '') + (A.bad ? ', ошибок: ' + A.bad : '');
+  if (S.tab === 'series') render(); toast(A.msg);
+}
+
 const adding = new Set();
 const askChoose = o => (window.__chooseHook || choose)(o), askPrompt = (...a) => (window.__promptHook || promptBox)(...a); // подмена нужна только тестам
 // обложка и SteamGridDB в фоне: сеть не задерживает добавление игры; после загрузки признак «есть обложка» записывается в базу
@@ -1609,7 +1770,7 @@ function serRowHtml(d, nm) {
   list.sort((a, b) => (+a.year || 9999) - (+b.year || 9999) || (a.added || 0) - (b.added || 0) || String(a.name).localeCompare(String(b.name)));
   const i = list.findIndex(g => g.id === d.id), done = list.filter(g => g.done).length;
   const nb = (g, dd, ch) => '<button class="ib" data-act="serNav" data-d="' + dd + '"' + (g ? ' data-id="' + g.id + '" title="' + esc(g.name) + '"' : ' disabled') + ' aria-label="' + (dd < 0 ? 'Предыдущая игра серии' : 'Следующая игра серии') + '">' + ch + '</button>';
-  return nb(list[i - 1], -1, '‹') + '<div class="spmid"><span>Серия: <b>' + (i + 1) + ' из ' + list.length + '</b> · завершено ' + done + '</span><div class="spbar"><i style="width:' + Math.round(done / list.length * 100) + '%"></i></div></div>' + nb(list[i + 1], 1, '›');
+  return nb(list[i - 1], -1, '‹') + '<div class="spmid"><span>Серия: <b>' + (i + 1) + ' из ' + list.length + '</b> · завершено ' + done + '</span><div class="spbar"><i style="width:' + Math.round(done / list.length * 100) + '%"></i></div>' + serBadge(nm) + '</div>' + nb(list[i + 1], 1, '›');
 }
 function drawShSeries() {
   const el = $('#shSerie'); if (!el || !S.sheet) return; const d = S.sheet.draft;
@@ -2013,12 +2174,12 @@ function entryHtml(k, o) {
   const meta = '<div class="ct"><span>' + gWord(o.count) + '</span><span title="Завершено" style="color:' + pcol + '">✓ ' + pc + '%</span></div><div class="pb"><i style="width:' + pc + '%;background:' + pcol + '"></i></div>';
   if (list) {
     const u = o.covers[0];
-    return '<div class="lrow" data-act="' + o.act + '"' + key + lpm + (col ? ' style="border-left-color:' + col + '"' : '') + '><div class="lth"' + (u ? ' style="background-image:url(\'' + bgu(u) + '\')"' : '') + '></div><div class="lm"><div class="nm">' + esc(o.name) + '</div>' + meta + '</div></div>';
+    return '<div class="lrow" data-act="' + o.act + '"' + key + lpm + (col ? ' style="border-left-color:' + col + '"' : '') + '><div class="lth"' + (u ? ' style="background-image:url(\'' + bgu(u) + '\')"' : '') + '></div><div class="lm"><div class="nm">' + esc(o.name) + '</div>' + meta + (o.badge ? '<div class="sbw">' + o.badge + '</div>' : '') + '</div></div>';
   }
   // обложки растянуты на всю ширину плитки и перекрывают друг друга
   const n = o.covers.length, w = n === 1 ? 61 : n === 2 ? 52 : n === 3 ? 46 : 40, left = i => n === 1 ? (100 - w) / 2 : i * (100 - w) / (n - 1);
   return '<div class="tile" data-act="' + o.act + '"' + key + lpm + (col ? ' style="border-top:4px solid ' + col + '"' : '') + '><div class="mos">' + o.covers.map((u, i) => '<i style="left:' + left(i) + '%;width:' + w + '%;background-image:url(\'' + bgu(u) + '\')"></i>').join('') + '</div>'
-    + '<div class="nm">' + esc(o.name) + '</div>' + meta + '</div>';
+    + '<div class="nm">' + esc(o.name) + '</div>' + meta + (o.badge ? '<div class="sbw">' + o.badge + '</div>' : '') + '</div>';
 }
 function collTilesHtml() {
   const q = normName(S.cFind), out = [];
@@ -2367,30 +2528,33 @@ function viewStats() {
 
 /* ====================== Серии ====================== */
 function seriesGroups() { const m = new Map(); S.games.forEach(g => { const k = g.series || ''; if (!m.has(k)) m.set(k, []); m.get(k).push(g); }); return m; }
-const SER_SORTS = [['alpha', 'По алфавиту (А → Я)'], ['-alpha', 'По алфавиту (Я → А)'], ['-count', 'По количеству игр (больше сверху)'], ['count', 'По количеству игр (меньше сверху)'], ['-pct', 'По проценту прохождения (больше сверху)'], ['pct', 'По проценту прохождения (меньше сверху)']];
+const SER_SORTS = [['alpha', 'По алфавиту (А → Я)'], ['-alpha', 'По алфавиту (Я → А)'], ['-count', 'По количеству игр (больше сверху)'], ['count', 'По количеству игр (меньше сверху)'], ['-pct', 'По проценту прохождения (больше сверху)'], ['pct', 'По проценту прохождения (меньше сверху)'], ['-miss', 'Сначала неполные (по проверке в IGDB)']];
 function seriesTilesHtml() {
   const m = seriesGroups(), q = normName(S.sFind), none = m.get('') || [];
   const so = S.set.serSort || 'alpha', desc = so.charAt(0) === '-', kind = so.replace('-', ''), alpha = (a, b) => a.localeCompare(b, LOC);
-  const names = Array.from(m.keys()).filter(n => n && (!q || normName(n).includes(q))).sort((a, b) => {
-    const la = m.get(a), lb = m.get(b), r = kind === 'count' ? la.length - lb.length : kind === 'pct' ? donePct(la) - donePct(lb) || la.length - lb.length : alpha(a, b);
+  const names = Array.from(m.keys()).filter(n => n && (!q || normName(n).includes(q)) && (!S.set.serOnlyInc || serMiss(n) > 0)).sort((a, b) => {
+    const la = m.get(a), lb = m.get(b), r = kind === 'count' ? la.length - lb.length : kind === 'pct' ? donePct(la) - donePct(lb) || la.length - lb.length : kind === 'miss' ? serMiss(a) - serMiss(b) : alpha(a, b);
     return r ? (desc ? -r : r) : alpha(a, b);
   });
-  const mk = (key, list, menu) => entryHtml('series', { act: 'serOpen', attr: 'name', key, name: key || 'Без серий', count: list.length, games: list, color: '', covers: list.filter(x => x.hasCover || x.coverUrl).slice(0, 4).map(coverSrc).filter(Boolean), lpm: 'ser' });
+  const mk = (key, list, menu) => entryHtml('series', { act: 'serOpen', attr: 'name', key, name: key || 'Без серий', count: list.length, games: list, color: '', covers: list.filter(x => x.hasCover || x.coverUrl).slice(0, 4).map(coverSrc).filter(Boolean), lpm: 'ser', badge: key ? serBadge(key) : '' });
   return ((!q || 'без серий'.includes(q)) ? mk('', none, false) : '') + names.map(n => mk(n, m.get(n), true)).join('') || '<p class="hint">Ничего не найдено</p>';
 }
 function viewSeries() {
   const hasNames = Array.from(seriesGroups().keys()).some(Boolean);
   return '<div class="top"><div class="hdr2"><h2>Серии игр</h2>' + modeBtns('series') + '</div>'
-    + '<div class="bar"><div class="sbox"><span>🔍</span><input id="sfind" placeholder="Поиск серий" value="' + esc(S.sFind) + '"></div></div></div><div class="scrl">' + dupBanner('series')
+    + '<div class="bar"><div class="sbox"><span>🔍</span><input id="sfind" placeholder="Поиск серий" value="' + esc(S.sFind) + '"></div></div>'
+    + (hasNames ? '<div class="toolbar" style="margin:2px 0 4px"><button class="btn" id="serAllBtn" data-act="serCheckAll">' + (S.serAll && S.serAll.run ? 'Остановить проверку' : 'Проверить полноту серий') + '</button><button class="p' + (S.set.serOnlyInc ? ' on' : '') + '" data-act="serOnlyInc">Только неполные</button></div><div class="sub" id="serProg" style="margin:0 2px 4px">' + (S.serAll ? (S.serAll.run ? 'Проверено серий: ' + S.serAll.done + ' из ' + S.serAll.total : S.serAll.msg || '') : '') + '</div>' : '')
+    + '</div><div class="scrl">' + dupBanner('series')
     + boxHtml('series', seriesTilesHtml())
     + (hasNames ? '<p class="sub" style="text-align:center;margin-top:12px">Долгое нажатие на серию: выгрузить, переименовать или убрать</p>' : '')
     + (hasNames ? '' : '<p class="hint">Серий пока нет. Они появляются, когда у игры указана серия: при добавлении из IGDB она заполняется сама, а вручную её можно вписать в карточке игры.</p>') + '</div>';
 }
 async function serMenu(name) {
   if (!name) { const r0 = await choose({ title: 'Без серий', items: [{ id: 'export', label: 'Выгрузить список…' }] }); if (r0 === 'export') openExport(S.games.filter(g => !g.series), 'Без серий'); return; }
-  const r = await choose({ title: name, items: [{ id: 'export', label: 'Выгрузить список…' }, { id: 'rename', label: 'Переименовать (или объединить с другой серией)' }, { id: 'del', label: 'Убрать серию у всех игр (игры останутся)' }] });
+  const r = await choose({ title: name, items: [{ id: 'check', label: 'Проверить полноту серии в IGDB' }, { id: 'export', label: 'Выгрузить список…' }, { id: 'rename', label: 'Переименовать (или объединить с другой серией)' }, { id: 'del', label: 'Убрать серию у всех игр (игры останутся)' }] });
   const games = S.games.filter(g => g.series === name), f = S.set.f;
   if (r === 'export') return openExport(games, name);
+  if (r === 'check') { S.retGame = null; return showSeriesView(name, { from: 'series', onlyMiss: true }); }
   if (r === 'rename') {
     let n = await promptBox('Название серии', name); if (n) n = normName(n) === normName(name) ? n.trim() : canonSeries(n);
     if (n && n !== name) { const snap = takeSnap(); for (const g of games) g.series = n; await saveGames(games); f.series = f.series.map(x => x === name ? n : x); saveSet(); render(); toastUndo('Серия переименована', snap); }
@@ -2411,7 +2575,7 @@ function viewSearch() {
   const pit = pendingItem();
   const banner = pit ? '<div class="banner">Разбор: «' + esc(pit.text) + '» - выберите игру<div class="toolbar" style="margin:8px 0 0"><button class="btn" data-act="pendingMatch">Уже в базе</button><button class="btn" data-act="pendingCancel">Отмена</button></div></div>' : '';
   const ret = S.retGame && gameById(S.retGame.id) ? '<div class="banner">Поиск из карточки «' + esc(gameById(S.retGame.id).name) + '»<div class="toolbar" style="margin:8px 0 0"><button class="btn" data-act="retGame">← Вернуться в карточку</button></div></div>' : '';
-  return '<div class="top">' + banner + ret + blockBanner(true, S.search.src) + '<div class="bar"><div class="sbox"><span>🔍</span><input id="sq" placeholder="Поиск в ' + PROV[S.search.src].name + '" value="' + esc(S.search.q) + '"><button class="x" data-act="clearSQ">✕</button></div></div>'
+  return '<div class="top">' + banner + ret + blockBanner(true, S.search.src) + (S.search.bind ? '<div class="banner">Выберите серию IGDB для «' + esc(S.search.bind) + '»<div class="toolbar" style="margin:8px 0 0"><button class="btn" data-act="serBindCancel">Отмена</button></div></div>' : '') + '<div class="bar"><div class="sbox"><span>🔍</span><input id="sq" placeholder="' + (S.search.kind === 'series' ? 'Поиск серии в IGDB' : 'Поиск в ' + PROV[S.search.src].name) + '" value="' + esc(S.search.q) + '"><button class="x" data-act="clearSQ">✕</button></div></div>'
     + '<div class="tools" id="sTools"></div><div class="chips actv" id="sActive"></div></div><div class="scrl" id="srBody"></div>';
 }
 // кнопка быстрого переключения типов карточек IGDB: «Игры» (игры, ремейки, бандлы) <-> «Все»
@@ -2422,19 +2586,23 @@ function typeQuickBtn() {
 }
 function renderSearchHead() {
   const s = S.search, f = s.f, chips = [], fc = searchFilterCount();
-  const t = $('#sTools'); if (t) t.innerHTML = '<button class="ib srcsw" data-act="sSrcSwitch" title="Переключить источник поиска" style="color:' + PROV[s.src].color + ';border-color:' + PROV[s.src].color + '"><b>' + PROV[s.src].name + '</b></button>' + ib('sFilters', 'filter', 'Фильтры', fc > 0, fc ? '<span class="cnt">' + fc + '</span>' : '') + typeQuickBtn() + sortBtn() + ib('vmode', vmodeOf('search') === 'list' ? 'grid' : 'list', vmodeOf('search') === 'list' ? 'Плитка' : 'Список', false, '', ' data-k="search"') + (vmodeOf('search') === 'tiles' ? zoomBtn('search') : '');
+  const kindBtn = '<button class="ib srcsw kindsw" data-act="sKind" title="Искать игры или серии" aria-label="Искать игры или серии"><b>' + (s.kind === 'series' ? 'Серии' : 'Игры') + '</b></button>';
+  const t = $('#sTools'); if (t && s.kind === 'series') t.innerHTML = kindBtn; else if (t) t.innerHTML = kindBtn + '<button class="ib srcsw" data-act="sSrcSwitch" title="Переключить источник поиска" style="color:' + PROV[s.src].color + ';border-color:' + PROV[s.src].color + '"><b>' + PROV[s.src].name + '</b></button>' + ib('sFilters', 'filter', 'Фильтры', fc > 0, fc ? '<span class="cnt">' + fc + '</span>' : '') + typeQuickBtn() + sortBtn() + ib('vmode', vmodeOf('search') === 'list' ? 'grid' : 'list', vmodeOf('search') === 'list' ? 'Плитка' : 'Список', false, '', ' data-k="search"') + (vmodeOf('search') === 'tiles' ? zoomBtn('search') : '');
   fa(f, 'genres').forEach((id, i) => chips.push('<button class="chip" data-act="sRm" data-k="genres" data-v="' + esc(id) + '">' + esc((f.genreNames || [])[i] || id) + ' ✕</button>'));
   fa(f, 'platforms').forEach((id, i) => chips.push('<button class="chip" data-act="sRm" data-k="platforms" data-v="' + esc(id) + '">' + esc((f.platformNames || [])[i] || id) + ' ✕</button>'));
   fa(f, 'years').forEach(y => chips.push('<button class="chip" data-act="sRm" data-k="years" data-v="' + esc(y) + '">' + esc(y) + ' ✕</button>'));
   if (s.src === 'igdb' && typesCustom()) chips.push('<button class="chip" data-act="sRm" data-k="types">Типы: ' + searchTypes().length + ' ✕</button>');
   if (f.minRating) chips.push('<button class="chip" data-act="sRm" data-k="minRating">от ★' + f.minRating + ' ✕</button>');
-  const a = $('#sActive'); if (a) a.innerHTML = chips.join('');
+  const a = $('#sActive'); if (a) a.innerHTML = s.kind === 'series' ? '' : chips.join('');
 }
 function renderSearchBody() {
   const s = S.search, el = $('#srBody'); if (!el) return;
   renderSearchHead();
+  if (s.kind === 'series' && s.mode === 'search') { el.innerHTML = colListHtml(); return; }
   let h = '';
-  if (s.mode === 'series') h += '<div class="hdr2"><h2 style="font-size:17px">Игры серии: ' + esc(s.title) + '</h2><button class="btn" data-act="sBack">← Назад</button></div>';
+  if (s.mode === 'series' && s.chk) h += serHeadHtml();
+  else if (s.mode === 'series') h += '<div class="hdr2"><h2 style="font-size:17px">Игры серии: ' + esc(s.title) + '</h2><button class="btn" data-act="sBack">← Назад</button></div>';
+  const serEmpty = !!(s.chk && s.mode === 'series' && !s.loading && !s.results.length);
   if (s.mode === 'bundle') {
     const pi = S.pending && pendingItem(), na = pi ? ((S.pending.added || []).length) : 0;
     h += '<div class="hdr2"><h2 style="font-size:17px">Бандл: ' + esc(s.title) + '</h2><button class="btn" data-act="sBack">← Назад</button></div><p class="sub" style="margin:0 2px 8px">'
@@ -2443,15 +2611,16 @@ function renderSearchBody() {
   }
   if (blockFor(s.src)) h += blockBanner(true, s.src);
   else if (!PROV[s.src].ready()) h += '<div class="hint">' + PROV[s.src].noKeys + '<br><br><button class="btn acc" data-act="tab" data-tab="settings">Открыть настройки</button></div>';
+  else if (serEmpty) h += s.chk.col ? '<div class="hint">' + (s.chk.onlyMiss ? 'Все игры серии выбранных типов уже в каталоге.' : 'В IGDB нет игр серии выбранных типов. Включите нужные типы кнопками выше.') + '</div>' : '';
   else if (!s.results.length && !s.loading) h += '<div class="hint">' + (s.started ? 'Ничего не найдено в ' + PROV[s.src].name + '.<br><br><button class="btn" data-act="sSrcSwitch">Искать в ' + PROV[otherSrc(s.src)].name + '</button>' : 'Введите название игры или выберите фильтры') + '</div>' + (s.started ? '' : recentHtml());
   else {
     const row = vmodeOf('search') === 'list';
     h += row ? '<div class="srl">' + s.results.map(it => {
-      const inCat = !!gameByRid(it.rid);
-      return '<div class="srow' + (it.rid === s.lastRid ? ' last' : '') + '" data-act="igdbTap" data-rid="' + it.rid + '"><div class="sth"' + (it.cover ? ' style="background-image:url(\'' + bgu(thumbUrl(it.cover)) + '\')"' : '') + '></div><div class="sm"><div class="nm">' + esc(it.name) + '</div><div class="m">' + typeChip(it.type) + meta(it) + (it.time ? ' · ⏱ ' + it.time + 'ч' : '') + '</div></div>' + (inCat ? '<span class="ok2">✓</span>' : '') + (isBundleType(it.type) ? bbadge(it.rid) : '') + '</div>';
+      const inCat = !!gameByRid(it.rid) || !!it.have, pk = (s.sel && s.sel.has(it.rid) ? ' pick' : '') + (it.ign ? ' dim' : ''), ck = pk.includes('pick') ? '<span class="selck">✓</span>' : '';
+      return '<div class="srow' + (it.rid === s.lastRid ? ' last' : '') + pk + '" data-act="igdbTap" data-rid="' + it.rid + '">' + ck + '<div class="sth"' + (it.cover ? ' style="background-image:url(\'' + bgu(thumbUrl(it.cover)) + '\')"' : '') + '></div><div class="sm"><div class="nm">' + esc(it.name) + '</div><div class="m">' + typeChip(it.type) + meta(it) + (it.time ? ' · ⏱ ' + it.time + 'ч' : '') + '</div></div>' + (inCat ? '<span class="ok2">✓</span>' : '') + (isBundleType(it.type) ? bbadge(it.rid) : '') + '</div>';
     }).join('') + '</div>' : '<div class="grid z' + colsFor('search') + '" style="--cols:' + colsFor('search') + '">' + s.results.map(it => {
-      const inCat = !!gameByRid(it.rid);
-      return '<div class="card' + (it.rid === s.lastRid ? ' last' : '') + '" data-act="igdbTap" data-rid="' + it.rid + '"><div class="cv' + (it.cover ? '' : ' nocover') + '"' + (it.cover ? ' style="background-image:url(\'' + bgu(thumbUrl(it.cover)) + '\')"' : '') + '>'
+      const inCat = !!gameByRid(it.rid) || !!it.have, pk = (s.sel && s.sel.has(it.rid) ? ' pick' : '') + (it.ign ? ' dim' : ''), ck = pk.includes('pick') ? '<span class="selck">✓</span>' : '';
+      return '<div class="card' + (it.rid === s.lastRid ? ' last' : '') + pk + '" data-act="igdbTap" data-rid="' + it.rid + '">' + ck + '<div class="cv' + (it.cover ? '' : ' nocover') + '"' + (it.cover ? ' style="background-image:url(\'' + bgu(thumbUrl(it.cover)) + '\')"' : '') + '>'
         + typeChip(it.type) + (isBundleType(it.type) ? bbadge(it.rid) : '') + (inCat ? '<span class="ok">✓</span>' : '')
         + (it.year ? '<span class="ovl yr">' + it.year + '</span>' : '')
         + (it.rating || it.time ? '<span class="ovr">' + (it.rating ? '<span class="ovl"><i>★</i>' + it.rating + '</span>' : '') + (it.time ? '<span class="ovl tm">⏱ ' + it.time + 'ч</span>' : '') + '</span>' : '')
@@ -2487,7 +2656,8 @@ function recentHtml() {
 function pushRecent(q) { const r = (S.set.recentQ || []).filter(x => x.toLowerCase() !== q.toLowerCase()); r.unshift(q); S.set.recentQ = r.slice(0, 8); saveSet(); }
 async function runSearch(reset) {
   const s = S.search;
-  if (reset) { s.stack = []; s.bundle = null; s.results = []; s.lastRid = ''; s.page = 0; s.hasMore = true; s.count = 0; s.token++; s.loading = false; s.mode = 'search'; const sb = $('#srBody'); if (sb) sb.scrollTop = 0; }
+  if (reset) { s.stack = []; s.bundle = null; s.results = []; s.lastRid = ''; s.page = 0; s.hasMore = true; s.count = 0; s.token++; s.loading = false; s.mode = 'search'; s.chk = null; s.sel = new Set(); s.selMode = false; const sb = $('#srBody'); if (sb) sb.scrollTop = 0; }
+  if (s.kind === 'series') return reset ? runColSearch() : undefined;
   if (s.loading || !s.hasMore) return;
   const f = s.f;
   if (!s.q.trim() && !hasSearchFilter(f)) { s.started = false; s.results = []; renderSearchBody(); return; }
@@ -2509,7 +2679,7 @@ async function runSearch(reset) {
 // перед входом в серию или бандл запоминаем результаты, положение и подсветку: «назад» возвращает основной поиск без нового запроса
 function pushSearchState() {
   const s = S.search, sb = $('#srBody'); if (!s.started && !s.results.length) return false;
-  (s.stack || (s.stack = [])).push({ mode: s.mode, title: s.title, bundle: s.bundle, q: s.q, src: s.src, results: s.results, count: s.count, hasMore: s.hasMore, page: s.page, started: s.started, lastRid: s.lastRid, scroll: sb ? sb.scrollTop : 0 });
+  (s.stack || (s.stack = [])).push({ mode: s.mode, title: s.title, bundle: s.bundle, q: s.q, src: s.src, results: s.results, count: s.count, hasMore: s.hasMore, page: s.page, started: s.started, lastRid: s.lastRid, kind: s.kind, cols: s.cols, chk: s.chk, sel: s.sel, selMode: s.selMode, scroll: sb ? sb.scrollTop : 0 });
   return true;
 }
 function popSearchState() {
@@ -3084,7 +3254,7 @@ function render() {
 const lp = { t: null, fired: false, x: 0, y: 0 };
 S.expColls = S.expColls || new Set(); // игры, у которых в списке раскрыты все коллекции
 const ACT = {
-  tab: t => { saveScroll(); if (t.dataset.tab !== 'search') S.pending = null; else if (S.tab !== 'search') { S.search.src = S.set.mainSrc; fClear(S.search.f); } S.retGame = null; S.inSelMode = false; S.inSel.clear(); S.tab = t.dataset.tab; S.selMode = false; S.sel.clear(); closeSheet(); render(); if (S.tab === 'library') setTimeout(focusLast, 0); restoreScroll(S.tab); },
+  tab: t => { saveScroll(); if (t.dataset.tab !== 'search') S.pending = null; else if (S.tab !== 'search') { S.search.kind = 'games'; S.search.bind = ''; S.search.src = S.set.mainSrc; fClear(S.search.f); } S.retGame = null; S.inSelMode = false; S.inSel.clear(); S.tab = t.dataset.tab; S.selMode = false; S.sel.clear(); closeSheet(); render(); if (S.tab === 'library') setTimeout(focusLast, 0); restoreScroll(S.tab); },
   fab: () => S.tab === 'collections' ? createCollection().then(c => { if (c) render(); }) : S.tab === 'inbox' ? createList() : openGameSheet(null),
   closeSheet: () => closeSheet(),
   clearQ: () => { S.set.f.q = ''; saveSet(); if (S.tab === 'library') { const q = $('#q'); if (q) q.value = ''; libRefilter(); if (sheetEl) openFilters(); } },
@@ -3186,7 +3356,35 @@ const ACT = {
   sFilters: () => openSearchFilters(),
   sReset: () => { fClear(S.search.f, true); closeSheet(); renderSearchBody(); runSearch(true); },
   sRm: t => { const f = S.search.f, k = t.dataset.k, v = t.dataset.v; if (k === 'minRating') f.minRating = 0; else if (k === 'types') { delete S.set.searchTypes; saveSet(); } else { const arr = fa(f, k).slice(), i = arr.map(String).indexOf(String(v)), nk = k === 'genres' ? 'genreNames' : k === 'platforms' ? 'platformNames' : ''; if (i >= 0) { arr.splice(i, 1); if (nk) { const nm = (f[nk] || []).slice(); nm.splice(i, 1); f[nk] = nm; } } f[k] = arr; } runSearch(true); },
-  sBack: () => { if (popSearchState()) return; if (bundleMode() && S.pending) return backToInbox(); S.search.mode = 'search'; runSearch(true); },
+  sBack: () => {
+    if (popSearchState()) return; if (bundleMode() && S.pending) return backToInbox();
+    if (S.retGame) return ACT.retGame();
+    const s = S.search, c = s.chk; if (c && c.from && c.from !== 'search') { s.chk = null; s.mode = 'search'; s.results = []; s.started = false; S.tab = c.from; render(); return; }
+    s.mode = 'search'; runSearch(true);
+  },
+  sKind: () => { const s = S.search; s.kind = s.kind === 'series' ? 'games' : 'series'; s.src = s.kind === 'series' ? 'igdb' : S.set.mainSrc; s.bind = ''; s.stack = []; s.chk = null; s.cols = []; s.results = []; s.started = false; s.token++; s.loading = false; s.mode = 'search'; render(); runSearch(true); },
+  colTap: t => {
+    const s = S.search, id = +t.dataset.id, nm = t.dataset.name;
+    if (s.bind) { const b = s.bind; s.bind = ''; serMap('serCol')[serKey(b)] = { id, name: nm, manual: 1 }; delete serMap('serChk')[serKey(b)]; saveSet(); return showSeriesView(b, { onlyMiss: true }); }
+    return showSeriesView(nm, { colId: id });
+  },
+  serCheck: t => { const d = S.sheet && S.sheet.draft; S.retGame = d && d.id ? { id: d.id, tab: S.tab } : null; showSeriesView(t.dataset.name, { from: S.tab, onlyMiss: true }); },
+  serCheckAll: () => serCheckAll(),
+  serOnlyInc: () => { S.set.serOnlyInc = !S.set.serOnlyInc; saveSet(); render(); },
+  serType: t => { const v = +t.dataset.v, cur = serTypes().slice(), i = cur.indexOf(v); if (i >= 0) { if (cur.length < 2) return; cur.splice(i, 1); } else cur.push(v); S.set.serTypes = cur; saveSet(); serApply(); renderSearchBody(); },
+  serOnly: () => { const c = S.search.chk; if (!c) return; c.onlyMiss = !c.onlyMiss; serApply(); renderSearchBody(); },
+  serFuture: () => { S.set.serFuture = !S.set.serFuture; saveSet(); serApply(); renderSearchBody(); },
+  serShowIgn: () => { const s = S.search, c = s.chk; if (!c) return; c.showIgn = !c.showIgn; s.sel.clear(); serApply(); renderSearchBody(); },
+  serSel: () => { const s = S.search; s.selMode = !s.selMode; if (!s.selMode) s.sel.clear(); renderSearchBody(); },
+  serSelMiss: () => { const s = S.search; s.selMode = true; s.results.forEach(i => { if (!i.have && !i.ign) s.sel.add(i.rid); }); renderSearchBody(); },
+  serAddSel: () => serAddSelected(),
+  serIgnSel: () => {
+    const s = S.search, c = s.chk; if (!c || !s.sel.size) return; const k = serKey(c.name), ids = new Set(serMap('serIgnore')[k] || []), pick = s.results.filter(i => s.sel.has(i.rid)).map(i => i.gid);
+    if (c.showIgn) pick.forEach(id => ids.delete(id)); else pick.forEach(id => ids.add(id));
+    serMap('serIgnore')[k] = Array.from(ids); saveSet(); s.sel.clear(); serApply(); renderSearchBody(); toast(c.showIgn ? 'Игры возвращены в серию: ' + pick.length : 'Игры скрыты из проверки серии: ' + pick.length);
+  },
+  serRebind: () => { const s = S.search, nm = s.chk ? s.chk.name : ''; if (!nm) return; s.bind = nm; s.kind = 'series'; s.src = 'igdb'; s.q = nm; s.stack = []; s.chk = null; s.cols = []; s.results = []; s.token++; s.loading = false; s.mode = 'search'; S.tab = 'search'; render(); runSearch(true); },
+  serBindCancel: () => { const s = S.search; s.bind = ''; s.q = ''; s.kind = 'games'; s.src = S.set.mainSrc; s.cols = []; s.results = []; s.started = false; S.tab = 'series'; render(); },
   bundleOpen: t => { const rid = t.dataset.rid; showBundle(rid, t.dataset.t || (S.search.results.find(x => x.rid === rid) || {}).name || '', false); },
   bundleDone: () => { const it = pendingItem(), p = S.pending; if (!it) return; const g = gameById(((p && p.added) || [])[0]); if (!g) return toast('Сначала добавьте хотя бы одну игру из бандла'); linkItem(it, g); },
   itBundle: t => { const it = S.inbox.items.find(i => i.id === t.dataset.id); if (!it || !it.bundle) return; S.pending = { itemId: it.id, scroll: $('#view').scrollTop, added: [] }; Object.assign(S.search, { q: it.text, src: 'igdb' }); fClear(S.search.f); S.retGame = null; showBundle(it.bundle.rid, it.bundle.name, true); },
@@ -3200,7 +3398,7 @@ const ACT = {
   openIgdb: t => openIgdbSheet(t.dataset.rid),
   openUrl: t => openExternal(t.dataset.u),
   sSrcSwitch: () => { const s = S.search; s.src = otherSrc(s.src); fClear(S.search.f); s.token++; render(); runSearch(true); },
-  igdbTap: t => openIgdbSheet(t.dataset.rid), // всегда открывает карточку: добавить игру можно только из неё
+  igdbTap: t => { const s = S.search; if (s.chk && s.selMode && s.mode === 'series') { const r = t.dataset.rid, sb = $('#srBody'), y = sb ? sb.scrollTop : 0; if (s.sel.has(r)) s.sel.delete(r); else s.sel.add(r); renderSearchBody(); const b2 = $('#srBody'); if (b2) b2.scrollTop = y; return; } return openIgdbSheet(t.dataset.rid); }, // всегда открывает карточку: добавить игру можно только из неё
   rsAdd: async t => {
     const rid = t.dataset.rid; if (adding.has(rid)) return;
     const pit = pendingItem(), job = addFromIgdb(rid, (S.rs ? S.rs.colls : []).slice(), Object.assign({ bg: true }, itemAddOpts(bundleMode() ? null : pit))); // запись игры идёт сразу, обложка в фоне
@@ -3228,8 +3426,9 @@ const ACT = {
   typeQuick: () => { const cur = searchTypes().slice().sort((a, b) => a - b).join(), q = QUICK_TYPES.slice().sort((a, b) => a - b).join(); S.set.searchTypes = cur === q ? ALL_TYPES.slice() : QUICK_TYPES.slice(); saveSet(); renderSearchHead(); runSearch(true); },
   serFind: () => { // поиск игр серии в IGDB прямо из карточки игры (как кнопка «Игры серии» в поиске); без привязки к источнику ищем по названию серии
     const d = S.sheet.draft, nm = ((($('#f_series') || {}).value) || d.series || '').trim(), src = ['igdb', 'rawg'].find(k => d[k + 'Id']);
-    if (src) return ACT.seriesIgdb({ dataset: { src } });
-    if (!nm) return toast('Сначала укажите серию'); S.retGame = { id: d.id, tab: S.tab }; Object.assign(S.search, { q: nm, src: S.set.mainSrc || 'igdb', mode: 'search' }); fClear(S.search.f); S.tab = 'search'; closeSheet(); render(); runSearch(true);
+    if (!nm) return toast('Сначала укажите серию');
+    if (PROV.igdb.ready()) { S.retGame = { id: d.id, tab: S.tab }; return showSeriesView(nm, {}); } // поиск по серии: все игры серии IGDB, что уже в каталоге отмечено ✓
+    if (src) return ACT.seriesIgdb({ dataset: { src } }); S.retGame = { id: d.id, tab: S.tab }; Object.assign(S.search, { q: nm, src: S.set.mainSrc || 'igdb', mode: 'search' }); fClear(S.search.f); S.tab = 'search'; closeSheet(); render(); runSearch(true);
   },
   zoom: t => { const k = t.dataset.k, R = ZOOM_RANGE[k], c = colsFor(k); S.set.zoom[k] = c >= R[1] ? R[0] : c + 1; saveSet(); if (S.tab === 'library') renderLibrary(); else render(); },
   setLang: t => { try { if (t.dataset.v) localStorage.setItem('gc_lang', t.dataset.v); else localStorage.removeItem('gc_lang'); } catch (e) { /* ignore */ } location.reload(); }, // язык переключается перезагрузкой: русская и английская сборки лежат в разных файлах
@@ -3567,7 +3766,7 @@ function applyTheme() {
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
   const m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', dark ? '#0b0b0d' : '#f2f3f6');
 }
-window.__GC = { sortResults, filterGames, collTilesHtml, seriesTilesHtml, NO_COLL, showBundle, popSearchState, sourceResolve, searchTypes, sheetOpen: () => !!sheetEl, logErr, ERRLOG, takeSnap, undoLast, UNDO, toastUndo, removeGame, sheetSibling, itemLine, animOn, reviewOne, catalogMatch, matchCfg, reviewItems, autoResolve, ipMask, addrOf, textLines, syncNow, SY, DB, reloadData, nextPool, PRESETS, applyFilterSet, withSeries, buildEntries, groupGames, textHtml, listHtml, cardHtml, openYoutube, canonPlat, canonGenre, canonAll, dictMerge, dictRename, dictRewrite, openDict, mergeGroups, openMergeCompare, applyMerge, mgBase, renderKeep, toggleInSel, handleShared, applyExtra, addParsed, openExport, exportText, copyText, gameLine, zipBuild, zipRead, shotStats, delShots, rawgQuotaTick, refreshOne, rawg, effItem, applyDefaults, linkItem, itemOpts, viewInbox, bulkMore, openLb, libToolsHtml: () => { renderLibHead(); return $('#libTools').innerHTML; }, filterGames, getShots, putShots, collTilesHtml, seriesTilesHtml, viewCollections, viewSeries, DONE_ID, autoResolve, viewStats, restoreGames, removeGame, canonSeries, findDupes, mergeAllDupes, collectSheet, persistDraft, closeSheet, S, ACT, bump, igdb, hltbFind, sgdbAuto, openSgdb, applyTheme, colsFor, usageHtml, serMenu, viewInbox, addItems, linkItem, createList, pendingItem, render, runSearch, addFromIgdb, importData, openIgdbSheet, openGameSheet, openFilters, openCols, selectionAction, loadAll, renderSearchBody };
+window.__GC = { serCheck, serAnalyze, serCollection, collGames, showSeriesView, serCheckAll, searchCollections, serBadge, serMiss, serApply, runColSearch, sortResults, filterGames, collTilesHtml, seriesTilesHtml, NO_COLL, showBundle, popSearchState, sourceResolve, searchTypes, sheetOpen: () => !!sheetEl, logErr, ERRLOG, takeSnap, undoLast, UNDO, toastUndo, removeGame, sheetSibling, itemLine, animOn, reviewOne, catalogMatch, matchCfg, reviewItems, autoResolve, ipMask, addrOf, textLines, syncNow, SY, DB, reloadData, nextPool, PRESETS, applyFilterSet, withSeries, buildEntries, groupGames, textHtml, listHtml, cardHtml, openYoutube, canonPlat, canonGenre, canonAll, dictMerge, dictRename, dictRewrite, openDict, mergeGroups, openMergeCompare, applyMerge, mgBase, renderKeep, toggleInSel, handleShared, applyExtra, addParsed, openExport, exportText, copyText, gameLine, zipBuild, zipRead, shotStats, delShots, rawgQuotaTick, refreshOne, rawg, effItem, applyDefaults, linkItem, itemOpts, viewInbox, bulkMore, openLb, libToolsHtml: () => { renderLibHead(); return $('#libTools').innerHTML; }, filterGames, getShots, putShots, collTilesHtml, seriesTilesHtml, viewCollections, viewSeries, DONE_ID, autoResolve, viewStats, restoreGames, removeGame, canonSeries, findDupes, mergeAllDupes, collectSheet, persistDraft, closeSheet, S, ACT, bump, igdb, hltbFind, sgdbAuto, openSgdb, applyTheme, colsFor, usageHtml, serMenu, viewInbox, addItems, linkItem, createList, pendingItem, render, runSearch, addFromIgdb, importData, openIgdbSheet, openGameSheet, openFilters, openCols, selectionAction, loadAll, renderSearchBody };
 (async () => {
   try {
     await loadAll();

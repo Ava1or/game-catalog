@@ -39,7 +39,6 @@ button{background:none;border:0;cursor:pointer}
 .card.sel .chk{background:var(--acc);border-color:var(--acc)}
 .card.sel .cv{outline:3px solid var(--acc)}
 .ok{position:absolute;right:5px;top:5px;color:#fff;width:22px;height:22px;line-height:22px;text-align:center;border-radius:11px;background:var(--green);font-size:13px}
-.qa{position:absolute;right:5px;bottom:5px;width:30px;height:30px;border-radius:15px;background:var(--acc);color:#fff;font-size:20px;line-height:30px}
 .t{font-weight:600;margin-top:5px;font-size:13px;line-height:16px;max-height:32px;overflow:hidden}
 .m{color:var(--mut);font-size:11px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .m .st{color:#ffa000;font-weight:400}
@@ -124,7 +123,7 @@ h3{margin:16px 2px 8px;font-size:16px}
 body{cursor:default;-webkit-user-select:none;user-select:none}
 input,textarea{cursor:text;-webkit-user-select:text;user-select:text}
 select{cursor:pointer}
-button,[data-act],.opt,.acts span,.p,.chip,.btn,.ib,.tile,.card,.lcard,.it .tx,.row[data-act],th a,.n,.chk,.qa,.backdrop,#tabs button{cursor:pointer}
+button,[data-act],.opt,.acts span,.p,.chip,.btn,.ib,.tile,.card,.lcard,.it .tx,.row[data-act],th a,.n,.chk,.backdrop,#tabs button{cursor:pointer}
 
 .banner.red{background:var(--banred);border-color:var(--redbd)}
 .card{-webkit-touch-callout:none}
@@ -236,8 +235,6 @@ button.tag{cursor:pointer;font-family:inherit}
 .mp{font-weight:600}
 
 /* поиск IGDB: лупа вместо плюса, чёрно-белая */
-.qa{width:32px;height:32px;background:#000b;color:#fff;border:1px solid #fff5;display:flex;align-items:center;justify-content:center;font-size:0;line-height:0;padding:0}
-.card.busy{opacity:.5;pointer-events:none}
 .chip.green{background:var(--green)}
 .oi{font-size:20px;width:26px;text-align:center;flex:0 0 26px}
 .card,.tile,.lrow,.wrap tbody tr{-webkit-user-select:none;user-select:none}
@@ -254,20 +251,12 @@ button.tag{cursor:pointer;font-family:inherit}
 /* значки на плитках уменьшаются вместе с масштабом: время, галочка, лупа */
 .grid.z3 .badge{font-size:10px;padding:1px 6px}
 .grid.z3 .ok,.grid.z3 .dn{width:19px;height:19px;line-height:19px;font-size:11px}
-.grid.z3 .qa{width:26px;height:26px}
-.grid.z3 .qa svg{width:15px;height:15px}
 .grid.z4 .badge{font-size:10px;padding:0 5px;left:4px;top:4px}
 .grid.z4 .ok,.grid.z4 .dn{width:16px;height:16px;line-height:16px;font-size:10px;right:4px;top:4px}
-.grid.z4 .qa{width:21px;height:21px;right:3px;bottom:3px}
-.grid.z4 .qa svg{width:12px;height:12px}
 .grid.z5 .badge{font-size:8px;padding:0 4px;left:3px;top:3px;border-radius:6px}
 .grid.z5 .ok,.grid.z5 .dn{width:13px;height:13px;line-height:13px;font-size:8px;right:3px;top:3px}
-.grid.z5 .qa{width:17px;height:17px;right:3px;bottom:3px}
-.grid.z5 .qa svg{width:10px;height:10px}
 .grid.z6 .badge{font-size:7px;padding:0 3px;left:2px;top:2px;border-radius:5px}
 .grid.z6 .ok,.grid.z6 .dn{width:11px;height:11px;line-height:11px;font-size:7px;right:2px;top:2px}
-.grid.z6 .qa{width:14px;height:14px;right:2px;bottom:2px}
-.grid.z6 .qa svg{width:8px;height:8px}
 .grid.z5 .chk,.grid.z6 .chk{transform:scale(.7);transform-origin:top left}
 
 /* разбор: настройки списка */
@@ -280,8 +269,6 @@ button.tag{cursor:pointer;font-family:inherit}
 .lb img{touch-action:none;transform-origin:center;will-change:transform}
 
 /* лупа на масштабах 5 и 6 не меньше, чем на 4 */
-.grid.z5 .qa,.grid.z6 .qa{width:21px;height:21px}
-.grid.z5 .qa svg,.grid.z6 .qa svg{width:12px;height:12px}
 
 /* коллекции и серии: цветной прогресс «Завершено» */
 .tile .ct{padding-bottom:3px}
@@ -300,7 +287,6 @@ button.tag{cursor:pointer;font-family:inherit}
 .srow .sm{flex:1;min-width:0}
 .srow .nm{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .srow .m{font-size:11px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.srow .qa{position:static;flex:0 0 auto;width:30px;height:30px}
 .srow .ok2{color:var(--green);font-weight:700}
 
 /* таблица: фон задан самой таблице, чтобы при прокрутке вправо цвет не менялся */
@@ -771,3 +757,36 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .grid.z4 .tchip,.grid.z5 .tchip,.grid.z6 .tchip{font-size:9px;padding:1px 3px;left:3px;top:3px}
 .grid.z5 .bbadge,.grid.z6 .bbadge{width:17px;height:17px;font-size:10px;right:3px;top:3px}
 .grid.z5 .cv>.bbadge ~ .ok,.grid.z6 .cv>.bbadge ~ .ok{right:23px}
+
+/* подсветка последней открытой игры в списке поиска: у строки сплошной фон, поэтому слой поверх него и оранжевая метка слева */
+.srow.last{background:var(--card);background-image:linear-gradient(rgba(255,255,255,.09),rgba(255,255,255,.09));box-shadow:inset 3px 0 0 var(--acc)}
+/* масштаб списка коллекций и серий */
+.lrows.z1{gap:5px}.lrows.z1 .lrow{padding:4px 6px 4px 8px;gap:8px}.lrows.z1 .lth{width:26px;height:34px;flex-basis:26px;border-radius:4px}.lrows.z1 .lrow .nm{font-size:12px}.lrows.z1 .lrow .ct{font-size:10px;margin-top:1px}.lrows.z1 .lrow .pb{height:3px;margin-top:2px}
+.lrows.z3{gap:10px}.lrows.z3 .lrow{padding:10px 10px 10px 12px;gap:14px}.lrows.z3 .lth{width:48px;height:64px;flex-basis:48px;border-radius:8px}.lrows.z3 .lrow .nm{font-size:16px}.lrows.z3 .lrow .ct{font-size:13px;margin-top:3px}.lrows.z3 .lrow .pb{height:5px;margin-top:6px}
+.lrows.z4{gap:12px}.lrows.z4 .lrow{padding:12px 12px 12px 14px;gap:16px}.lrows.z4 .lth{width:64px;height:86px;flex-basis:64px;border-radius:10px}.lrows.z4 .lrow .nm{font-size:19px}.lrows.z4 .lrow .ct{font-size:14px;margin-top:4px}.lrows.z4 .lrow .pb{height:6px;margin-top:8px}
+/* очень мелкое число игр в отборе в иконке фильтра; иконка поиска серии рядом с серией; быстрый выбор типов */
+.ib .fcnt{position:absolute;left:0;right:0;bottom:1px;text-align:center;font-size:8px;line-height:9px;color:var(--mut);pointer-events:none;font-weight:600}
+.ib .fcnt:empty{display:none}
+.ichip.icon{padding-left:9px;padding-right:9px}
+.ichip.icon svg{width:16px;height:16px}
+.ib.tq{min-width:50px}
+.ib.tq b{font-size:12px}
+
+/* плитка поиска: год внизу слева, рейтинг и время внизу справа, как чип типа карточки */
+.card .cv .ovl{background:rgba(0,0,0,.66);color:#fff;border-radius:8px;padding:2px 6px;font-size:11px;font-weight:600;line-height:1.25;white-space:nowrap;pointer-events:none}
+.card .cv>.ovl{position:absolute;z-index:2}
+.card .cv>.ovl.yr{left:5px;bottom:5px}
+.card .cv>.ovr{position:absolute;right:5px;bottom:5px;z-index:2;display:flex;flex-direction:column;align-items:flex-end;gap:3px;pointer-events:none}
+.card .cv>.ovr .ovl{position:static}
+.ovl i{font-style:normal;color:#ffc107;margin-right:2px}
+.grid.z4 .cv>.ovl,.grid.z4 .cv>.ovr .ovl{font-size:9px;padding:1px 4px}
+.grid.z5 .cv>.ovl,.grid.z6 .cv>.ovl,.grid.z5 .cv>.ovr .ovl,.grid.z6 .cv>.ovr .ovl{font-size:8px;padding:0 3px;border-radius:6px}
+.grid.z5 .cv>.ovl.yr,.grid.z6 .cv>.ovl.yr{left:3px;bottom:3px}
+.grid.z5 .cv>.ovr,.grid.z6 .cv>.ovr{right:3px;bottom:3px;gap:2px}
+.grid.z5 .ovl.tm,.grid.z6 .ovl.tm{display:none}
+
+/* кнопка «Добавляю…» и отметка «Добавлено» в карточке поиска */
+.btn .spin{display:inline-block;width:14px;height:14px;vertical-align:-2px;margin-right:6px;box-sizing:border-box}
+.btn.acc .spin{border-color:rgba(255,255,255,.45);border-top-color:#fff}
+.btn:disabled{opacity:.85;cursor:default}
+.added{display:inline-flex;align-items:center;color:var(--green);font-weight:700;font-size:13px;padding:0 4px}

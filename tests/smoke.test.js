@@ -115,7 +115,7 @@ const L = require('../www/app.js');
     G.openGameSheet('ser_b'); const html = (document.querySelector('#shSerie') || {}).innerHTML || '';
     if (!html.includes('data-act="serCard"') || !html.includes('3 игры') || !html.includes('завершено <b>67%</b>') || !html.includes('не проверена') || html.includes('serNav') || !html.includes('spbar tk') || !html.includes('--n:3;') || html.replace(/data-name="[^"]*"/, '').includes('Сага проверки')) throw new Error('строка серии: без названия, с делениями по числу игр: ' + html.slice(0, 200));
     if ((document.querySelector('#shChips') || { innerHTML: '' }).innerHTML.includes('Открыть карточку серии')) throw new Error('кнопки перехода в карточку серии рядом с чипом быть не должно');
-    S.set.serOk = { [G.serKey('Сага проверки')]: 1 }; G.openGameSheet('ser_b'); if (!(document.querySelector('#shSerie') || {}).innerHTML.includes('✓ проверена')) throw new Error('серия отмечена проверенной'); S.set.serOk = {};
+    S.set.serOk = { [G.serKey('Сага проверки')]: 1 }; G.openGameSheet('ser_b'); if (!(document.querySelector('#shSerie') || {}).innerHTML.includes('✓ проверена')) throw new Error('серия отмечена проверенной'); S.set.serOk = {}; if ((document.querySelector('#shSerie') || {}).innerHTML.includes('serbd')) throw new Error('без проверки IGDB значка нет'); S.set.serChk = { [G.serKey('Сага проверки')]: { t: Date.now(), id: 1, total: 5, have: 3 } }; const h2 = G.serRowHtml(S.games.find(g => g.id === 'ser_b'), 'Сага проверки'); if (!h2.includes('class="serbd warn"') || !h2.includes('⚠ 2') || !h2.includes('не проверена')) throw new Error('строка серии: значок ⚠ 2 в жёлтой рамке рядом со статусом: ' + h2.slice(0, 400)); S.set.serChk = {};
     G.ACT.closeSheet(); gs.forEach(g => { S.games.splice(S.games.indexOf(g), 1); });
   });
   await step('бандлы: тип карточки, состав, возврат в основной поиск без нового запроса', async () => {
@@ -565,7 +565,7 @@ const L = require('../www/app.js');
     need(S.games.some(g => g.igdbId === 201 || g.name === 'Fallout 3') || S.games.length > 0, 'добавление выбранных');
     G.renderSearchBody();
     // ручная отметка «серия полная» и полноэкранный экран серии
-    need(/serbd ok/.test((G.ACT.serMark(), G.serBadge('Fallout'))) && G.serMiss('Fallout') === 0, 'отметка серии полной');
+    need(/serbd good/.test((G.ACT.serMark(), G.serBadge('Fallout'))) && G.serMiss('Fallout') === 0, 'отметка серии полной');
     need(!/data-act="sq"|id="sq"/.test(G.viewSearch()) && (G.viewSearch().match(/data-act="sBack"/g) || []).length === 1 && !/id="sTools"/.test(G.viewSearch()), 'экран серии без строки поиска и с одной кнопкой возврата');
     G.ACT.serMark(); need(G.serMiss('Fallout') > 0, 'отметка снимается');
     // чипы типов: название и число игр; в серии включают/выключают тип, в поиске фильтруют список
@@ -592,6 +592,8 @@ const L = require('../www/app.js');
     need(S.tab === 'sercard' && G.scList('Final Fantasy').length === 4, 'карточка серии открыта с составом');
     const v = G.viewSerCard(); need(/Игр в серии/.test(v) && /scSearch/.test(v) && /scNameCheck/.test(v) && /scMark/.test(v), 'кнопки и параметры карточки серии');
     const r = await G.serNameCheck('Final Fantasy'); need(r.main && r.main.id === 50 && !r.rename && r.groups.length === 1 && r.groups[0].games.length === 2 && r.groups[0].col.name === 'Dissidia Final Fantasy', 'проверка названия: 2 игры в другой серии IGDB ' + JSON.stringify([r.main, r.rename, r.groups.length]));
+    need(/class="tools scbar"/.test(v) && /scCatalog/.test(v) && !/data-act="scSel"/.test(v) && /data-lpm="scgame"/.test(v), 'кнопки карточки серии значками в один ряд, без кнопки «Выбрать», выбор долгим нажатием');
+    { const sc = S.serCard; sc.selMode = true; sc.sel.add('ff1'); need(/data-act="scSel">Отмена/.test(G.viewSerCard()) && /pick/.test(G.viewSerCard()), 'режим выбора: кнопка отмены и отмеченная игра'); sc.selMode = false; sc.sel.clear(); }
     G.ACT.scGame({ dataset: { gid: 'ff2' } }); need(S.shown.length === 4 && S.sheet && S.sheet.draft.id === 'ff2', 'игра открывается, соседи по серии для свайпа'); G.ACT.closeSheet();
     // поиск по серии из карточки серии и возврат: поиск -> карточка серии -> карточка игры
     await G.ACT.scSearch(); need(S.search.chk && S.search.chk.from === 'sercard' && S.tab === 'search', 'поиск по серии из карточки серии');

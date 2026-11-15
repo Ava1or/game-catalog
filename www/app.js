@@ -841,17 +841,16 @@ function serCardInfoHtml() {
     + kv('Проверка серии', stat) + (chk && !chk.none ? kv('В IGDB (выбранные типы)', chk.total + ', у вас ' + chk.have) : '')
     + (col ? kv('Серия в IGDB', esc(col.name) + (serKey(col.name) !== k ? ' <i class="warnk">≠ названию</i>' : '')) : '')
     + (hours ? kv('Время прохождения', hours + ' ч') : '') + (avg ? kv('Средний рейтинг', '★' + avg) : '') + (ys.length ? kv('Годы', Math.min.apply(null, ys) === Math.max.apply(null, ys) ? ys[0] : Math.min.apply(null, ys) + '–' + Math.max.apply(null, ys)) : '') + '</div>'
-    + '<div class="chips sm"><button class="p sm" data-act="scSearch">🔍 Поиск по серии</button><button class="p sm" data-act="scCheck">✓ Проверить полноту</button><button class="p sm" data-act="scNameCheck">Aa Проверить название</button><button class="p sm" data-act="scAdd">＋ Добавить игры</button><button class="p sm' + (c.selMode ? ' on' : '') + '" data-act="scSel">' + (c.selMode ? '✓ Выбор' : 'Выбрать') + '</button></div>'
-    + '<div class="chips sm"><button class="p sm' + (ok ? ' on' : '') + '" data-act="scMark">' + (ok ? '☑' : '☐') + ' Серия проверена и полная, остальное не нужно</button></div>'
-    + (c.selMode ? '<div class="toolbar"><button class="btn" data-act="scSelAll">Все</button><button class="btn" data-act="scRemove"' + (c.sel.size ? '' : ' disabled') + '>Убрать из серии (' + c.sel.size + ')</button><button class="btn" data-act="scMove"' + (c.sel.size ? '' : ' disabled') + '>В другую серию… (' + c.sel.size + ')</button><button class="btn" data-act="scDel"' + (c.sel.size ? '' : ' disabled') + '>Удалить из каталога (' + c.sel.size + ')</button></div>' : '')
+    + '<div class="tools scbar">' + ib('scSearch', 'find', 'Поиск по серии') + ib('scCheck', 'checkc', 'Проверить полноту') + ib('scNameCheck', 'aa', 'Проверить название') + ib('scAdd', 'plus', 'Добавить игры') + ib('scCatalog', 'tolib', 'Показать игры серии в списке') + ib('scMark', 'chkbox', ok ? 'Серия проверена и полная: снять отметку' : 'Серия проверена и полная, остальное не нужно', ok) + '</div>'
+    + (c.selMode ? '<div class="toolbar"><button class="btn" data-act="scSel">Отмена</button><button class="btn" data-act="scSelAll">Все</button><button class="btn" data-act="scRemove"' + (c.sel.size ? '' : ' disabled') + '>Убрать из серии (' + c.sel.size + ')</button><button class="btn" data-act="scMove"' + (c.sel.size ? '' : ' disabled') + '>В другую серию… (' + c.sel.size + ')</button><button class="btn" data-act="scDel"' + (c.sel.size ? '' : ' disabled') + '>Удалить из каталога (' + c.sel.size + ')</button></div>' : '')
     + (list.length ? '' : '<p class="hint">В серии пока нет игр. Добавьте их кнопкой «Добавить игры».</p>');
 }
 function serCardGamesHtml() {
   const c = S.serCard, list = scList(c.name), row = vmodeOf('sercard') === 'list';
   if (!list.length) return '';
   const mk = g => { const src = coverSrc(g), sel = c.sel.has(g.id), pk = (sel ? ' pick' : '') + (g.done ? ' isdone' : '') + (g.id === S.lastGame ? ' last' : ''), ck = sel ? '<span class="selck">✓</span>' : '';
-    return row ? '<div class="srow' + pk + '" data-gid="' + g.id + '" data-act="scGame">' + ck + '<div class="sth" data-cvid="' + g.id + '"' + (src ? ' style="background-image:url(\'' + bgu(src) + '\')"' : '') + '></div><div class="sm"><div class="nm">' + esc(g.name) + '</div><div class="m">' + esc([g.year || '', (g.platforms || []).slice(0, 2).map(shortPlat).join(', '), g.time ? g.time + ' ч' : ''].filter(Boolean).join(' · ')) + '</div></div>' + (g.done ? '<span class="ok2">✓</span>' : '') + '</div>'
-      : '<div class="card' + pk + '" data-gid="' + g.id + '" data-act="scGame">' + ck + '<div class="cv' + (src ? '' : ' nocover') + '" data-cvid="' + g.id + '"' + (src ? ' style="background-image:url(\'' + bgu(src) + '\')"' : '') + '>' + (g.year || g.time || g.done ? '<div class="strip"><span class="sp">' + (g.year || '') + '</span><span class="sr">' + (g.time ? '⏱ ' + g.time + 'ч' : '') + (g.done ? ' <i class="ck">✓</i>' : '') + '</span></div>' : '') + '</div><div class="t">' + esc(g.name) + '</div></div>'; };
+    return row ? '<div class="srow' + pk + '" data-gid="' + g.id + '" data-lpm="scgame" data-act="scGame">' + ck + '<div class="sth" data-cvid="' + g.id + '"' + (src ? ' style="background-image:url(\'' + bgu(src) + '\')"' : '') + '></div><div class="sm"><div class="nm">' + esc(g.name) + '</div><div class="m">' + esc([g.year || '', (g.platforms || []).slice(0, 2).map(shortPlat).join(', '), g.time ? g.time + ' ч' : ''].filter(Boolean).join(' · ')) + '</div></div>' + (g.done ? '<span class="ok2">✓</span>' : '') + '</div>'
+      : '<div class="card' + pk + '" data-gid="' + g.id + '" data-lpm="scgame" data-act="scGame">' + ck + '<div class="cv' + (src ? '' : ' nocover') + '" data-cvid="' + g.id + '"' + (src ? ' style="background-image:url(\'' + bgu(src) + '\')"' : '') + '>' + (g.year || g.time || g.done ? '<div class="strip"><span class="sp">' + (g.year || '') + '</span><span class="sr">' + (g.time ? '⏱ ' + g.time + 'ч' : '') + (g.done ? ' <i class="ck">✓</i>' : '') + '</span></div>' : '') + '</div><div class="t">' + esc(g.name) + '</div></div>'; };
   return row ? '<div class="srl z' + colsFor('searchL') + '">' + list.map(mk).join('') + '</div>' : '<div class="grid z' + colsFor('grid') + '" style="--cols:' + colsFor('grid') + '">' + list.map(mk).join('') + '</div>';
 }
 function viewSerCard() {
@@ -976,7 +975,7 @@ const serMiss = name => { if (serMap('serOk')[serKey(name)]) return 0; const c =
 function serBadge(name) {
   const k = serKey(name), c = serMap('serChk')[k], ok = !!serMap('serOk')[k]; if ((!c || c.none) && !ok) return '';
   const miss = ok || !c ? 0 : c.total - c.have, a = ' data-act="serCheck" data-name="' + esc(name) + '" title="' + (ok ? 'Серия отмечена как полная' : miss > 0 ? 'Не хватает игр: ' + miss : 'Серия полная') + (c ? '. Проверено ' + esc(new Date(c.t).toLocaleDateString(LOC)) : '') + '"';
-  return miss > 0 ? '<button class="serbd warn"' + a + '>⚠ ' + miss + '</button>' : '<button class="serbd ok"' + a + '>✓</button>';
+  return miss > 0 ? '<button class="serbd warn"' + a + '>⚠ ' + miss + '</button>' : '<button class="serbd good"' + a + '>✓</button>';
 }
 // название серии в каталоге по играм из списка IGDB (чтобы не заводить вторую серию с другим названием)
 function serCatalogName(list) {
@@ -1290,7 +1289,7 @@ function openModal() {
 function closeModal(silent) { if (modalEl) { modalEl.remove(); modalEl = null; } if (!silent) modalCancel = null; }
 function choose({ title, items, multi = false, selected = [], ok = 'Готово', search = false }) {
   return new Promise(res => {
-    const sel = new Set(selected.map(String)); const m = openModal();
+    const sel = new Set(selected.map(String)); const m = openModal(); if (m.classList) m.classList.add('chm');
     m.innerHTML = '<h4>' + esc(title) + '</h4>' + (search ? '<label class="field"><input id="chq" placeholder="Поиск…" autocomplete="off"></label>' : '') + '<div id="chl"></div>'
       + '<div class="acts"><span data-x="cancel">Отмена</span>' + (multi ? '<span data-x="ok">' + ok + '</span>' : '') + '</div>';
     const draw = () => {
@@ -1464,6 +1463,8 @@ const ICONS = {
   wrap: '<path d="M4 6h16M4 12h11a3 3 0 0 1 0 6h-3M12 18l2-2M12 18l2 2M4 18h4"/>', list: '<path d="M4 6h16M4 12h16M4 18h16"/>', mark: '<path d="M6 4h12v16l-6-4-6 4z"/>', dice: '<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="15" r="1"/><circle cx="12" cy="12" r="1"/>', text: '<path d="M5 7h14M5 12h14M5 17h9"/>', group: '<path d="M4 5h16M7 9h13M7 13h13M4 18h16"/>', cols: '<rect x="4" y="4" width="16" height="16"/><path d="M9.5 4v16M14.5 4v16"/>', sel: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 12l3 3 5-6"/>', coll: '<path d="M3 7h6l2 2h10v10H3z"/>',
   layers: '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 12.5l9 5 9-5"/><path d="M3 17l9 5 9-5"/>', pad: '<rect x="2" y="7" width="20" height="11" rx="4"/><path d="M7 10v5M4.5 12.5h5"/><circle cx="16" cy="11.5" r="1"/><circle cx="18.5" cy="14" r="1"/>',
   tag: '<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.2"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>', aa: '<path d="M3 18l5-12 5 12M5 14h6"/><path d="M15 18l3-7 3 7M16 16h4"/>', chkbox: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12.5l3 3 5-6"/>',
+  tolib: '<path d="M4 6h16M4 12h16M4 18h9"/><path d="M16 15l4 3-4 3"/>',
 };
 const icoSvg = n => '<svg class="icx" viewBox="0 0 24 24">' + ICONS[n] + '</svg>';
 const ZOOM_RANGE = { text: [1, 4], list: [1, 3], grid: [2, 6], search: [2, 6], coll: [1, 4], series: [1, 4], collL: [1, 4], seriesL: [1, 4], searchL: [1, 4] };
@@ -1575,7 +1576,18 @@ function renderLibBody() {
   updLibCount(); renderAlpha();
 }
 let libRafT = 0; const libRaf = () => { if (libRafT) return; libRafT = requestAnimationFrame(() => { libRafT = 0; libScroll(); }); };
-function renderLibrary() { renderLibHead(); renderLibBody(); renderSelBar(); }
+/* кнопки «наверх» / «вниз» у списка каталога и «наверх» у результатов поиска */
+function bindScrollBtns() {
+  try {
+    let box = $('#scBtns'); const cfg = S.tab === 'library' ? { sel: '#libBody', up: true, down: true } : S.tab === 'search' ? { sel: '#srBody', up: true, down: false } : null, el = cfg && $(cfg.sel);
+    if (!el) { if (box && box.classList) box.classList.add('hidden'); return; }
+    if (!box) { box = document.createElement('div'); box.id = 'scBtns'; box.className = 'scb hidden'; box.innerHTML = '<button data-act="scrollTop" aria-label="Наверх" title="Наверх">↑</button><button data-act="scrollBottom" aria-label="Вниз" title="Вниз">↓</button>'; document.body.appendChild(box); }
+    const up = box.querySelector('[data-act="scrollTop"]'), dn = box.querySelector('[data-act="scrollBottom"]');
+    const upd = () => { const y = el.scrollTop || 0, max = (el.scrollHeight || 0) - (el.clientHeight || 0); up.classList.toggle('hidden', !cfg.up || y < 240); dn.classList.toggle('hidden', !cfg.down || max - y < 240); box.classList.toggle('hidden', up.classList.contains('hidden') && dn.classList.contains('hidden')); };
+    el.onscroll = upd; upd();
+  } catch (e) { /* кнопки прокрутки не обязательны */ }
+}
+function renderLibrary() { renderLibHead(); renderLibBody(); renderSelBar(); setTimeout(bindScrollBtns, 60); }
 function libRefilter() { renderLibrary(); const b = $('#libBody'); if (b) b.scrollTop = 0; } // после смены отбора список с начала
 function renderSelBar() {
   if (S.tab === 'library') $('#fab').classList.toggle('hidden', S.selMode); // после массового действия кнопка «+» возвращается
@@ -1857,11 +1869,13 @@ function drawShInfo() {
   drawShSeries();
 }
 // «Серия: 3 из 7 · завершено 2» с переходами к предыдущей и следующей игре серии (порядок: год, дата добавления, название)
-function serRowHtml(d, nm) { // строка серии в карточке игры: число игр, процент завершения, проверена ли серия, итог проверки IGDB; снизу полоса с делениями по числу игр
+function serRowHtml(d, nm) { // строка серии в карточке игры: число игр, процент завершения, проверена ли серия (вручную или автоматически), итог проверки IGDB в рамке; снизу полоса с делениями по числу игр
   nm = String(nm || '').trim(); if (!nm) return '';
   const key = serKey(nm), list = S.games.filter(g => g.id !== d.id && g.series && serKey(g.series) === key); list.push(d);
-  const done = list.filter(g => g.done).length, pc = Math.round(done * 100 / list.length), ok = !!serMap('serOk')[key], c = serMap('serChk')[key], checked = ok || (c && !c.none && c.total - c.have <= 0);
-  return '<div class="spmid" data-act="serCard" data-name="' + esc(nm) + '"><div class="sprow"><b>' + gWord(list.length) + '</b><span>завершено <b>' + pc + '%</b></span><i class="' + (checked ? 'okk' : 'nock') + '">' + (checked ? '✓ проверена' : 'не проверена') + '</i>' + serBadge(nm) + '</div><div class="spbar' + tkCls(list.length) + '" style="' + tkSty(list.length) + '"><i style="width:' + pc + '%"></i></div></div>';
+  const done = list.filter(g => g.done).length, pc = Math.round(done * 100 / list.length), ok = !!serMap('serOk')[key], c = serMap('serChk')[key], has = !!(c && !c.none), miss = has ? Math.max(0, c.total - c.have) : 0, auto = has && !miss;
+  const chk = ok || auto ? '<i class="okk" title="' + (ok ? 'Отмечена вручную' : 'Проверена автоматически по IGDB') + '">✓ проверена</i>' : '<i class="nock">не проверена</i>';
+  const a = ' data-act="serCheck" data-name="' + esc(nm) + '"', ig = !has ? '' : miss > 0 ? '<button class="serbd warn"' + a + ' title="В IGDB не хватает игр: ' + miss + '">⚠ ' + miss + '</button>' : '<button class="serbd good"' + a + ' title="Все игры IGDB есть">✓ IGDB</button>';
+  return '<div class="spmid" data-act="serCard" data-name="' + esc(nm) + '"><div class="sprow"><b>' + gWord(list.length) + '</b><span>завершено <b>' + pc + '%</b></span>' + chk + ig + '</div><div class="spbar' + tkCls(list.length) + '" style="' + tkSty(list.length) + '"><i style="width:' + pc + '%"></i></div></div>';
 }
 function drawShSeries() {
   const el = $('#shSerie'); if (!el || !S.sheet) return; const d = S.sheet.draft;
@@ -2262,7 +2276,7 @@ function entryHtml(k, o) {
   const col = okColor(o.color), list = vmodeOf(k) === 'list', key = ' data-' + o.attr + '="' + esc(o.key) + '"';
   const lpm = o.lpm ? ' data-lpm="' + o.lpm + '"' : '';
   const pc = donePct(o.games), pcol = o.count ? pctColor(pc) : 'var(--mut)';
-  const meta = '<div class="ct"><span>' + gWord(o.count) + '</span><span title="Завершено" style="color:' + pcol + '">✓ ' + pc + '%</span>' + (list && o.badge ? o.badge : '') + '</div><div class="pb' + tkCls(o.count) + '" style="' + tkSty(o.count) + '"><i style="width:' + pc + '%;background:' + pcol + '"></i></div>';
+  const meta = '<div class="ct"><span>' + gWord(o.count) + '</span><span class="ctr">' + (list && o.badge ? o.badge : '') + '<span title="Завершено" style="color:' + pcol + '">✓ ' + pc + '%</span></span></div><div class="pb' + tkCls(o.count) + '" style="' + tkSty(o.count) + '"><i style="width:' + pc + '%;background:' + pcol + '"></i></div>';
   if (list) {
     const u = o.covers[0];
     return '<div class="lrow" data-act="' + o.act + '"' + key + lpm + (col ? ' style="border-left-color:' + col + '"' : '') + '><div class="lth"' + (u ? ' style="background-image:url(\'' + bgu(u) + '\')"' : '') + '></div><div class="lm"><div class="nm">' + esc(o.name) + '</div>' + meta + '</div></div>';
@@ -2518,7 +2532,7 @@ function pasteModal(listId) {
 }
 function pickGame(prefill) {
   return new Promise(res => {
-    const m = openModal();
+    const m = openModal(); if (m.classList) m.classList.add('chm');
     m.innerHTML = '<h4>Сопоставить с игрой из каталога</h4><label class="field"><input id="pgq" value="' + esc(prefill) + '" placeholder="Название"></label><div id="pgl"></div><div class="acts"><span data-x="cancel">Отмена</span></div>';
     const draw = () => {
       const toks = $('#pgq', m).value.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -2679,6 +2693,7 @@ function typeQuickBtn() {
   return '<button class="ib tq' + (m ? ' on' : '') + '" data-act="typeQuick" title="Чипы типов: ' + (m === 0 ? 'выключены' : m === 1 ? 'все' : 'выбранные в фильтре') + '" aria-label="Чипы типов"><svg viewBox="0 0 24 24">' + ICONS.tag + '</svg><span class="lbl">Типы</span></button>';
 }
 function renderSearchHead() {
+  setTimeout(bindScrollBtns, 60);
   const s = S.search, f = s.f, chips = [], fc = searchFilterCount();
   const kindBtn = ib('sKind', s.kind === 'series' ? 'layers' : 'pad', s.kind === 'series' ? 'Ищу серии' : 'Ищу игры', s.kind === 'series', '', ' aria-label="Переключить поиск игр и серий"');
   const srcBtn = '<button class="ib srcsw" data-act="sSrcSwitch" title="Переключить источник поиска" style="color:' + PROV[s.src].color + ';border-color:' + PROV[s.src].color + '"><b>' + PROV[s.src].name + '</b></button>';
@@ -2727,8 +2742,13 @@ function renderSearchBody() {
     h += '<div class="status">' + (s.loading ? 'Загрузка…' : (s.count ? 'Найдено: ' + s.count + ', показано: ' + vr.length : '')) + '</div>';
   }
   if (s.loading && !s.results.length) h += '<div class="status">Загрузка…</div>';
-  if (s.mode === 'search' && s.kind === 'games' && s.hasMore && s.results.length) h += '<div class="moreBar"><button class="btn acc" data-act="sMore"' + (s.loading ? ' disabled' : '') + '>' + (s.loading ? 'Загрузка…' : 'Загрузить ещё') + '</button></div>'; // новые игры подгружаются только по кнопке, она всегда видна поверх списка
+  const more = s.mode === 'search' && s.kind === 'games' && s.hasMore && s.results.length; // новые игры подгружаются только по кнопке в конце списка; пока кнопки не видно, в углу стрелка вниз
+  if (more) h += '<div class="moreDn hidden" id="moreDn"><button class="dn" data-act="sMoreDown" title="Вниз, к кнопке «Загрузить ещё»" aria-label="Вниз, к кнопке «Загрузить ещё»">↓</button></div><div class="moreEnd"><button class="btn acc" id="moreBtn" data-act="sMore"' + (s.loading ? ' disabled' : '') + '>' + (s.loading ? 'Загрузка…' : 'Загрузить ещё') + '</button></div>';
   el.innerHTML = h;
+  if (S.moreIO) { try { S.moreIO.disconnect(); } catch (e) { /* уже отключён */ } S.moreIO = null; }
+  const mb = more && $('#moreBtn'), dn = more && $('#moreDn');
+  if (mb && dn && typeof IntersectionObserver === 'function') { S.moreIO = new IntersectionObserver(en => { dn.classList.toggle('hidden', !!en[0] && en[0].isIntersecting); }, { root: $('#srBody') }); S.moreIO.observe(mb); }
+  else if (dn) dn.classList.remove('hidden');
 }
 // сортировка результатов поиска: IGDB не умеет сортировать запрос с поисковой строкой, поэтому сортируется уже загруженный список (порядок источника запоминается в _o)
 const SEARCH_SORTS = [['rel', 'По релевантности (как в источнике)'], ['name', 'По названию (А → Я)'], ['-name', 'По названию (Я → А)'], ['-year', 'По году (новые сверху)'], ['year', 'По году (старые сверху)'], ['-rating', 'По рейтингу (высокий сверху)'], ['rating', 'По рейтингу (низкий сверху)'], ['-time', 'По времени прохождения (дольше сверху)'], ['time', 'По времени прохождения (короче сверху)']];
@@ -3335,7 +3355,7 @@ function restoreScroll(tab) {
   b.scrollTop = p;
 }
 function render() {
-  setTimeout(lazyCovers, 800);
+  setTimeout(lazyCovers, 800); setTimeout(bindScrollBtns, 60);
   $$('#tabs button').forEach(b => { const on = b.dataset.tab === S.tab || (S.tab === 'stats' && b.dataset.tab === 'settings') || (S.tab === 'sercard' && b.dataset.tab === 'series'); b.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   const fab = $('#fab'); fab.classList.toggle('hidden', !(S.tab === 'library' || S.tab === 'collections' || (S.tab === 'inbox' && !S.inboxList)) || S.selMode);
   const v = $('#view'); v.className = ['library', 'collections', 'series', 'search', 'sercard'].includes(S.tab) ? 'fx' : '';
@@ -3468,6 +3488,9 @@ const ACT = {
     const s = S.search, c = s.chk; if (c && c.from && c.from !== 'search') { s.chk = null; s.mode = 'search'; s.results = []; s.started = false; S.tab = c.from; render(); return; }
     s.mode = 'search'; render(); runSearch(true);
   },
+  scrollTop: () => { const el = $(S.tab === 'search' ? '#srBody' : '#libBody'); if (el && el.scrollTo) el.scrollTo({ top: 0, behavior: 'smooth' }); },
+  scrollBottom: () => { const el = $('#libBody'); if (el && el.scrollTo) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' }); },
+  sMoreDown: () => { const b = $('#moreBtn'); if (b && b.scrollIntoView) b.scrollIntoView({ block: 'end', behavior: 'smooth' }); },
   sKind: () => { const s = S.search; s.kind = s.kind === 'series' ? 'games' : 'series'; s.src = s.kind === 'series' ? 'igdb' : S.set.mainSrc; s.bind = ''; s.stack = []; s.chk = null; s.cols = []; s.results = []; s.started = false; s.token++; s.loading = false; s.mode = 'search'; render(); runSearch(true); },
   colTap: t => {
     const s = S.search, id = +t.dataset.id, nm = t.dataset.name;
@@ -3478,13 +3501,14 @@ const ACT = {
   serCard: t => { const nm = (t && t.dataset && t.dataset.name) || (($('#f_series') || {}).value || '').trim(); if (!nm) return; const d = S.sheet && S.sheet.draft; if (d && d.id && !S.sheet.isNew) S.retGame = { id: d.id, tab: S.tab }; openSerCard(nm); },
   scBack: () => { const r = S.retGame; if (r && gameById(r.id)) return ACT.retGame(); S.retGame = null; S.tab = 'series'; render(); },
   scMenu: () => serMenu(S.serCard.name),
+  scCatalog: () => serInLibrary(S.serCard.name),
   scVmode: () => { S.set.vmode = S.set.vmode || {}; S.set.vmode.sercard = vmodeOf('sercard') === 'list' ? 'tiles' : 'list'; saveSet(); render(); },
   scSearch: () => showSeriesView(S.serCard.name, { from: 'sercard' }),
   scCheck: () => showSeriesView(S.serCard.name, { from: 'sercard', onlyMiss: true }),
   scMark: () => { const m = serMap('serOk'), k = serKey(S.serCard.name); if (m[k]) delete m[k]; else m[k] = 1; saveSet(); scRefresh(); toast(m[k] ? 'Серия отмечена как проверенная и полная' : 'Отметка снята'); },
   scSel: () => { const c = S.serCard; c.selMode = !c.selMode; if (!c.selMode) c.sel.clear(); scRefresh(); },
   scSelAll: () => { const c = S.serCard, l = scList(c.name); if (c.sel.size === l.length) c.sel.clear(); else l.forEach(g => c.sel.add(g.id)); scRefresh(); },
-  scGame: t => { const c = S.serCard, id = t.dataset.gid; if (c.selMode) { if (c.sel.has(id)) c.sel.delete(id); else c.sel.add(id); return scRefresh(); } S.shown = scList(c.name); openGameSheet(id); },
+  scGame: t => { if (lp.fired) { lp.fired = false; return; } const c = S.serCard, id = t.dataset.gid; if (c.selMode) { if (c.sel.has(id)) c.sel.delete(id); else c.sel.add(id); return scRefresh(); } S.shown = scList(c.name); openGameSheet(id); },
   scRemove: async () => { const c = S.serCard, games = scList(c.name).filter(g => c.sel.has(g.id)); if (!games.length) return; const snap = takeSnap(); for (const g of games) g.series = ''; await saveGames(games); c.sel.clear(); c.selMode = false; scRefresh(); toastUndo('Убрано из серии: ' + games.length, snap); },
   scMove: async () => { const c = S.serCard, games = scList(c.name).filter(g => c.sel.has(g.id)); if (!games.length) return; const n = await chooseSeries(c.name); if (!n) return; const snap = takeSnap(); for (const g of games) g.series = n; await saveGames(games); c.sel.clear(); c.selMode = false; scRefresh(); toastUndo('Перенесено в «' + n + '»: ' + games.length, snap); },
   scDel: async () => { const c = S.serCard, games = scList(c.name).filter(g => c.sel.has(g.id)); if (!games.length) return; if (!await confirmBox('Удалить из каталога игры: ' + games.length + '? Их можно вернуть из корзины.', 'Удалить')) return; const snap = takeSnap(); for (const g of games) await removeGame(g.id); c.sel.clear(); c.selMode = false; scRefresh(); toastUndo('Удалено игр: ' + games.length, snap); },
@@ -3836,7 +3860,7 @@ document.addEventListener('click', e => {
 const lpTarget = el => (S.tab === 'library' && el.closest('.card[data-gid], tr[data-gid], .tl[data-gid]')) || el.closest('[data-lpm]');
 function lpFire(c) {
   if (!c || lp.fired) return; clearTimeout(lp.t); lp.fired = true;
-  if (c.dataset.lpm === 'item') toggleInSel(c.dataset.iid, true); else if (c.dataset.lpm === 'coll') collMenu(c.dataset.id); else if (c.dataset.lpm === 'ser') serMenu(c.dataset.name); else toggleSel(c.dataset.gid, true);
+  if (c.dataset.lpm === 'item') toggleInSel(c.dataset.iid, true); else if (c.dataset.lpm === 'coll') collMenu(c.dataset.id); else if (c.dataset.lpm === 'ser') serMenu(c.dataset.name); else if (c.dataset.lpm === 'scgame') { const sc = S.serCard; if (sc) { sc.selMode = true; sc.sel.add(c.dataset.gid); scRefresh(); } } else toggleSel(c.dataset.gid, true);
 }
 document.addEventListener('input', e => { const t = e.target; if (!t || !t.id) return; if (t.id === 'syIp') { const v = ipMask(t.value); if (v !== t.value) t.value = v; } else if (t.id === 'syPort') { const v = t.value.replace(/\D/g, '').slice(0, 5); if (v !== t.value) t.value = v; } });
 document.addEventListener('pointerdown', e => {

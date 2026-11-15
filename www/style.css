@@ -794,10 +794,10 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 /* серии: проверка полноты, поиск серий */
 .serbd{border:1px solid var(--mut);background:transparent;border-radius:9px;padding:0 6px;font-size:11px;line-height:18px;height:20px;color:var(--mut);white-space:nowrap}
 .serbd.warn{color:#f0a030;border-color:#f0a030;background:rgba(240,160,48,.14)}
-.serbd.ok{color:var(--green);border-color:var(--green)}
+.serbd.good{color:var(--green);border-color:var(--green)}
 .tile .sbw{position:absolute;right:6px;top:8px;z-index:2}
 .tile .sbw .serbd{background:rgba(20,20,20,.82)}
-.lrow .ct{align-items:center;flex-wrap:wrap}.lrow .ct .serbd{margin-left:auto}
+.ct .ctr{display:flex;align-items:center;gap:8px;margin-left:auto;white-space:nowrap}
 .p.sm,.chips.sm .p{padding:4px 10px;font-size:12px}
 .chips.sm{gap:6px;margin-bottom:6px}
 .p.ic{display:inline-flex;align-items:center;gap:4px}
@@ -822,8 +822,6 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 #sTypes{flex-wrap:wrap;overflow:visible}
 .serttl{font-size:15px;font-weight:700;margin:0 2px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hdr2:has(+ .serttl){margin-bottom:2px}
-.moreBar{position:sticky;bottom:10px;z-index:6;display:flex;justify-content:center;pointer-events:none;margin-top:6px}
-.moreBar .btn{pointer-events:auto;box-shadow:0 4px 14px rgba(0,0,0,.45)}
 .srl.z1{gap:4px}.srl.z1 .srow{padding:3px 6px;gap:8px}.srl.z1 .sth{width:28px;height:28px;flex-basis:28px;border-radius:5px}.srl.z1 .nm{font-size:12px}.srl.z1 .m{font-size:10px}
 .srl.z3{gap:8px}.srl.z3 .srow{padding:8px 10px;gap:12px}.srl.z3 .sth{width:60px;height:60px;flex-basis:60px;border-radius:10px}.srl.z3 .nm{font-size:16px}.srl.z3 .m{font-size:12px}
 .srl.z4{gap:10px}.srl.z4 .srow{padding:10px 12px;gap:14px}.srl.z4 .sth{width:76px;height:76px;flex-basis:76px;border-radius:12px}.srl.z4 .nm{font-size:19px}.srl.z4 .m{font-size:13px}
@@ -848,3 +846,21 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 /* кнопки выбора и «Готово» всегда видны: закреплены внизу окна, список прокручивается */
 .modal .acts{position:sticky;bottom:-18px;z-index:3;margin:12px -18px -18px;padding:12px 18px 16px;background:var(--modal);border-top:1px solid var(--line)}
 .sheet > .btn[data-act="closeSheet"]{position:sticky;bottom:0;z-index:5;box-shadow:0 -14px 12px -6px var(--sheet),0 14px 0 0 var(--sheet)}
+
+/* поиск: «Загрузить ещё» в конце списка, стрелка вниз в углу, пока кнопки не видно */
+.moreEnd{display:flex;justify-content:center;margin:14px 0 10px}
+.moreDn{position:sticky;bottom:12px;height:0;z-index:6;pointer-events:none}
+.moreDn .dn{position:absolute;right:8px;bottom:0;width:40px;height:40px;border-radius:20px;border:0;background:var(--acc);color:#fff;font-size:20px;line-height:40px;padding:0;box-shadow:0 4px 14px rgba(0,0,0,.45);pointer-events:auto}
+/* окна выбора: заголовок, строка поиска и кнопки закреплены, прокручивается только список */
+.modal.chm{display:flex;flex-direction:column;overflow:hidden}
+.modal.chm h4,.modal.chm .field,.modal.chm .acts{flex:0 0 auto}
+.modal.chm #chl,.modal.chm #pgl{flex:1 1 auto;min-height:0;overflow-y:auto}
+.modal.chm .acts{position:static;margin:10px 0 0;padding:10px 0 0}
+/* ряд значков карточки серии */
+.scbar{flex-wrap:nowrap;gap:6px;margin:0 0 8px}
+.scbar .ib{flex:0 0 auto;min-width:40px;height:38px}
+
+/* кнопки прокрутки */
+.scb{position:fixed;right:16px;bottom:calc(144px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px;z-index:16}
+.scb button{width:40px;height:40px;border-radius:20px;border:1px solid var(--line);background:var(--card);color:var(--tx);font-size:18px;line-height:1;padding:0;box-shadow:0 3px 10px rgba(0,0,0,.4);opacity:.92}
+.sprow .serbd{height:auto;min-height:22px;padding:1px 9px;font-size:13px;border-radius:11px;border-width:1.5px}

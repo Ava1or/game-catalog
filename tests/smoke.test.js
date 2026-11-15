@@ -19,7 +19,7 @@ const FNV = { id: 1, name: 'Fallout: New Vegas', first_release_date: Date.UTC(20
 const igdbData = (ep, body) => {
   const D = (y, m = 0) => Date.UTC(y, m, 1) / 1000;
   if (ep === '/collections') return body.includes('search "fallout') ? [{ id: 7, name: 'Fallout', games: [1, 201, 202, 203, 204, 205] }] : [];
-  if (body.includes('fields collections.id,collections.name; where id = (')) return [{ id: 1, collections: [{ id: 7, name: 'Fallout' }] }];
+  if (body.includes('fields collections.id,collections.name; where id = (')) { const ids = (body.match(/where id = \(([\d,]+)\)/) || [, ''])[1].split(',').map(Number); if (global.__collections && ids.some(i => global.__collections[i])) return ids.filter(i => global.__collections[i]).map(i => ({ id: i, collections: global.__collections[i] })); return [{ id: 1, collections: [{ id: 7, name: 'Fallout' }] }]; }
   if (ep === '/games' && body.includes('game_type = (0,8,9,4,10,11,3,6)')) return [
     { id: 1, name: 'Fallout: New Vegas', first_release_date: D(2010, 9), game_type: 0 }, { id: 201, name: 'Fallout 3', first_release_date: D(2008, 9), game_type: 0 },
     { id: 202, name: 'Fallout 3 Remake', first_release_date: D(2020), game_type: 8 }, { id: 203, name: 'Fallout 3 Port', first_release_date: D(2021), game_type: 11 },
@@ -63,7 +63,7 @@ const L = require('../www/app.js');
   await step('add from igdb', async () => { const g = await G.addFromIgdb('igdb:1', []); if (!g || g.series !== 'Fallout') throw new Error('series=' + (g && g.series)); });
   await step('quick add + render', async () => { await G.addFromIgdb('igdb:101'); G.renderSearchBody(); });
   await step('collections + library', async () => { S.collections.push({ id: 'c1', name: 'Любимые' }); S.games[0].collections.push('c1'); S.tab = 'collections'; G.render(); S.tab = 'library'; G.render(); G.ACT.collChip({ dataset: { id: 'c1' } }); G.ACT.openFilters(); G.ACT.openCols(); G.ACT.toggleView(); G.ACT.fToggle({ dataset: { k: 'genres', v: 'RPG' } }); G.ACT.rmF({ dataset: { k: 'genres', v: 'RPG' } }); G.ACT.resetF(); });
-  await step('series tab', async () => { S.tab = 'series'; G.render(); G.ACT.serOpen({ dataset: { name: 'Fallout' } }); if (S.tab !== 'library' || S.set.f.series[0] !== 'Fallout') throw new Error('serOpen'); G.ACT.serOpen({ dataset: { name: '' } }); G.render(); });
+  await step('series tab', async () => { S.tab = 'series'; G.render(); G.ACT.serOpen({ dataset: { name: 'Fallout' } }); if (S.tab !== 'sercard' || !/Fallout/.test(G.viewSerCard())) throw new Error('serOpen: карточка серии'); S.tab = 'series'; G.ACT.serOpen({ dataset: { name: '' } }); G.render(); });
   await step('карточка поиска: соседние результаты, кнопки и границы', async () => {
     S.tab = 'search'; S.search.results = [{ rid: 'igdb:100', name: 'А', platforms: [], genres: [] }, { rid: 'igdb:101', name: 'Б', platforms: [], genres: [] }];
     await G.openIgdbSheet('igdb:100'); if (!document.querySelector('.snav')) throw new Error('нет кнопок в карточке поиска');
@@ -113,7 +113,8 @@ const L = require('../www/app.js');
     const mk = (id, y, d) => Object.assign({}, S.games[0], { id, name: 'Сага ' + id, year: y, series: 'Сага проверки', done: d, collections: [], added: 1 });
     const gs = [mk('ser_a', 2001, true), mk('ser_b', 2005, false), mk('ser_c', 2010, true)]; gs.forEach(g => S.games.push(g));
     G.openGameSheet('ser_b'); const html = (document.querySelector('#shSerie') || {}).innerHTML || '';
-    if (!html.includes('2 из 3') || !html.includes('завершено 2')) throw new Error('строка серии: ' + html.slice(0, 120));
+    if (!html.includes('data-act="serCard"') || !html.includes('3 игры') || !html.includes('завершено <b>67%</b>') || !html.includes('не проверена') || html.includes('serNav')) throw new Error('строка серии: ' + html.slice(0, 160));
+    S.set.serOk = { [G.serKey('Сага проверки')]: 1 }; G.openGameSheet('ser_b'); if (!(document.querySelector('#shSerie') || {}).innerHTML.includes('✓ проверена')) throw new Error('серия отмечена проверенной'); S.set.serOk = {};
     G.ACT.closeSheet(); gs.forEach(g => { S.games.splice(S.games.indexOf(g), 1); });
   });
   await step('бандлы: тип карточки, состав, возврат в основной поиск без нового запроса', async () => {
@@ -152,12 +153,14 @@ const L = require('../www/app.js');
     S.set.serSort = '-pct'; sh = G.seriesTilesHtml(); if (idx(sh, 'Серия А') > idx(sh, 'Серия Б')) throw new Error('сортировка по проценту прохождения (А 100%, Б 33%)');
     delete S.set.serSort; extra.forEach(g => { S.games.splice(S.games.indexOf(g), 1); });
   });
-  await step('быстрое переключение типов карточек в поиске', async () => {
-    const before = S.set.searchTypes; S.search.src = 'igdb'; delete S.set.searchTypes;
-    G.ACT.typeQuick(); if (G.searchTypes().join() !== '0,8,3') throw new Error('быстрый набор: игры, ремейки, бандлы');
-    G.ACT.typeQuick(); if (G.searchTypes().length !== 15) throw new Error('второй нажим: все типы');
-    G.ACT.typeQuick(); if (G.searchTypes().join() !== '0,8,3') throw new Error('третий нажим снова быстрый набор');
-    await new Promise(r => setTimeout(r, 60)); if (before === undefined) delete S.set.searchTypes; else S.set.searchTypes = before;
+  await step('кнопка «Типы»: чипы все -> выбранные в фильтре -> выключены', async () => {
+    const keep = S.set.chipMode, keepV = S.set.typeChips, s = S.search, kr = s.results, km = s.mode, kk = s.kind; s.kind = 'games'; s.mode = 'search'; s.src = 'igdb'; s.tf = []; delete S.set.chipMode; S.set.typeChips = [0];
+    s.results = [{ rid: 'igdb:1', name: 'A', type: 0 }, { rid: 'igdb:2', name: 'B', type: 8 }];
+    if (G.chipMode() !== 1 || !/Ремейк/.test(G.typeCountsHtml())) throw new Error('по умолчанию показаны все чипы');
+    G.ACT.typeQuick(); if (G.chipMode() !== 2 || /Ремейк/.test(G.typeCountsHtml()) || !/Игра/.test(G.typeCountsHtml())) throw new Error('второй режим: только выбранные в фильтре: ' + G.typeCountsHtml());
+    G.ACT.typeQuick(); if (G.chipMode() !== 0 || G.typeCountsHtml() !== '') throw new Error('третий режим: чипы выключены');
+    G.ACT.typeQuick(); if (G.chipMode() !== 1) throw new Error('четвёртый нажим снова все чипы');
+    s.results = kr; s.mode = km; s.kind = kk; if (keep === undefined) delete S.set.chipMode; else S.set.chipMode = keep; if (keepV === undefined) delete S.set.typeChips; else S.set.typeChips = keepV;
   });
   await step('сортировка результатов поиска', async () => {
     const s = S.search, keep = s.results, mode = s.mode; s.mode = 'search';
@@ -508,7 +511,7 @@ const L = require('../www/app.js');
     // платформу при добавлении не спрашиваем: без выбора у игры с несколькими платформами основной нет, заданная заранее ставится
     let asked = false; global.__chooseHook = async () => { asked = true; return null; }; global.__promptHook = async () => { asked = true; return null; };
     const g1 = await G.addFromIgdb('igdb:150', [], {}); if (!g1 || asked) throw new Error('спросили платформу или не добавили');
-    const g2 = await G.addFromIgdb('igdb:151', [], { series: 'Моя серия', hours: 42 }); if (!g2 || g2.series !== 'Моя серия' || g2.time !== 42) throw new Error('серия и время из строки важнее источника ' + (g2 && g2.series + g2.time));
+    const g2 = await G.addFromIgdb('igdb:151', [], { series: 'Моя серия', hours: 42 }); if (!g2 || g2.series !== 'Fallout' || g2.time !== 42) throw new Error('серия из IGDB важнее серии строки, время из строки важнее источника ' + (g2 && g2.series + g2.time));
     if (!g1.added || !g2.added) throw new Error('дата добавления не записана');
     delete global.__chooseHook; delete global.__promptHook;
     S.games = S.games.filter(g => !g.id.startsWith('np_') && g.id !== g1.id && g.id !== g2.id);
@@ -578,6 +581,26 @@ const L = require('../www/app.js');
     // вкладка серий: кнопка проверки и бейджи
     S.tab = 'series'; G.render(); need(G.seriesTilesHtml().includes('serbd'), 'бейдж на плитке серии');
     await G.serCheckAll(); S.tab = 'library'; G.render();
+  });
+  await step('карточка серии: состав, навигация назад, проверка названия, перенос игр', async () => {
+    const need = (c, m) => { if (!c) throw new Error(m); };
+    const mk = (id, igdb, y) => Object.assign({}, S.games[0], { id, igdbId: igdb, name: 'FF ' + id, year: y, series: 'Final Fantasy', done: false, collections: [], added: 1 });
+    const gs = [mk('ff1', 301, 2001), mk('ff2', 302, 2002), mk('ff3', 303, 2003), mk('ff4', 304, 2004)]; gs.forEach(g => S.games.push(g));
+    global.__collections = { 301: [{ id: 50, name: 'Final Fantasy' }], 302: [{ id: 50, name: 'Final Fantasy' }], 303: [{ id: 60, name: 'Dissidia Final Fantasy' }], 304: [{ id: 60, name: 'Dissidia Final Fantasy' }] };
+    S.tab = 'series'; S.retGame = { id: gs[0].id, tab: 'library' }; G.openSerCard('Final Fantasy');
+    need(S.tab === 'sercard' && G.scList('Final Fantasy').length === 4, 'карточка серии открыта с составом');
+    const v = G.viewSerCard(); need(/Игр в серии/.test(v) && /scSearch/.test(v) && /scNameCheck/.test(v) && /scMark/.test(v), 'кнопки и параметры карточки серии');
+    const r = await G.serNameCheck('Final Fantasy'); need(r.main && r.main.id === 50 && !r.rename && r.groups.length === 1 && r.groups[0].games.length === 2 && r.groups[0].col.name === 'Dissidia Final Fantasy', 'проверка названия: 2 игры в другой серии IGDB ' + JSON.stringify([r.main, r.rename, r.groups.length]));
+    G.ACT.scGame({ dataset: { gid: 'ff2' } }); need(S.shown.length === 4 && S.sheet && S.sheet.draft.id === 'ff2', 'игра открывается, соседи по серии для свайпа'); G.ACT.closeSheet();
+    // поиск по серии из карточки серии и возврат: поиск -> карточка серии -> карточка игры
+    await G.ACT.scSearch(); need(S.search.chk && S.search.chk.from === 'sercard' && S.tab === 'search', 'поиск по серии из карточки серии');
+    G.ACT.sBack(); need(S.tab === 'sercard' && S.serCard, 'из поиска по серии назад в карточку серии');
+    G.ACT.scBack(); need(S.sheet && S.sheet.draft.id === 'ff1', 'из карточки серии назад в карточку игры'); G.ACT.closeSheet(); S.retGame = null;
+    // перенос игр в серию IGDB и переименование
+    S.serFix = r; G.ACT.serFixMove({ dataset: { i: '0' } }); await new Promise(x => setTimeout(x, 50));
+    need(G.scList('Dissidia Final Fantasy').length === 2 && G.scList('Final Fantasy').length === 2, 'игры перенесены в другую серию');
+    const rn = await G.serRenameAll('Dissidia Final Fantasy', 'Dissidia FF'); need(G.scList('Dissidia FF').length === 2 && rn.n === 'Dissidia FF', 'серия переименована');
+    G.ACT.tab({ dataset: { tab: 'series' } }); delete global.__collections; gs.forEach(g => { const i = S.games.indexOf(g); if (i >= 0) S.games.splice(i, 1); });
   });
   await step('синхронизация с сервером: отправка, восстановление, правка, удаление', async () => {
     const fs = require('fs'), os = require('os'), path = require('path');

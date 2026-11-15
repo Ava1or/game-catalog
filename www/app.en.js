@@ -821,6 +821,76 @@ function gameFromRawg(d, series) {
 }
 const gameFromDetails = (d, series) => d._src === 'rawg' ? gameFromRawg(d, series) : gameFromIgdb(d, series);
 const yearOfD = d => d._src === 'rawg' ? (d.released ? +d.released.slice(0, 4) : 0) : yearOf(d);
+/* ====== Карточка серии: состав, прогресс, проверка, правка названия ====== */
+const scList = name => { const k = serKey(name); return S.games.filter(g => g.series && serKey(g.series) === k).sort((a, b) => (+a.year || 9999) - (+b.year || 9999) || (a.added || 0) - (b.added || 0) || String(a.name).localeCompare(String(b.name), LOC)); };
+function serMigrate(a, b) { const ka = serKey(a), kb = serKey(b); if (ka === kb) return; ['serOk', 'serCol', 'serChk', 'serIgnore'].forEach(m => { const o = serMap(m); if (o[ka] !== undefined) { if (o[kb] === undefined) o[kb] = o[ka]; delete o[ka]; } }); }
+function serInLibrary(name) { Object.assign(S.set.f, { q: '', years: [], genres: [], platforms: [], series: [name], collections: [], props: [], addedFrom: '', addedTo: '', seriesMode: '', maxTime: 0, done: '', minRating: 0 }); saveSet(); S.retGame = null; S.tab = 'library'; render(); }
+function openSerCard(name) { S.serCard = { name, sel: new Set(), selMode: false }; closeSheet(); S.tab = 'sercard'; render(); const b = $('#scBody'); if (b) b.scrollTop = 0; }
+async function serRenameAll(name, n) { // переименовать серию у всех игр (если такая серия уже есть, игры объединяются с ней)
+  const games = scList(name), f = S.set.f, snap = takeSnap(); n = serKey(n) === serKey(name) ? String(n).trim() : canonSeries(n);
+  for (const g of games) g.series = n; await saveGames(games); f.series = f.series.map(x => x === name ? n : x); serMigrate(name, n);
+  if (S.serCard && serKey(S.serCard.name) === serKey(name)) S.serCard.name = n; saveSet(); return { n, snap };
+}
+function serCardInfoHtml() {
+  const c = S.serCard, name = c.name, k = serKey(name), list = scList(name), done = list.filter(g => g.done).length, pc = list.length ? Math.round(done * 100 / list.length) : 0;
+  const chk = serMap('serChk')[k], ok = !!serMap('serOk')[k], col = serMap('serCol')[k], miss = ok ? 0 : chk && !chk.none ? Math.max(0, chk.total - chk.have) : -1;
+  const hours = Math.round(list.reduce((a, g) => a + (+g.time || 0), 0) * 10) / 10, rated = list.filter(g => g.rating), avg = rated.length ? Math.round(rated.reduce((a, g) => a + g.rating, 0) / rated.length * 10) / 10 : 0;
+  const ys = list.map(g => +g.year).filter(Boolean), kv = (a, b) => '<div class="kv"><span>' + a + '</span><b>' + b + '</b></div>';
+  const stat = ok ? '<i class="okk">✓ checked, complete (marked manually)</i>' : chk && !chk.none ? (miss > 0 ? '<i class="warnk">⚠ missing from IGDB: ' + miss + '</i>' : '<i class="okk">✓ every IGDB game is here</i>') + ' · ' + esc(new Date(chk.t).toLocaleDateString(LOC)) : '<i class="nock">not checked</i>';
+  return '<div class="scard">' + kv('Games in the series', list.length) + kv('Completed', done + ' of ' + list.length + ' (' + pc + '%)')
+    + '<div class="spbar" style="margin:2px 0 8px"><i style="width:' + pc + '%;background:' + pctColor(pc) + '"></i></div>'
+    + kv('Series check', stat) + (chk && !chk.none ? kv('In IGDB (selected types)', chk.total + ', you have ' + chk.have) : '')
+    + (col ? kv('Series in IGDB', esc(col.name) + (serKey(col.name) !== k ? ' <i class="warnk">≠ the name</i>' : '')) : '')
+    + (hours ? kv('Playtime', hours + ' h') : '') + (avg ? kv('Average rating', '★' + avg) : '') + (ys.length ? kv('Years', Math.min.apply(null, ys) === Math.max.apply(null, ys) ? ys[0] : Math.min.apply(null, ys) + '–' + Math.max.apply(null, ys)) : '') + '</div>'
+    + '<div class="chips sm"><button class="p sm" data-act="scSearch">🔍 Search the series</button><button class="p sm" data-act="scCheck">✓ Check completeness</button><button class="p sm" data-act="scNameCheck">Aa Check the name</button><button class="p sm" data-act="scAdd">＋ Add games</button><button class="p sm' + (c.selMode ? ' on' : '') + '" data-act="scSel">' + (c.selMode ? '✓ Select' : 'Select') + '</button></div>'
+    + '<div class="chips sm"><button class="p sm' + (ok ? ' on' : '') + '" data-act="scMark">' + (ok ? '☑' : '☐') + ' Series checked and complete, the rest is not needed</button></div>'
+    + (c.selMode ? '<div class="toolbar"><button class="btn" data-act="scSelAll">All</button><button class="btn" data-act="scRemove"' + (c.sel.size ? '' : ' disabled') + '>Remove from the series (' + c.sel.size + ')</button><button class="btn" data-act="scMove"' + (c.sel.size ? '' : ' disabled') + '>Move to another series… (' + c.sel.size + ')</button><button class="btn" data-act="scDel"' + (c.sel.size ? '' : ' disabled') + '>Delete from the catalog (' + c.sel.size + ')</button></div>' : '')
+    + (list.length ? '' : '<p class="hint">The series has no games yet. Add them with the “Add games” button.</p>');
+}
+function serCardGamesHtml() {
+  const c = S.serCard, list = scList(c.name), row = vmodeOf('sercard') === 'list';
+  if (!list.length) return '';
+  const mk = g => { const src = coverSrc(g), sel = c.sel.has(g.id), pk = (sel ? ' pick' : '') + (g.done ? ' isdone' : '') + (g.id === S.lastGame ? ' last' : ''), ck = sel ? '<span class="selck">✓</span>' : '';
+    return row ? '<div class="srow' + pk + '" data-gid="' + g.id + '" data-act="scGame">' + ck + '<div class="sth" data-cvid="' + g.id + '"' + (src ? ' style="background-image:url(\'' + bgu(src) + '\')"' : '') + '></div><div class="sm"><div class="nm">' + esc(g.name) + '</div><div class="m">' + esc([g.year || '', (g.platforms || []).slice(0, 2).map(shortPlat).join(', '), g.time ? g.time + ' h' : ''].filter(Boolean).join(' · ')) + '</div></div>' + (g.done ? '<span class="ok2">✓</span>' : '') + '</div>'
+      : '<div class="card' + pk + '" data-gid="' + g.id + '" data-act="scGame">' + ck + '<div class="cv' + (src ? '' : ' nocover') + '" data-cvid="' + g.id + '"' + (src ? ' style="background-image:url(\'' + bgu(src) + '\')"' : '') + '>' + (g.year || g.time || g.done ? '<div class="strip"><span class="sp">' + (g.year || '') + '</span><span class="sr">' + (g.time ? '⏱ ' + g.time + 'h' : '') + (g.done ? ' <i class="ck">✓</i>' : '') + '</span></div>' : '') + '</div><div class="t">' + esc(g.name) + '</div></div>'; };
+  return row ? '<div class="srl z' + colsFor('searchL') + '">' + list.map(mk).join('') + '</div>' : '<div class="grid z' + colsFor('grid') + '" style="--cols:' + colsFor('grid') + '">' + list.map(mk).join('') + '</div>';
+}
+function viewSerCard() {
+  const c = S.serCard, retOk = !!(S.retGame && gameById(S.retGame.id));
+  return '<div class="top"><div class="hdr2" style="margin:6px 0 4px"><button class="btn" data-act="scBack">' + (retOk ? '← Back to the card' : '← Back') + '</button><div class="tools" style="margin:0">' + ib('scVmode', vmodeOf('sercard') === 'list' ? 'grid' : 'list', vmodeOf('sercard') === 'list' ? 'Tile' : 'List', false) + '<button class="ib" data-act="scMenu" aria-label="Series menu" title="Series menu">⋮</button></div></div><div class="serttl big">' + esc(c.name) + '</div></div>'
+    + '<div class="scrl" id="scBody">' + serCardInfoHtml() + serCardGamesHtml() + '</div>';
+}
+function scRefresh() { if (S.tab !== 'sercard' || !S.serCard) return; const b = $('#scBody'); if (!b) return render(); const y = b.scrollTop; b.innerHTML = serCardInfoHtml() + serCardGamesHtml(); b.scrollTop = y; setTimeout(lazyCovers, 300); }
+async function chooseSeries(exclude) {
+  const m = new Map(); S.games.forEach(g => { if (g.series && serKey(g.series) !== serKey(exclude || '\u0000')) m.set(g.series, (m.get(g.series) || 0) + 1); });
+  const names = Array.from(m.keys()).sort((a, b) => a.localeCompare(b, LOC));
+  const r = await choose({ title: 'Move to a series', search: true, items: [{ id: '__new', label: 'New series…', accent: true, pin: true }].concat(names.map(n => ({ id: n, label: n, sub: gWord(m.get(n)) }))) });
+  if (r === null) return null; if (r === '__new') { const n = await promptBox('Series name', ''); return n && n.trim() ? canonSeries(n) : null; } return r;
+}
+// проверка названия серии: сверка серий игр каталога с сериями IGDB
+async function serNameCheck(name) {
+  const games = scList(name).filter(g => g.igdbId), info = new Map();
+  if (!games.length) return { name, none: true, linked: 0, total: scList(name).length, groups: [], rename: false, main: null };
+  for (let i = 0; i < games.length; i += 100) { const part = games.slice(i, i + 100), list = await igdb('/games', 'fields collections.id,collections.name; where id = (' + part.map(g => g.igdbId).join(',') + '); limit ' + part.length + ';'); list.forEach(x => info.set(x.id, x.collections || [])); }
+  const votes = new Map(), key = serKey(name);
+  games.forEach(g => (info.get(g.igdbId) || []).forEach(c => { const v = votes.get(c.id) || { id: c.id, name: c.name, n: 0 }; v.n++; votes.set(c.id, v); }));
+  const all = Array.from(votes.values()).sort((a, b) => b.n - a.n), same = all.find(c => serKey(c.name) === key), main = same || all[0] || null, out = new Map();
+  if (main) games.forEach(g => {
+    const cs = info.get(g.igdbId) || []; if (!cs.length || cs.some(c => c.id === main.id)) return;
+    const t = cs.slice().sort((a, b) => (votes.get(b.id) ? votes.get(b.id).n : 0) - (votes.get(a.id) ? votes.get(a.id).n : 0))[0], e = out.get(t.id) || { col: { id: t.id, name: t.name }, games: [] }; e.games.push(g); out.set(t.id, e);
+  });
+  return { name, none: false, linked: games.length, total: scList(name).length, main, rename: !!main && !same, groups: Array.from(out.values()).sort((a, b) => b.games.length - a.games.length) };
+}
+function drawSerFix() {
+  const f = S.serFix; if (!f) return;
+  const rows = [];
+  if (f.none) rows.push('<p class="sub">The games of this series have no IGDB entries, so there is nothing to check. Add games from IGDB or refresh them from the source.</p>');
+  else if (!f.main) rows.push('<p class="sub">IGDB lists no series for these games.</p>');
+  if (f.rename) rows.push('<div class="fixrow"><div>In IGDB this series is called <b>«' + esc(f.main.name) + '»</b>, and yours is “' + esc(f.name) + '».</div><button class="btn acc" data-act="serFixRename">Rename to “' + esc(f.main.name) + '»</button></div>');
+  f.groups.forEach((g, i) => rows.push('<div class="fixrow"><div><b>' + gWord(g.games.length) + '</b> belong to the series in IGDB <b>«' + esc(g.col.name) + '»</b>: ' + esc(g.games.slice(0, 6).map(x => x.name).join(', ') + (g.games.length > 6 ? '…' : '')) + '</div><button class="btn acc" data-act="serFixMove" data-i="' + i + '">Move to “' + esc(g.col.name) + '»</button></div>'));
+  if (!rows.length || (f.main && !f.rename && !f.groups.length)) rows.push('<p class="sub">✓ The series name matches IGDB, and every game with an IGDB entry belongs to it.</p>');
+  openSheet('<div class="hdr2"><h2>Series name</h2></div><p class="sub">Series “' + esc(f.name) + '”: games ' + f.total + ', of them with an IGDB entry ' + f.linked + '</p>' + rows.join('') + '<button class="btn acc" style="width:100%;margin-top:14px" data-act="closeSheet">Done</button>');
+}
 /* ====== Серии IGDB: поиск серий и проверка полноты ====== */
 const SER_TYPE_LIST = [[0, 'Games'], [8, 'Remakes'], [9, 'Remasters'], [4, 'Standalone add-ons'], [10, 'Expanded'], [11, 'Ports'], [3, 'Bundles'], [6, 'Episodes']];
 const SER_TYPES_DEF = [0, 8, 9]; // в проверке серии по умолчанию: основные игры, ремейки и ремастеры; порты, бандлы и прочее включаются кнопками
@@ -828,6 +898,7 @@ const serTypes = () => { const t = S.set.serTypes; return Array.isArray(t) && t.
 const serKey = n => normName(n);
 // чипы типов игр: название и число игр этого типа; в поиске по играм нажатие фильтрует список, в серии включает/выключает тип в подсчёте серии
 const typeChipsVis = () => { const t = S.set.typeChips; return Array.isArray(t) ? t.map(Number) : ALL_TYPES; };
+const chipMode = () => { const m = S.set.chipMode; return m === 0 || m === 2 ? m : 1; }; // 0 - чипы выключены, 1 - все, 2 - выбранные в фильтре
 const typeLabel = t => { const n = TYPE_NAME[t] || ''; return n.length > 12 ? (TYPE_CHIP[t] || n) : n; };
 const viewRes = () => { const s = S.search; return s.mode === 'search' && s.kind === 'games' && s.tf && s.tf.length ? s.results.filter(r => s.tf.includes(r.type)) : s.results; };
 function typeCountsHtml() {
@@ -836,12 +907,11 @@ function typeCountsHtml() {
     if (!s.chk.list) return '';
     s.chk.list.forEach(x => { const t = typeOf(x); if (t != null) cnt.set(t, (cnt.get(t) || 0) + 1); });
     const st = serTypes(); on = t => st.includes(t); act = 'serType';
-    cfg = '<button class="p xs ic" data-act="sfChips" title="Which type chips to show" aria-label="Which type chips to show">' + icoSvg('tag') + '</button>';
-  } else if (s.kind === 'games' && s.mode === 'search' && s.src === 'igdb') {
+  } else if (s.kind === 'games' && s.mode === 'search' && s.src === 'igdb' && chipMode()) {
     s.results.forEach(x => { if (x.type != null) cnt.set(x.type, (cnt.get(x.type) || 0) + 1); });
     const tf = s.tf || []; on = t => tf.includes(t); act = 'tfChip';
   } else return '';
-  const ids = ALL_TYPES.filter(t => cnt.has(t) && (vis.includes(t) || on(t)));
+  const ids = ALL_TYPES.filter(t => cnt.has(t) && (act === 'serType' || chipMode() === 1 || vis.includes(t) || on(t)));
   if (!ids.length) return '';
   return ids.map(t => '<button class="p xs' + (on(t) ? ' on' : '') + '" data-act="' + act + '" data-v="' + t + '">' + esc(typeLabel(t)) + ' <b>' + cnt.get(t) + '</b></button>').join('') + cfg;
 }
@@ -939,7 +1009,7 @@ async function showSeriesView(name, o) {
 }
 function serHeadHtml() {
   const s = S.search, c = s.chk, an = c.an, ok = !!serMap('serOk')[serKey(c.name)];
-  let h = '<h2 style="font-size:17px;margin:0 2px 6px">Series: ' + esc(c.name) + '</h2>';
+  let h = '';
   if (s.loading) return h + '<p class="sub">Checking the series in IGDB…</p>';
   if (!c.col) return h + '<div class="hint">Series “' + esc(c.name) + '” was not found in IGDB.<br><br><button class="btn acc" data-act="serRebind">Pick the IGDB series manually</button></div>';
   const pc = an.total ? Math.round(an.haveN * 100 / an.total) : 0, full = ok || (an.total > 0 && an.miss === 0), n = s.sel.size;
@@ -978,7 +1048,7 @@ async function runColSearch() {
 async function serAddSelected() {
   const s = S.search, c = s.chk, rids = Array.from(s.sel).filter(r => !gameByRid(r)); if (!rids.length) return toast('The selected games are already in the catalog');
   const snap = takeSnap(); let n = 0, bad = 0; toast('Adding games: ' + rids.length + '…');
-  for (const rid of rids) { try { if (await addFromIgdb(rid, [], { series: c.name, bg: true })) n++; } catch (e) { bad++; logErr('series: adding a game', e); if (S.block) break; } }
+  for (const rid of rids) { try { if (await addFromIgdb(rid, [], { forceSeries: c.name, bg: true })) n++; } catch (e) { bad++; logErr('series: adding a game', e); if (S.block) break; } }
   s.sel.clear(); s.selMode = false; serApply(); renderSearchBody(); toastUndo('Games added: ' + n + (bad ? ', failed: ' + bad : ''), snap);
 }
 function serDrawProg() {
@@ -1026,12 +1096,12 @@ async function addFromIgdb(rid, collIds = [], opts = {}) {
       if (manual && await confirmBox('The game “' + manual.name + '” is already in the catalog' + (srcsOf(manual).length ? ' (from ' + PROV[srcsOf(manual)[0]].name + ')' : ' (added manually)') + '. Merge with the data ' + PROV[src].name + '?', 'Merge')) {
         g = manual; g[idk] = d.id; if (n0[urlk]) g[urlk] = n0[urlk];
         ['year', 'rating', 'time', 'coverUrl'].forEach(k => { if (!g[k] && n0[k]) g[k] = n0[k]; });
-        if (!g.genres.length) g.genres = n0.genres; if (!g.platforms.length) g.platforms = n0.platforms; if (!g.series) g.series = canonSeries(opts.series || n0.series);
+        if (!g.genres.length) g.genres = n0.genres; if (!g.platforms.length) g.platforms = n0.platforms; if (!g.series) g.series = canonSeries(opts.forceSeries || n0.series || opts.series);
         if (!g.hasCover) { g.coverSrc = src; await cacheCover(g); }
         await saveGame(g);
       } else {
         if (opts.line) n0.srcLine = opts.line; // строка разбора, из которой создана карточка
-        if (opts.series) n0.series = opts.series; // серия из строки разбора важнее серии источника
+        if (opts.forceSeries) n0.series = opts.forceSeries; else if (opts.series && !n0.series) n0.series = opts.series; // серия из IGDB важнее серии из строки разбора: строка нужна, только если у игры в источнике серии нет
         if (opts.hours > 0) n0.time = opts.hours; // время из строки разбора важнее времени источника
         g = n0; g.series = canonSeries(g.series); S.games.push(g);
         if (opts.bg) { // из карточки поиска: игра записывается сразу (коллекции и «Завершено» уже в записи), обложка докачивается в фоне
@@ -1396,8 +1466,8 @@ const ICONS = {
   tag: '<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.2"/>',
 };
 const icoSvg = n => '<svg class="icx" viewBox="0 0 24 24">' + ICONS[n] + '</svg>';
-const ZOOM_RANGE = { text: [1, 4], list: [1, 3], grid: [2, 6], search: [2, 6], coll: [1, 4], series: [1, 4], collL: [1, 4], seriesL: [1, 4] };
-const ZOOM_DEF = { text: [2, 2], list: [1, 1], grid: [3, 6], search: [3, 6], coll: [2, 4], series: [2, 4], collL: [2, 2], seriesL: [2, 2] };
+const ZOOM_RANGE = { text: [1, 4], list: [1, 3], grid: [2, 6], search: [2, 6], coll: [1, 4], series: [1, 4], collL: [1, 4], seriesL: [1, 4], searchL: [1, 4] };
+const ZOOM_DEF = { text: [2, 2], list: [1, 1], grid: [3, 6], search: [3, 6], coll: [2, 4], series: [2, 4], collL: [2, 2], seriesL: [2, 2], searchL: [2, 2] };
 const colsFor = k => S.set.zoom[k] || ZOOM_DEF[k][(window.innerWidth || 0) >= 620 ? 1 : 0];
 const zoomBtn = k => ib('zoom', 'zoom', 'Zoom', false, '<span class="cnt bw">' + colsFor(k) + '</span>', ' data-k="' + k + '"');
 const ib = (act, icon, label, on, extra, attrs) => '<button class="ib' + (on ? ' on' : '') + '" data-act="' + act + '"' + (attrs || '') + ' title="' + label + '" aria-label="' + label + '"><svg viewBox="0 0 24 24">' + ICONS[icon] + '</svg><span class="lbl">' + label + '</span>' + (extra || '') + '</button>';
@@ -1783,18 +1853,15 @@ function drawShHead() {
 function drawShInfo() {
   const el = $('#shInfo'); if (!el) return; const v = k => (($('#f_' + k) || {}).value || '').trim();
   const chip = (ic, txt, k, act) => '<button class="ichip" data-act="' + (act || 'shEdit') + '"' + (k ? ' data-k="' + k + '"' : '') + '>' + I(ic) + ' ' + txt + '</button>';
-  el.innerHTML = chip('cal', v('year') || '—', 'year') + chip('star', v('rating') ? esc(v('rating')) + '/10' : '—', 'rating') + chip('clock', v('time') ? esc(v('time')) + ' h' : '— h', 'time') + '<span class="brk"></span>' + chip('book', v('series') ? esc(v('series')) : 'Series', '', 'pickSeries') + (v('series') ? '<button class="ichip icon" data-act="serFind" title="Find series games in IGDB" aria-label="Find series games in IGDB">' + I('find') + '</button>' : '');
+  el.innerHTML = chip('cal', v('year') || '—', 'year') + chip('star', v('rating') ? esc(v('rating')) + '/10' : '—', 'rating') + chip('clock', v('time') ? esc(v('time')) + ' h' : '— h', 'time') + '<span class="brk"></span>' + chip('book', v('series') ? esc(v('series')) : 'Series', '', v('series') ? 'serCard' : 'pickSeries') + (v('series') ? '<button class="ichip icon" data-act="serCard" title="Open the series card" aria-label="Open the series card">' + I('book') + '</button>' : '');
   drawShSeries();
 }
 // «Серия: 3 из 7 · завершено 2» с переходами к предыдущей и следующей игре серии (порядок: год, дата добавления, название)
-function serRowHtml(d, nm) {
+function serRowHtml(d, nm) { // строка серии в карточке игры: сколько игр, процент завершения, проверена ли серия; нажатие открывает карточку серии
   nm = String(nm || '').trim(); if (!nm) return '';
-  const key = normName(nm), list = S.games.filter(g => g.id !== d.id && g.series && normName(g.series) === key); list.push(d);
-  if (list.length < 2) return '';
-  list.sort((a, b) => (+a.year || 9999) - (+b.year || 9999) || (a.added || 0) - (b.added || 0) || String(a.name).localeCompare(String(b.name)));
-  const i = list.findIndex(g => g.id === d.id), done = list.filter(g => g.done).length;
-  const nb = (g, dd, ch) => '<button class="ib" data-act="serNav" data-d="' + dd + '"' + (g ? ' data-id="' + g.id + '" title="' + esc(g.name) + '"' : ' disabled') + ' aria-label="' + (dd < 0 ? 'Previous game in the series' : 'Next game in the series') + '">' + ch + '</button>';
-  return nb(list[i - 1], -1, '‹') + '<div class="spmid"><span>Series: <b>' + (i + 1) + ' of ' + list.length + '</b> · completed ' + done + '</span><div class="spbar"><i style="width:' + Math.round(done / list.length * 100) + '%"></i></div>' + serBadge(nm) + '</div>' + nb(list[i + 1], 1, '›');
+  const key = serKey(nm), list = S.games.filter(g => g.id !== d.id && g.series && serKey(g.series) === key); list.push(d);
+  const done = list.filter(g => g.done).length, pc = Math.round(done * 100 / list.length), ok = !!serMap('serOk')[key], c = serMap('serChk')[key], checked = ok || (c && !c.none && c.total - c.have <= 0);
+  return '<div class="spmid" data-act="serCard" data-name="' + esc(nm) + '"><span>' + esc(nm) + ' · <b>' + gWord(list.length) + '</b> · completed <b>' + pc + '%</b> · <i class="' + (checked ? 'okk' : 'nock') + '">' + (checked ? '✓ checked' : 'not checked') + '</i></span><div class="spbar"><i style="width:' + pc + '%"></i></div>' + serBadge(nm) + '</div>';
 }
 function drawShSeries() {
   const el = $('#shSerie'); if (!el || !S.sheet) return; const d = S.sheet.draft;
@@ -2575,14 +2642,15 @@ function viewSeries() {
 }
 async function serMenu(name) {
   if (!name) { const r0 = await choose({ title: 'No series', items: [{ id: 'export', label: 'Export the list…' }] }); if (r0 === 'export') openExport(S.games.filter(g => !g.series), 'No series'); return; }
-  const r = await choose({ title: name, items: [{ id: 'check', label: 'Check series completeness in IGDB' }, { id: 'ok', label: serMap('serOk')[serKey(name)] ? 'Remove the “series complete” mark' : 'Mark the series complete (the rest is not needed)' }, { id: 'export', label: 'Export the list…' }, { id: 'rename', label: 'Rename (or merge with another series)' }, { id: 'del', label: 'Remove the series from all games (the games stay)' }] });
+  const r = await choose({ title: name, items: [{ id: 'check', label: 'Check series completeness in IGDB' }, { id: 'ok', label: serMap('serOk')[serKey(name)] ? 'Remove the “series complete” mark' : 'Mark the series complete (the rest is not needed)' }, { id: 'export', label: 'Export the list…' }, { id: 'catalog', label: 'Show the series games in the list' }, { id: 'rename', label: 'Rename (or merge with another series)' }, { id: 'del', label: 'Remove the series from all games (the games stay)' }] });
   const games = S.games.filter(g => g.series === name), f = S.set.f;
   if (r === 'export') return openExport(games, name);
-  if (r === 'check') { S.retGame = null; return showSeriesView(name, { from: 'series', onlyMiss: true }); }
+  if (r === 'check') { if (S.tab !== 'sercard') S.retGame = null; return showSeriesView(name, { from: S.tab === 'sercard' ? 'sercard' : 'series', onlyMiss: true }); }
+  if (r === 'catalog') return serInLibrary(name);
   if (r === 'ok') { const m = serMap('serOk'), k = serKey(name); if (m[k]) delete m[k]; else m[k] = 1; saveSet(); render(); return toast(m[k] ? 'Series marked as complete' : 'Mark removed'); }
   if (r === 'rename') {
     let n = await promptBox('Series name', name); if (n) n = normName(n) === normName(name) ? n.trim() : canonSeries(n);
-    if (n && n !== name) { const snap = takeSnap(); for (const g of games) g.series = n; await saveGames(games); f.series = f.series.map(x => x === name ? n : x); saveSet(); render(); toastUndo('Series renamed', snap); }
+    if (n && n !== name) { const snap = takeSnap(); for (const g of games) g.series = n; await saveGames(games); f.series = f.series.map(x => x === name ? n : x); serMigrate(name, n); if (S.serCard && serKey(S.serCard.name) === serKey(name)) S.serCard.name = n; saveSet(); render(); toastUndo('Series renamed', snap); }
   }
   if (r === 'del' && await confirmBox('Remove the series “' + name + '” from games: ' + games.length + '? The games themselves stay in the catalog.', 'Remove')) {
     const snap = takeSnap(); for (const g of games) g.series = ''; await saveGames(games); f.series = f.series.filter(x => x !== name); saveSet(); render(); toastUndo('Series removed from games: ' + games.length, snap);
@@ -2600,26 +2668,28 @@ function viewSearch() {
   const pit = pendingItem();
   const banner = pit ? '<div class="banner">Inbox: “' + esc(pit.text) + '” - choose a game<div class="toolbar" style="margin:8px 0 0"><button class="btn" data-act="pendingMatch">Already in the database</button><button class="btn" data-act="pendingCancel">Cancel</button></div></div>' : '';
   const retOk = !!(S.retGame && gameById(S.retGame.id)), ret = retOk ? '<div class="banner">Search from the card “' + esc(gameById(S.retGame.id).name) + '»<div class="toolbar" style="margin:8px 0 0"><button class="btn" data-act="retGame">← Back to the card</button></div></div>' : '';
-  if (S.search.mode === 'series' && S.search.chk) return '<div class="top">' + banner + blockBanner(true, 'igdb') + '<div class="hdr2" style="margin:6px 0 8px"><button class="btn" data-act="sBack">' + (retOk ? '← Back to the card' : '← Back') + '</button></div><div id="sTypes"></div></div><div class="scrl" id="srBody"></div>'; // экран серии: без строки поиска и панели кнопок, одна кнопка возврата
+  if (S.search.mode === 'series' && S.search.chk) return '<div class="top">' + banner + blockBanner(true, 'igdb') + '<div class="hdr2" style="margin:6px 0 8px"><button class="btn" data-act="sBack">' + (retOk ? '← Back to the card' : '← Back') + '</button></div><div class="serttl" id="serTtl"></div><div id="sTypes"></div></div><div class="scrl" id="srBody"></div>'; // экран серии: без строки поиска и панели кнопок, одна кнопка возврата
   return '<div class="top">' + banner + ret + blockBanner(true, S.search.src) + (S.search.bind ? '<div class="banner">Pick the IGDB series for “' + esc(S.search.bind) + '»<div class="toolbar" style="margin:8px 0 0"><button class="btn" data-act="serBindCancel">Cancel</button></div></div>' : '') + '<div class="bar"><div class="sbox"><span>🔍</span><input id="sq" placeholder="' + (S.search.kind === 'series' ? 'Search a series in IGDB' : 'Search in ' + PROV[S.search.src].name) + '" value="' + esc(S.search.q) + '"><button class="x" data-act="clearSQ">✕</button></div></div>'
     + '<div class="tools" id="sTools"></div><div class="chips actv" id="sActive"></div><div id="sTypes"></div></div><div class="scrl" id="srBody"></div>';
 }
 // кнопка быстрого переключения типов карточек IGDB: «Игры» (игры, ремейки, бандлы) <-> «Все»
 function typeQuickBtn() {
   if (S.search.src !== 'igdb') return '';
-  const cur = searchTypes().slice().sort((a, b) => a - b).join(), isQ = cur === QUICK_TYPES.slice().sort((a, b) => a - b).join(), isAll = cur === ALL_TYPES.join();
-  return '<button class="ib tq' + (isQ || isAll ? ' on' : '') + '" data-act="typeQuick" title="Card types: games, remakes and bundles / all (now: ' + (isQ ? 'games' : isAll ? 'all' : 'custom') + ')" aria-label="Card types"><svg viewBox="0 0 24 24">' + ICONS.tag + '</svg><span class="lbl">Types</span></button>';
+  const m = chipMode();
+  return '<button class="ib tq' + (m ? ' on' : '') + '" data-act="typeQuick" title="Type chips: ' + (m === 0 ? 'off' : m === 1 ? 'all' : 'selected in the filter') + '" aria-label="Type chips"><svg viewBox="0 0 24 24">' + ICONS.tag + '</svg><span class="lbl">Types</span></button>';
 }
 function renderSearchHead() {
   const s = S.search, f = s.f, chips = [], fc = searchFilterCount();
   const kindBtn = ib('sKind', s.kind === 'series' ? 'layers' : 'pad', s.kind === 'series' ? 'Searching series' : 'Searching games', s.kind === 'series', '', ' aria-label="Switch between game and series search"');
-  const t = $('#sTools'); if (t && s.kind === 'series') t.innerHTML = kindBtn; else if (t) t.innerHTML = kindBtn + '<button class="ib srcsw" data-act="sSrcSwitch" title="Switch the search source" style="color:' + PROV[s.src].color + ';border-color:' + PROV[s.src].color + '"><b>' + PROV[s.src].name + '</b></button>' + ib('sFilters', 'filter', 'Filters', fc > 0, fc ? '<span class="cnt">' + fc + '</span>' : '') + typeQuickBtn() + sortBtn() + ib('vmode', vmodeOf('search') === 'list' ? 'grid' : 'list', vmodeOf('search') === 'list' ? 'Tile' : 'List', false, '', ' data-k="search"') + (vmodeOf('search') === 'tiles' ? zoomBtn('search') : '');
+  const srcBtn = '<button class="ib srcsw" data-act="sSrcSwitch" title="Switch the search source" style="color:' + PROV[s.src].color + ';border-color:' + PROV[s.src].color + '"><b>' + PROV[s.src].name + '</b></button>';
+  const t = $('#sTools'); if (t && s.kind === 'series') t.innerHTML = kindBtn; else if (t) t.innerHTML = srcBtn + kindBtn + ib('sFilters', 'filter', 'Filters', fc > 0, fc ? '<span class="cnt">' + fc + '</span>' : '') + typeQuickBtn() + sortBtn() + ib('vmode', vmodeOf('search') === 'list' ? 'grid' : 'list', vmodeOf('search') === 'list' ? 'Tile' : 'List', false, '', ' data-k="search"') + zoomBtn(vmodeOf('search') === 'tiles' ? 'search' : 'searchL');
   fa(f, 'genres').forEach((id, i) => chips.push('<button class="chip" data-act="sRm" data-k="genres" data-v="' + esc(id) + '">' + esc((f.genreNames || [])[i] || id) + ' ✕</button>'));
   fa(f, 'platforms').forEach((id, i) => chips.push('<button class="chip" data-act="sRm" data-k="platforms" data-v="' + esc(id) + '">' + esc((f.platformNames || [])[i] || id) + ' ✕</button>'));
   fa(f, 'years').forEach(y => chips.push('<button class="chip" data-act="sRm" data-k="years" data-v="' + esc(y) + '">' + esc(y) + ' ✕</button>'));
   if (s.src === 'igdb' && typesCustom()) chips.push('<button class="chip" data-act="sRm" data-k="types">Types: ' + searchTypes().length + ' ✕</button>');
   if (f.minRating) chips.push('<button class="chip" data-act="sRm" data-k="minRating">from ★' + f.minRating + ' ✕</button>');
   const a = $('#sActive'); if (a) a.innerHTML = s.kind === 'series' ? '' : chips.join('');
+  const st = $('#serTtl'); if (st) st.textContent = s.mode === 'series' && s.chk ? 'Series: ' + s.chk.name : '';
   const tc = $('#sTypes'); if (tc) { const th = typeCountsHtml(); tc.innerHTML = th; tc.style.display = th ? 'flex' : 'none'; }
 }
 function renderSearchBody() {
@@ -2639,11 +2709,11 @@ function renderSearchBody() {
   if (blockFor(s.src)) h += blockBanner(true, s.src);
   else if (!PROV[s.src].ready()) h += '<div class="hint">' + PROV[s.src].noKeys + '<br><br><button class="btn acc" data-act="tab" data-tab="settings">Open settings</button></div>';
   else if (serEmpty) h += s.chk.col ? '<div class="hint">' + (s.chk.onlyMiss ? 'All games of the series of the selected types are already in the catalog.' : 'IGDB has no games of this series of the selected types. Turn on the types you need with the buttons above.') + '</div>' : '';
-  else if (s.results.length && !viewRes().length) h += '<div class="hint">None of the loaded results are of the selected types.' + (s.hasMore && !s.loading ? '<br><br><button class="btn" data-act="sMore">Show more</button>' : '') + '</div>';
+  else if (s.results.length && !viewRes().length) h += '<div class="hint">None of the loaded results are of the selected types.</div>';
   else if (!s.results.length && !s.loading) h += '<div class="hint">' + (s.started ? 'Nothing found in ' + PROV[s.src].name + '.<br><br><button class="btn" data-act="sSrcSwitch">Search in ' + PROV[otherSrc(s.src)].name + '</button>' : 'Enter a game title or choose filters') + '</div>' + (s.started ? '' : recentHtml());
   else {
     const row = vmodeOf('search') === 'list', vr = viewRes();
-    h += row ? '<div class="srl">' + vr.map(it => {
+    h += row ? '<div class="srl z' + colsFor('searchL') + '">' + vr.map(it => {
       const inCat = !!gameByRid(it.rid) || !!it.have, pk = (s.sel && s.sel.has(it.rid) ? ' pick' : '') + (it.ign ? ' dim' : ''), ck = pk.includes('pick') ? '<span class="selck">✓</span>' : '';
       return '<div class="srow' + (it.rid === s.lastRid ? ' last' : '') + pk + '" data-act="igdbTap" data-rid="' + it.rid + '">' + ck + '<div class="sth"' + (it.cover ? ' style="background-image:url(\'' + bgu(thumbUrl(it.cover)) + '\')"' : '') + '></div><div class="sm"><div class="nm">' + esc(it.name) + '</div><div class="m">' + typeChip(it.type) + meta(it) + (it.time ? ' · ⏱ ' + it.time + 'h' : '') + '</div></div>' + (inCat ? '<span class="ok2">✓</span>' : '') + (isBundleType(it.type) ? bbadge(it.rid) : '') + '</div>';
     }).join('') + '</div>' : '<div class="grid z' + colsFor('search') + '" style="--cols:' + colsFor('search') + '">' + vr.map(it => {
@@ -2655,12 +2725,10 @@ function renderSearchBody() {
         + '</div><div class="t">' + esc(it.name) + '</div><div class="m">' + esc((it.platforms || []).slice(0, 2).map(shortPlat).join(', ')) + '</div></div>';
     }).join('') + '</div>';
     h += '<div class="status">' + (s.loading ? 'Loading…' : (s.count ? 'Found: ' + s.count + ', shown: ' + vr.length : '')) + '</div>';
-    if (s.hasMore && !s.loading) h += '<div class="status"><button class="btn" data-act="sMore">Show more</button></div><div id="sentinel" style="height:2px"></div>';
   }
   if (s.loading && !s.results.length) h += '<div class="status">Loading…</div>';
+  if (s.mode === 'search' && s.kind === 'games' && s.hasMore && s.results.length) h += '<div class="moreBar"><button class="btn acc" data-act="sMore"' + (s.loading ? ' disabled' : '') + '>' + (s.loading ? 'Loading…' : 'Load more') + '</button></div>'; // новые игры подгружаются только по кнопке, она всегда видна поверх списка
   el.innerHTML = h;
-  const sen = $('#sentinel');
-  if (sen && 'IntersectionObserver' in window) { const io = new IntersectionObserver(en => { if (en[0].isIntersecting) { io.disconnect(); runSearch(false); } }, { root: $('#srBody'), rootMargin: '300px' }); io.observe(sen); }
 }
 // сортировка результатов поиска: IGDB не умеет сортировать запрос с поисковой строкой, поэтому сортируется уже загруженный список (порядок источника запоминается в _o)
 const SEARCH_SORTS = [['rel', 'By relevance (as in the source)'], ['name', 'By name (A → Z)'], ['-name', 'By name (Z → A)'], ['-year', 'By year (newest first)'], ['year', 'By year (oldest first)'], ['-rating', 'By rating (highest first)'], ['rating', 'By rating (lowest first)'], ['-time', 'By playtime (longest first)'], ['time', 'By playtime (shortest first)']];
@@ -2825,7 +2893,7 @@ async function loadShots(rid, save) {
 }
 async function openSearchFilters() {
   const f = S.search.f, row = (label, val, act) => '<div class="row" data-act="' + act + '"><span>' + label + '</span><span style="color:var(--mut)">' + (val || 'All') + ' ›</span></div>';
-  openSheet('<div class="hdr2"><h2>Search filters</h2><button class="btn" data-act="sReset">Reset</button></div>' + row('Genres', fa(f, 'genreNames').join(', '), 'sfGenre') + row('Platforms', fa(f, 'platformNames').join(', '), 'sfPlatform') + row('Years', fa(f, 'years').join(', '), 'sfYear') + (S.search.src === 'igdb' ? row('IGDB card types', typesCustom() ? 'selected ' + searchTypes().length + ' of ' + IGDB_TYPES.length : 'default', 'sfTypes') : '') + (S.search.src === 'igdb' ? row('Type chips under the search', typeChipsVis().length === ALL_TYPES.length ? 'all' : 'selected ' + typeChipsVis().length, 'sfChips') : '') + row('Min. rating (out of 10)', f.minRating ? '★' + f.minRating : '', 'sfRating') + row('Games in the result', String(S.set.pageSize || 40), 'sfPageSize')
+  openSheet('<div class="hdr2"><h2>Search filters</h2><button class="btn" data-act="sReset">Reset</button></div>' + row('Genres', fa(f, 'genreNames').join(', '), 'sfGenre') + row('Platforms', fa(f, 'platformNames').join(', '), 'sfPlatform') + row('Years', fa(f, 'years').join(', '), 'sfYear') + (S.search.src === 'igdb' ? row('IGDB card types', typesCustom() ? 'selected ' + searchTypes().length + ' of ' + IGDB_TYPES.length : 'default', 'sfTypes') : '') + (S.search.src === 'igdb' ? row('Type chips (the “selected” mode of the “Types” button)', typeChipsVis().length === ALL_TYPES.length ? 'all' : 'selected ' + typeChipsVis().length, 'sfChips') : '') + row('Min. rating (out of 10)', f.minRating ? '★' + f.minRating : '', 'sfRating') + row('Games in the result', String(S.set.pageSize || 40), 'sfPageSize')
     + '<button class="btn acc" style="width:100%;margin-top:14px" data-act="closeSheet">Done</button>');
 }
 
@@ -3268,14 +3336,15 @@ function restoreScroll(tab) {
 }
 function render() {
   setTimeout(lazyCovers, 800);
-  $$('#tabs button').forEach(b => { const on = b.dataset.tab === S.tab || (S.tab === 'stats' && b.dataset.tab === 'settings'); b.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+  $$('#tabs button').forEach(b => { const on = b.dataset.tab === S.tab || (S.tab === 'stats' && b.dataset.tab === 'settings') || (S.tab === 'sercard' && b.dataset.tab === 'series'); b.classList.toggle('on', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   const fab = $('#fab'); fab.classList.toggle('hidden', !(S.tab === 'library' || S.tab === 'collections' || (S.tab === 'inbox' && !S.inboxList)) || S.selMode);
-  const v = $('#view'); v.className = ['library', 'collections', 'series', 'search'].includes(S.tab) ? 'fx' : '';
+  const v = $('#view'); v.className = ['library', 'collections', 'series', 'search', 'sercard'].includes(S.tab) ? 'fx' : '';
   if (S.tab === 'library') { v.innerHTML = viewLibrary(); renderLibrary(); }
   else if (S.tab === 'collections') { v.innerHTML = viewCollections(); renderSelBar(); }
   else if (S.tab === 'stats') { v.innerHTML = viewStats(); renderSelBar(); }
   else if (S.tab === 'inbox') { v.innerHTML = viewInbox(); renderSelBar(); }
   else if (S.tab === 'series') { v.innerHTML = viewSeries(); renderSelBar(); }
+  else if (S.tab === 'sercard' && S.serCard) { v.innerHTML = viewSerCard(); }
   else if (S.tab === 'search') { v.innerHTML = viewSearch(); renderSearchBody(); renderSelBar(); }
   else { v.innerHTML = viewSettings(); renderSelBar(); fillEstimate(); fillShotStats(); }
 }
@@ -3344,7 +3413,7 @@ const ACT = {
   collChip: t => { const c = S.set.f.collections, i = c.indexOf(t.dataset.id); i < 0 ? c.push(t.dataset.id) : c.splice(i, 1); saveSet(); if (t.classList) t.classList.toggle('on', i < 0); libRefilter(); }, // без перерисовки окна: список не прыгает наверх
   collOpen: t => { if (lp.fired) { lp.fired = false; return; } S.set.f.collections = t.dataset.id === 'all' ? [] : [t.dataset.id]; saveSet(); S.tab = 'library'; render(); },
   collMenu: (t, e) => { e.stopPropagation(); collMenu(t.dataset.id); },
-  serOpen: t => { if (lp.fired) { lp.fired = false; return; } Object.assign(S.set.f, { q: '', years: [], genres: [], platforms: [], series: [t.dataset.name], collections: [], props: [], addedFrom: '', addedTo: '', seriesMode: '', maxTime: 0, done: '', minRating: 0 }); saveSet(); S.tab = 'library'; render(); },
+  serOpen: t => { if (lp.fired) { lp.fired = false; return; } if (t.dataset.name) { S.retGame = null; return openSerCard(t.dataset.name); } serInLibrary(t.dataset.name); },
   serMenu: (t, e) => { e.stopPropagation(); serMenu(t.dataset.name); },
   collMode: t => { S.set.f.collMode = t.dataset.v; saveSet(); $$('[data-act="collMode"]').forEach(b => b.classList.toggle('on', b.dataset.v === t.dataset.v)); renderLibrary(); },
   toggleWrap: () => { S.set.textWrap = S.set.textWrap === 'scroll' ? 'wrap' : 'scroll'; saveSet(); renderLibrary(); },
@@ -3385,6 +3454,15 @@ const ACT = {
   sReset: () => { fClear(S.search.f, true); closeSheet(); renderSearchBody(); runSearch(true); },
   sRm: t => { const f = S.search.f, k = t.dataset.k, v = t.dataset.v; if (k === 'minRating') f.minRating = 0; else if (k === 'types') { delete S.set.searchTypes; saveSet(); } else { const arr = fa(f, k).slice(), i = arr.map(String).indexOf(String(v)), nk = k === 'genres' ? 'genreNames' : k === 'platforms' ? 'platformNames' : ''; if (i >= 0) { arr.splice(i, 1); if (nk) { const nm = (f[nk] || []).slice(); nm.splice(i, 1); f[nk] = nm; } } f[k] = arr; } runSearch(true); },
   sBack: () => {
+    { // экран серии, открытый из другой вкладки, из карточки серии или игры: назад туда, откуда пришли (накопленный стек поиска не трогаем)
+      const s0 = S.search, c0 = s0.mode === 'series' ? s0.chk : null;
+      if (c0 && c0.from && c0.from !== 'search') {
+        s0.chk = null; s0.mode = 'search'; s0.results = []; s0.started = false;
+        if (c0.from === 'sercard' && S.serCard) { S.tab = 'sercard'; return render(); }
+        if (S.retGame) return ACT.retGame();
+        S.tab = c0.from; return render();
+      }
+    }
     if (popSearchState()) return; if (bundleMode() && S.pending) return backToInbox();
     if (S.retGame) return ACT.retGame();
     const s = S.search, c = s.chk; if (c && c.from && c.from !== 'search') { s.chk = null; s.mode = 'search'; s.results = []; s.started = false; S.tab = c.from; render(); return; }
@@ -3396,7 +3474,36 @@ const ACT = {
     if (s.bind) { const b = s.bind; s.bind = ''; serMap('serCol')[serKey(b)] = { id, name: nm, manual: 1 }; delete serMap('serChk')[serKey(b)]; saveSet(); return showSeriesView(b, { onlyMiss: true }); }
     return showSeriesView(nm, { colId: id });
   },
-  serCheck: t => { const d = S.sheet && S.sheet.draft; S.retGame = d && d.id ? { id: d.id, tab: S.tab } : null; showSeriesView(t.dataset.name, { from: S.tab, onlyMiss: true }); },
+  serCheck: t => { const d = S.sheet && S.sheet.draft; if (d && d.id) S.retGame = { id: d.id, tab: S.tab }; showSeriesView(t.dataset.name, { from: S.tab, onlyMiss: true }); },
+  serCard: t => { const nm = (t && t.dataset && t.dataset.name) || (($('#f_series') || {}).value || '').trim(); if (!nm) return; const d = S.sheet && S.sheet.draft; if (d && d.id && !S.sheet.isNew) S.retGame = { id: d.id, tab: S.tab }; openSerCard(nm); },
+  scBack: () => { const r = S.retGame; if (r && gameById(r.id)) return ACT.retGame(); S.retGame = null; S.tab = 'series'; render(); },
+  scMenu: () => serMenu(S.serCard.name),
+  scVmode: () => { S.set.vmode = S.set.vmode || {}; S.set.vmode.sercard = vmodeOf('sercard') === 'list' ? 'tiles' : 'list'; saveSet(); render(); },
+  scSearch: () => showSeriesView(S.serCard.name, { from: 'sercard' }),
+  scCheck: () => showSeriesView(S.serCard.name, { from: 'sercard', onlyMiss: true }),
+  scMark: () => { const m = serMap('serOk'), k = serKey(S.serCard.name); if (m[k]) delete m[k]; else m[k] = 1; saveSet(); scRefresh(); toast(m[k] ? 'Series marked as checked and complete' : 'Mark removed'); },
+  scSel: () => { const c = S.serCard; c.selMode = !c.selMode; if (!c.selMode) c.sel.clear(); scRefresh(); },
+  scSelAll: () => { const c = S.serCard, l = scList(c.name); if (c.sel.size === l.length) c.sel.clear(); else l.forEach(g => c.sel.add(g.id)); scRefresh(); },
+  scGame: t => { const c = S.serCard, id = t.dataset.gid; if (c.selMode) { if (c.sel.has(id)) c.sel.delete(id); else c.sel.add(id); return scRefresh(); } S.shown = scList(c.name); openGameSheet(id); },
+  scRemove: async () => { const c = S.serCard, games = scList(c.name).filter(g => c.sel.has(g.id)); if (!games.length) return; const snap = takeSnap(); for (const g of games) g.series = ''; await saveGames(games); c.sel.clear(); c.selMode = false; scRefresh(); toastUndo('Removed from the series: ' + games.length, snap); },
+  scMove: async () => { const c = S.serCard, games = scList(c.name).filter(g => c.sel.has(g.id)); if (!games.length) return; const n = await chooseSeries(c.name); if (!n) return; const snap = takeSnap(); for (const g of games) g.series = n; await saveGames(games); c.sel.clear(); c.selMode = false; scRefresh(); toastUndo('Moved to “' + n + '»: ' + games.length, snap); },
+  scDel: async () => { const c = S.serCard, games = scList(c.name).filter(g => c.sel.has(g.id)); if (!games.length) return; if (!await confirmBox('Delete games from the catalog: ' + games.length + '? They can be restored from the trash.', 'Delete')) return; const snap = takeSnap(); for (const g of games) await removeGame(g.id); c.sel.clear(); c.selMode = false; scRefresh(); toastUndo('Games deleted: ' + games.length, snap); },
+  scAdd: async () => {
+    const c = S.serCard, r = await choose({ title: 'Add games to the series', items: [{ id: 'cat', label: 'From the catalog (pick games)' }, { id: 'igdb', label: 'Find in IGDB (series search)' }] });
+    if (r === 'igdb') return ACT.scSearch(); if (r !== 'cat') return;
+    const k = serKey(c.name), items = S.games.filter(g => !g.series || serKey(g.series) !== k).sort((a, b) => !!a.series - !!b.series || String(a.name).localeCompare(String(b.name), LOC)).map(g => ({ id: g.id, label: g.name + (g.year ? ' (' + g.year + ')' : ''), sub: g.series || 'no series' }));
+    const sel = await choose({ title: 'Catalog games', multi: true, search: true, items }); if (!sel || !sel.length) return;
+    const games = sel.map(gameById).filter(Boolean), snap = takeSnap(); for (const g of games) g.series = c.name; await saveGames(games); scRefresh(); toastUndo('Added to the series: ' + games.length, snap);
+  },
+  scNameCheck: async () => {
+    const c = S.serCard; if (!PROV.igdb.ready()) return toast('IGDB is unavailable: check the keys or the local server in the settings');
+    toast('Checking the series name…'); try { S.serFix = await serNameCheck(c.name); drawSerFix(); } catch (e) { logErr('series name check', e); toast(e.message); }
+  },
+  serFixRename: async () => { const f = S.serFix; if (!f || !f.rename) return; const r = await serRenameAll(f.name, f.main.name); f.name = r.n; f.rename = false; f.total = scList(r.n).length; render(); drawSerFix(); toastUndo('Series renamed', r.snap); },
+  serFixMove: async t => {
+    const f = S.serFix, g = f && f.groups[+t.dataset.i]; if (!g) return; const n = canonSeries(g.col.name), snap = takeSnap();
+    for (const x of g.games) x.series = n; await saveGames(g.games); f.groups.splice(+t.dataset.i, 1); f.total = scList(f.name).length; render(); drawSerFix(); toastUndo('Moved to “' + n + '»: ' + g.games.length, snap);
+  },
   serCheckAll: () => serCheckAll(),
   serOnlyInc: () => { S.set.serOnlyInc = !S.set.serOnlyInc; saveSet(); render(); },
   serType: t => { const v = +t.dataset.v, cur = serTypes().slice(), i = cur.indexOf(v); if (i >= 0) { if (cur.length < 2) return; cur.splice(i, 1); } else cur.push(v); S.set.serTypes = cur; saveSet(); serApply(); renderSearchBody(); },
@@ -3424,7 +3531,7 @@ const ACT = {
   sfPlatform: async () => { try { const l = await loadLists(), f = S.search.f, r = await choose({ title: 'Select platforms', multi: true, search: true, selected: fa(f, 'platforms'), items: l.platforms.map(x => ({ id: x.id, label: x.name })) }); if (r !== null) { f.platforms = r; f.platformNames = r.map(id => (l.platforms.find(x => String(x.id) === String(id)) || {}).name || id); closeSheet(); renderSearchBody(); runSearch(true); } } catch (e) { toast(e.message); } },
   sfYear: async () => { const y = new Date().getFullYear(), items = []; for (let i = y + 1; i >= 1975; i--) items.push({ id: i, label: String(i) }); const f = S.search.f, r = await choose({ title: 'Release years', multi: true, search: true, selected: fa(f, 'years'), items }); if (r !== null) { f.years = r.map(Number).sort((a, b) => b - a); closeSheet(); renderSearchBody(); runSearch(true); } },
   sfTypes: async () => { const r = await choose({ title: 'IGDB card types', multi: true, selected: searchTypes(), items: IGDB_TYPES.map(([id, label]) => ({ id, label, sub: isBundleType(id) ? 'several games in one card' : '' })) }); if (r === null) return; if (!r.length) return toast('Select at least one type'); const t = r.map(Number).sort((a, b) => a - b); if (t.join() === DEF_TYPES.join()) delete S.set.searchTypes; else S.set.searchTypes = t; saveSet(); closeSheet(); renderSearchBody(); runSearch(true); },
-  sfChips: async () => { const r = await choose({ title: 'Type chips under the search', multi: true, selected: typeChipsVis(), items: IGDB_TYPES.map(([id, label]) => ({ id, label })) }); if (r === null) return; const t = r.map(Number).sort((a, b) => a - b); if (t.join() === ALL_TYPES.join()) delete S.set.typeChips; else S.set.typeChips = t; saveSet(); closeSheet(); renderSearchBody(); },
+  sfChips: async () => { const r = await choose({ title: 'Type chips (the “selected” mode of the “Types” button)', multi: true, selected: typeChipsVis(), items: IGDB_TYPES.map(([id, label]) => ({ id, label })) }); if (r === null) return; const t = r.map(Number).sort((a, b) => a - b); if (t.join() === ALL_TYPES.join()) delete S.set.typeChips; else S.set.typeChips = t; saveSet(); closeSheet(); renderSearchBody(); },
   tfChip: t => { const s = S.search, v = +t.dataset.v, i = s.tf.indexOf(v); if (i >= 0) s.tf.splice(i, 1); else s.tf.push(v); renderSearchBody(); const sb = $('#srBody'); if (sb) sb.scrollTop = 0; },
   sfRating: async () => { const r = await choose({ title: 'Minimum rating', items: [{ id: 0, label: 'All' }, { id: 5, label: '★ 5+' }, { id: 6, label: '★ 6+' }, { id: 7, label: '★ 7+' }, { id: 8, label: '★ 8+' }, { id: 9, label: '★ 9+' }] }); if (r !== null) { S.search.f.minRating = +r; closeSheet(); renderSearchBody(); runSearch(true); } },
   openIgdb: t => openIgdbSheet(t.dataset.rid),
@@ -3455,7 +3562,7 @@ const ACT = {
   setMinRating: t => { S.set.f.minRating = +t.dataset.v; saveSet(); libRefilter(); if (sheetEl) openFilters(); },
   sSort: async () => { const cur = S.set.searchSort || 'rel', r = await choose({ title: 'Sort results', items: SEARCH_SORTS.map(([id, label]) => ({ id, label: (id === cur ? '✓ ' : '') + label })) }); if (!r) return; if (r === 'rel') delete S.set.searchSort; else S.set.searchSort = r; saveSet(); sortResults(); renderSearchBody(); const sb = $('#srBody'); if (sb) sb.scrollTop = 0; },
   serSort: async () => { const cur = S.set.serSort || 'alpha', r = await choose({ title: 'Sort series', items: SER_SORTS.map(([id, label]) => ({ id, label: (id === cur ? '✓ ' : '') + label })) }); if (r) { if (r === 'alpha') delete S.set.serSort; else S.set.serSort = r; saveSet(); render(); } },
-  typeQuick: () => { const cur = searchTypes().slice().sort((a, b) => a - b).join(), q = QUICK_TYPES.slice().sort((a, b) => a - b).join(); S.set.searchTypes = cur === q ? ALL_TYPES.slice() : QUICK_TYPES.slice(); saveSet(); renderSearchHead(); runSearch(true); },
+  typeQuick: () => { const m = (chipMode() + 1) % 3; S.set.chipMode = m; if (m === 1) delete S.set.chipMode; if (m === 0 || m === 2) S.search.tf = []; saveSet(); renderSearchBody(); }, // чипы типов: все -> выбранные в фильтре -> выключены
   serFind: () => { // поиск игр серии в IGDB прямо из карточки игры (как кнопка «Игры серии» в поиске); без привязки к источнику ищем по названию серии
     const d = S.sheet.draft, nm = ((($('#f_series') || {}).value) || d.series || '').trim(), src = ['igdb', 'rawg'].find(k => d[k + 'Id']);
     if (!nm) return toast('Enter a series first');
@@ -3616,11 +3723,12 @@ const ACT = {
   shMenu: async () => {
     const d = S.sheet.draft, srcs = srcsOf(d), miss = ['igdb', 'rawg'].filter(k => !d[k + 'Id']);
     const items = srcs.map(k => ({ id: 'refresh:' + k, label: 'Update from ' + PROV[k].name, sub: 'title, year, genres, platforms, description', ico: '🔄' })).concat([{ id: 'refreshTime', label: 'Update time from IGDB', sub: 'playtime only', ico: '⏱' }, { id: 'hltbOpen', label: 'HowLongToBeat', sub: 'playtime', ico: '⏱' }, { id: 'cubiqOpen', label: 'Cubiq.ru', sub: 'playtime', ico: '⏱' }])
-      .concat(miss.map(k => ({ id: 'find:' + k, label: 'Find in ' + PROV[k].name, ico: '🔍' })), d.series ? [{ id: 'seriesCatalog', label: 'Series in the catalog', ico: '📚' }] : [], srcs.map(k => ({ id: 'ser:' + k, label: 'Series ' + PROV[k].name, ico: '📚' })), [{ id: 'shareGame', label: 'Share the game', ico: '↗' }]);
+      .concat(miss.map(k => ({ id: 'find:' + k, label: 'Find in ' + PROV[k].name, ico: '🔍' })), [{ id: 'chgSeries', label: 'Change the game’s series…', ico: '📚' }], d.series ? [{ id: 'seriesCatalog', label: 'Series in the catalog', ico: '📚' }] : [], srcs.map(k => ({ id: 'ser:' + k, label: 'Series ' + PROV[k].name, ico: '📚' })), [{ id: 'shareGame', label: 'Share the game', ico: '↗' }]);
     const r = await askChoose({ title: 'Actions', items }); if (!r) return;
     if (r === 'refreshTime') return ACT.refreshTime();
     if (r.startsWith('refresh:')) return ACT.refreshIgdb({ dataset: { src: r.slice(8) } });
     if (r.startsWith('find:')) return ACT.findIgdb({ dataset: { src: r.slice(5) } });
+    if (r === 'chgSeries') return ACT.pickSeries();
     if (r.startsWith('ser:')) return ACT.seriesIgdb({ dataset: { src: r.slice(4) } });
     ACT[r]({ dataset: {} });
   },
@@ -3798,7 +3906,7 @@ function applyTheme() {
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
   const m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', dark ? '#0b0b0d' : '#f2f3f6');
 }
-window.__GC = { typeCountsHtml, viewRes, viewSearch, serCheck, serAnalyze, serCollection, collGames, showSeriesView, serCheckAll, searchCollections, serBadge, serMiss, serApply, runColSearch, sortResults, filterGames, collTilesHtml, seriesTilesHtml, NO_COLL, showBundle, popSearchState, sourceResolve, searchTypes, sheetOpen: () => !!sheetEl, logErr, ERRLOG, takeSnap, undoLast, UNDO, toastUndo, removeGame, sheetSibling, itemLine, animOn, reviewOne, catalogMatch, matchCfg, reviewItems, autoResolve, ipMask, addrOf, textLines, syncNow, SY, DB, reloadData, nextPool, PRESETS, applyFilterSet, withSeries, buildEntries, groupGames, textHtml, listHtml, cardHtml, openYoutube, canonPlat, canonGenre, canonAll, dictMerge, dictRename, dictRewrite, openDict, mergeGroups, openMergeCompare, applyMerge, mgBase, renderKeep, toggleInSel, handleShared, applyExtra, addParsed, openExport, exportText, copyText, gameLine, zipBuild, zipRead, shotStats, delShots, rawgQuotaTick, refreshOne, rawg, effItem, applyDefaults, linkItem, itemOpts, viewInbox, bulkMore, openLb, libToolsHtml: () => { renderLibHead(); return $('#libTools').innerHTML; }, filterGames, getShots, putShots, collTilesHtml, seriesTilesHtml, viewCollections, viewSeries, DONE_ID, autoResolve, viewStats, restoreGames, removeGame, canonSeries, findDupes, mergeAllDupes, collectSheet, persistDraft, closeSheet, S, ACT, bump, igdb, hltbFind, sgdbAuto, openSgdb, applyTheme, colsFor, usageHtml, serMenu, viewInbox, addItems, linkItem, createList, pendingItem, render, runSearch, addFromIgdb, importData, openIgdbSheet, openGameSheet, openFilters, openCols, selectionAction, loadAll, renderSearchBody };
+window.__GC = { serKey, serNameCheck, openSerCard, scList, viewSerCard, serRowHtml, serRenameAll, chooseSeries, chipMode, typeCountsHtml, viewRes, viewSearch, serCheck, serAnalyze, serCollection, collGames, showSeriesView, serCheckAll, searchCollections, serBadge, serMiss, serApply, runColSearch, sortResults, filterGames, collTilesHtml, seriesTilesHtml, NO_COLL, showBundle, popSearchState, sourceResolve, searchTypes, sheetOpen: () => !!sheetEl, logErr, ERRLOG, takeSnap, undoLast, UNDO, toastUndo, removeGame, sheetSibling, itemLine, animOn, reviewOne, catalogMatch, matchCfg, reviewItems, autoResolve, ipMask, addrOf, textLines, syncNow, SY, DB, reloadData, nextPool, PRESETS, applyFilterSet, withSeries, buildEntries, groupGames, textHtml, listHtml, cardHtml, openYoutube, canonPlat, canonGenre, canonAll, dictMerge, dictRename, dictRewrite, openDict, mergeGroups, openMergeCompare, applyMerge, mgBase, renderKeep, toggleInSel, handleShared, applyExtra, addParsed, openExport, exportText, copyText, gameLine, zipBuild, zipRead, shotStats, delShots, rawgQuotaTick, refreshOne, rawg, effItem, applyDefaults, linkItem, itemOpts, viewInbox, bulkMore, openLb, libToolsHtml: () => { renderLibHead(); return $('#libTools').innerHTML; }, filterGames, getShots, putShots, collTilesHtml, seriesTilesHtml, viewCollections, viewSeries, DONE_ID, autoResolve, viewStats, restoreGames, removeGame, canonSeries, findDupes, mergeAllDupes, collectSheet, persistDraft, closeSheet, S, ACT, bump, igdb, hltbFind, sgdbAuto, openSgdb, applyTheme, colsFor, usageHtml, serMenu, viewInbox, addItems, linkItem, createList, pendingItem, render, runSearch, addFromIgdb, importData, openIgdbSheet, openGameSheet, openFilters, openCols, selectionAction, loadAll, renderSearchBody };
 (async () => {
   try {
     await loadAll();

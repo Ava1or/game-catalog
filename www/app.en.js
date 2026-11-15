@@ -838,7 +838,7 @@ function serCardInfoHtml() {
   const ys = list.map(g => +g.year).filter(Boolean), kv = (a, b) => '<div class="kv"><span>' + a + '</span><b>' + b + '</b></div>';
   const stat = ok ? '<i class="okk">✓ checked, complete (marked manually)</i>' : chk && !chk.none ? (miss > 0 ? '<i class="warnk">⚠ missing from IGDB: ' + miss + '</i>' : '<i class="okk">✓ every IGDB game is here</i>') + ' · ' + esc(new Date(chk.t).toLocaleDateString(LOC)) : '<i class="nock">not checked</i>';
   return '<div class="scard">' + kv('Games in the series', list.length) + kv('Completed', done + ' of ' + list.length + ' (' + pc + '%)')
-    + '<div class="spbar" style="margin:2px 0 8px"><i style="width:' + pc + '%;background:' + pctColor(pc) + '"></i></div>'
+    + '<div class="spbar' + tkCls(list.length) + '" style="' + tkSty(list.length) + 'margin:2px 0 8px"><i style="width:' + pc + '%;background:' + pctColor(pc) + '"></i></div>'
     + kv('Series check', stat) + (chk && !chk.none ? kv('In IGDB (selected types)', chk.total + ', you have ' + chk.have) : '')
     + (col ? kv('Series in IGDB', esc(col.name) + (serKey(col.name) !== k ? ' <i class="warnk">≠ the name</i>' : '')) : '')
     + (hours ? kv('Playtime', hours + ' h') : '') + (avg ? kv('Average rating', '★' + avg) : '') + (ys.length ? kv('Years', Math.min.apply(null, ys) === Math.max.apply(null, ys) ? ys[0] : Math.min.apply(null, ys) + '–' + Math.max.apply(null, ys)) : '') + '</div>'
@@ -896,6 +896,7 @@ const SER_TYPE_LIST = [[0, 'Games'], [8, 'Remakes'], [9, 'Remasters'], [4, 'Stan
 const SER_TYPES_DEF = [0, 8, 9]; // в проверке серии по умолчанию: основные игры, ремейки и ремастеры; порты, бандлы и прочее включаются кнопками
 const serTypes = () => { const t = S.set.serTypes; return Array.isArray(t) && t.length ? t.map(Number) : SER_TYPES_DEF; };
 const serKey = n => normName(n);
+const tkOn = n => n > 1 && n <= 40, tkCls = n => tkOn(n) ? ' tk' : '', tkSty = n => tkOn(n) ? '--n:' + n + ';' : ''; // деления полосы прогресса равны числу игр
 // чипы типов игр: название и число игр этого типа; в поиске по играм нажатие фильтрует список, в серии включает/выключает тип в подсчёте серии
 const typeChipsVis = () => { const t = S.set.typeChips; return Array.isArray(t) ? t.map(Number) : ALL_TYPES; };
 const chipMode = () => { const m = S.set.chipMode; return m === 0 || m === 2 ? m : 1; }; // 0 - чипы выключены, 1 - все, 2 - выбранные в фильтре
@@ -1014,7 +1015,7 @@ function serHeadHtml() {
   if (!c.col) return h + '<div class="hint">Series “' + esc(c.name) + '” was not found in IGDB.<br><br><button class="btn acc" data-act="serRebind">Pick the IGDB series manually</button></div>';
   const pc = an.total ? Math.round(an.haveN * 100 / an.total) : 0, full = ok || (an.total > 0 && an.miss === 0), n = s.sel.size;
   h += '<p class="sub" style="margin:0 2px 6px">IGDB: «' + esc(c.col.name) + '” · in the catalog <b>' + an.haveN + ' of ' + an.total + '</b>' + (ok ? ' · ✓ marked as complete manually' : full ? ' · ✓ series complete' : an.miss ? ' · missing: <b>' + an.miss + '</b>' : '') + '</p>'
-    + '<div class="spbar" style="margin:0 2px 8px"><i style="width:' + (ok ? 100 : pc) + '%;background:' + (full ? 'var(--green)' : '#f0a030') + '"></i></div>'
+    + '<div class="spbar' + tkCls(an.total) + '" style="' + tkSty(an.total) + 'margin:0 2px 8px"><i style="width:' + (ok ? 100 : pc) + '%;background:' + (full ? 'var(--green)' : '#f0a030') + '"></i></div>'
     + '<div class="chips scroll sm"><button class="p sm' + (c.onlyMiss ? ' on' : '') + '" data-act="serOnly">Missing</button>'
     + '<button class="p sm' + (S.set.serFuture ? ' on' : '') + '" data-act="serFuture">Unreleased' + (an.future ? ' ' + an.future : '') + '</button>'
     + (an.hidden || c.showIgn ? '<button class="p sm' + (c.showIgn ? ' on' : '') + '" data-act="serShowIgn">Hidden ' + an.hidden + '</button>' : '')
@@ -1853,15 +1854,15 @@ function drawShHead() {
 function drawShInfo() {
   const el = $('#shInfo'); if (!el) return; const v = k => (($('#f_' + k) || {}).value || '').trim();
   const chip = (ic, txt, k, act) => '<button class="ichip" data-act="' + (act || 'shEdit') + '"' + (k ? ' data-k="' + k + '"' : '') + '>' + I(ic) + ' ' + txt + '</button>';
-  el.innerHTML = chip('cal', v('year') || '—', 'year') + chip('star', v('rating') ? esc(v('rating')) + '/10' : '—', 'rating') + chip('clock', v('time') ? esc(v('time')) + ' h' : '— h', 'time') + '<span class="brk"></span>' + chip('book', v('series') ? esc(v('series')) : 'Series', '', v('series') ? 'serCard' : 'pickSeries') + (v('series') ? '<button class="ichip icon" data-act="serCard" title="Open the series card" aria-label="Open the series card">' + I('book') + '</button>' : '');
+  el.innerHTML = chip('cal', v('year') || '—', 'year') + chip('star', v('rating') ? esc(v('rating')) + '/10' : '—', 'rating') + chip('clock', v('time') ? esc(v('time')) + ' h' : '— h', 'time') + '<span class="brk"></span>' + chip('book', v('series') ? esc(v('series')) : 'Series', '', v('series') ? 'serCard' : 'pickSeries');
   drawShSeries();
 }
 // «Серия: 3 из 7 · завершено 2» с переходами к предыдущей и следующей игре серии (порядок: год, дата добавления, название)
-function serRowHtml(d, nm) { // строка серии в карточке игры: сколько игр, процент завершения, проверена ли серия; нажатие открывает карточку серии
+function serRowHtml(d, nm) { // строка серии в карточке игры: число игр, процент завершения, проверена ли серия, итог проверки IGDB; снизу полоса с делениями по числу игр
   nm = String(nm || '').trim(); if (!nm) return '';
   const key = serKey(nm), list = S.games.filter(g => g.id !== d.id && g.series && serKey(g.series) === key); list.push(d);
   const done = list.filter(g => g.done).length, pc = Math.round(done * 100 / list.length), ok = !!serMap('serOk')[key], c = serMap('serChk')[key], checked = ok || (c && !c.none && c.total - c.have <= 0);
-  return '<div class="spmid" data-act="serCard" data-name="' + esc(nm) + '"><span>' + esc(nm) + ' · <b>' + gWord(list.length) + '</b> · completed <b>' + pc + '%</b> · <i class="' + (checked ? 'okk' : 'nock') + '">' + (checked ? '✓ checked' : 'not checked') + '</i></span><div class="spbar"><i style="width:' + pc + '%"></i></div>' + serBadge(nm) + '</div>';
+  return '<div class="spmid" data-act="serCard" data-name="' + esc(nm) + '"><div class="sprow"><b>' + gWord(list.length) + '</b><span>completed <b>' + pc + '%</b></span><i class="' + (checked ? 'okk' : 'nock') + '">' + (checked ? '✓ checked' : 'not checked') + '</i>' + serBadge(nm) + '</div><div class="spbar' + tkCls(list.length) + '" style="' + tkSty(list.length) + '"><i style="width:' + pc + '%"></i></div></div>';
 }
 function drawShSeries() {
   const el = $('#shSerie'); if (!el || !S.sheet) return; const d = S.sheet.draft;
@@ -2262,10 +2263,10 @@ function entryHtml(k, o) {
   const col = okColor(o.color), list = vmodeOf(k) === 'list', key = ' data-' + o.attr + '="' + esc(o.key) + '"';
   const lpm = o.lpm ? ' data-lpm="' + o.lpm + '"' : '';
   const pc = donePct(o.games), pcol = o.count ? pctColor(pc) : 'var(--mut)';
-  const meta = '<div class="ct"><span>' + gWord(o.count) + '</span><span title="Completed" style="color:' + pcol + '">✓ ' + pc + '%</span></div><div class="pb"><i style="width:' + pc + '%;background:' + pcol + '"></i></div>';
+  const meta = '<div class="ct"><span>' + gWord(o.count) + '</span><span title="Completed" style="color:' + pcol + '">✓ ' + pc + '%</span>' + (list && o.badge ? o.badge : '') + '</div><div class="pb' + tkCls(o.count) + '" style="' + tkSty(o.count) + '"><i style="width:' + pc + '%;background:' + pcol + '"></i></div>';
   if (list) {
     const u = o.covers[0];
-    return '<div class="lrow' + (o.badge ? ' hasbd' : '') + '" data-act="' + o.act + '"' + key + lpm + (col ? ' style="border-left-color:' + col + '"' : '') + '><div class="lth"' + (u ? ' style="background-image:url(\'' + bgu(u) + '\')"' : '') + '></div><div class="lm"><div class="nm">' + esc(o.name) + '</div>' + meta + (o.badge ? '<div class="sbw">' + o.badge + '</div>' : '') + '</div></div>';
+    return '<div class="lrow" data-act="' + o.act + '"' + key + lpm + (col ? ' style="border-left-color:' + col + '"' : '') + '><div class="lth"' + (u ? ' style="background-image:url(\'' + bgu(u) + '\')"' : '') + '></div><div class="lm"><div class="nm">' + esc(o.name) + '</div>' + meta + '</div></div>';
   }
   // обложки растянуты на всю ширину плитки и перекрывают друг друга
   const n = o.covers.length, w = n === 1 ? 61 : n === 2 ? 52 : n === 3 ? 46 : 40, left = i => n === 1 ? (100 - w) / 2 : i * (100 - w) / (n - 1);

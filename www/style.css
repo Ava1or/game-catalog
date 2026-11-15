@@ -797,8 +797,7 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .serbd.ok{color:var(--green);border-color:var(--green)}
 .tile .sbw{position:absolute;right:6px;top:8px;z-index:2}
 .tile .sbw .serbd{background:rgba(20,20,20,.82)}
-.lrow{position:relative}.lrow .sbw{position:absolute;right:10px;top:8px}.lrow.hasbd .nm{padding-right:46px}
-.spmid .serbd{align-self:flex-start;margin-top:2px}
+.lrow .ct{align-items:center;flex-wrap:wrap}.lrow .ct .serbd{margin-left:auto}
 .p.sm,.chips.sm .p{padding:4px 10px;font-size:12px}
 .chips.sm{gap:6px;margin-bottom:6px}
 .p.ic{display:inline-flex;align-items:center;gap:4px}
@@ -840,3 +839,12 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .okk{color:var(--green);font-style:normal}.warnk{color:#f0a030;font-style:normal}.nock{color:var(--mut);font-style:normal}
 .fixrow{background:var(--card);border-radius:12px;padding:10px 12px;margin:8px 0;font-size:13px;display:flex;flex-direction:column;gap:8px}
 .spmid[data-act]{cursor:pointer}
+
+/* строка серии в карточке игры, деления полос прогресса */
+.sprow{display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;font-size:13px}
+.sprow i{font-style:normal;font-size:12px}
+.tk{position:relative}
+.tk::after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(90deg,transparent 0,transparent calc(100%/var(--n) - 1px),rgba(0,0,0,.55) calc(100%/var(--n) - 1px),rgba(0,0,0,.55) calc(100%/var(--n)))}
+/* кнопки выбора и «Готово» всегда видны: закреплены внизу окна, список прокручивается */
+.modal .acts{position:sticky;bottom:-18px;z-index:3;margin:12px -18px -18px;padding:12px 18px 16px;background:var(--modal);border-top:1px solid var(--line)}
+.sheet > .btn[data-act="closeSheet"]{position:sticky;bottom:0;z-index:5;box-shadow:0 -14px 12px -6px var(--sheet),0 14px 0 0 var(--sheet)}

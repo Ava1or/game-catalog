@@ -826,8 +826,8 @@ const scList = name => { const k = serKey(name); return S.games.filter(g => g.se
 function serMigrate(a, b) { const ka = serKey(a), kb = serKey(b); if (ka === kb) return; ['serOk', 'serCol', 'serChk', 'serIgnore'].forEach(m => { const o = serMap(m); if (o[ka] !== undefined) { if (o[kb] === undefined) o[kb] = o[ka]; delete o[ka]; } }); }
 function serInLibrary(name) { Object.assign(S.set.f, { q: '', years: [], genres: [], platforms: [], series: [name], collections: [], props: [], addedFrom: '', addedTo: '', seriesMode: '', maxTime: 0, done: '', minRating: 0 }); saveSet(); S.retGame = null; S.tab = 'library'; render(); }
 function openSerCard(name) { S.serCard = { name, sel: new Set(), selMode: false }; closeSheet(); S.tab = 'sercard'; render(); const b = $('#scBody'); if (b) b.scrollTop = 0; }
-async function serRenameAll(name, n) { // переименовать серию у всех игр (если такая серия уже есть, игры объединяются с ней)
-  const games = scList(name), f = S.set.f, snap = takeSnap(); n = serKey(n) === serKey(name) ? String(n).trim() : canonSeries(n);
+async function serRenameAll(name, n, noSnap) { // переименовать серию у всех игр (если такая серия уже есть, игры объединяются с ней)
+  const games = scList(name), f = S.set.f, snap = noSnap ? null : takeSnap(); n = serKey(n) === serKey(name) ? String(n).trim() : canonSeries(n);
   for (const g of games) g.series = n; await saveGames(games); f.series = f.series.map(x => x === name ? n : x); serMigrate(name, n);
   if (S.serCard && serKey(S.serCard.name) === serKey(name)) S.serCard.name = n; saveSet(); return { n, snap };
 }
@@ -841,6 +841,7 @@ function serCardInfoHtml() {
     + '<div class="spbar' + tkCls(list.length) + '" style="' + tkSty(list.length) + 'margin:2px 0 8px"><i style="width:' + pc + '%;background:' + pctColor(pc) + '"></i></div>'
     + kv('Series check', stat) + (chk && !chk.none ? kv('In IGDB (selected types)', chk.total + ', you have ' + chk.have) : '')
     + (col ? kv('Series in IGDB', esc(col.name) + (serKey(col.name) !== k ? ' <i class="warnk">≠ the name</i>' : '')) : '')
+    + kv('Check against IGDB', (() => { const v = verMap(), ts = v.s[k], n = list.filter(g => v.g[g.id]).length; return ts ? esc(new Date(ts).toLocaleDateString(LOC)) + ', games: ' + n + ' of ' + list.length + (serStale(name, 'old') && !serStale(name, 'new') ? ' <i class="warnk">long ago</i>' : '') : '<i class="nock">not checked</i>'; })())
     + (hours ? kv('Playtime', hours + ' h') : '') + (avg ? kv('Average rating', '★' + avg) : '') + (ys.length ? kv('Years', Math.min.apply(null, ys) === Math.max.apply(null, ys) ? ys[0] : Math.min.apply(null, ys) + '–' + Math.max.apply(null, ys)) : '') + '</div>'
     + '<div class="tools scbar">' + ib('scSearch', 'find', 'Search the series') + ib('scCheck', 'checkc', 'Check completeness') + ib('scNameCheck', 'aa', 'Check the name') + ib('scAdd', 'plus', 'Add games') + ib('scCatalog', 'tolib', 'Show the series games in the list') + ib('scMark', 'chkbox', ok ? 'Series checked and complete: remove the mark' : 'Series checked and complete, the rest is not needed', ok) + '</div>'
     + (c.selMode ? '<div class="toolbar"><button class="btn" data-act="scSel">Cancel</button><button class="btn" data-act="scSelAll">All</button><button class="btn" data-act="scRemove"' + (c.sel.size ? '' : ' disabled') + '>Remove from the series (' + c.sel.size + ')</button><button class="btn" data-act="scMove"' + (c.sel.size ? '' : ' disabled') + '>Move to another series… (' + c.sel.size + ')</button><button class="btn" data-act="scDel"' + (c.sel.size ? '' : ' disabled') + '>Delete from the catalog (' + c.sel.size + ')</button></div>' : '')
@@ -868,27 +869,98 @@ async function chooseSeries(exclude) {
 }
 // проверка названия серии: сверка серий игр каталога с сериями IGDB
 async function serNameCheck(name) {
-  const games = scList(name).filter(g => g.igdbId), info = new Map();
-  if (!games.length) return { name, none: true, linked: 0, total: scList(name).length, groups: [], rename: false, main: null };
+  const games = scList(name).filter(g => g.igdbId), info = new Map(), key = serKey(name);
   for (let i = 0; i < games.length; i += 100) { const part = games.slice(i, i + 100), list = await igdb('/games', 'fields collections.id,collections.name; where id = (' + part.map(g => g.igdbId).join(',') + '); limit ' + part.length + ';'); list.forEach(x => info.set(x.id, x.collections || [])); }
-  const votes = new Map(), key = serKey(name);
+  const votes = new Map(), out = new Map(), saved = serMap('serCol')[key];
   games.forEach(g => (info.get(g.igdbId) || []).forEach(c => { const v = votes.get(c.id) || { id: c.id, name: c.name, n: 0 }; v.n++; votes.set(c.id, v); }));
-  const all = Array.from(votes.values()).sort((a, b) => b.n - a.n), same = all.find(c => serKey(c.name) === key), main = same || all[0] || null, out = new Map();
+  const all = Array.from(votes.values()).sort((a, b) => b.n - a.n), same = all.find(c => serKey(c.name) === key); let main = saved && saved.manual ? saved : same || all[0] || null, missing = false;
+  if (!main) { const col = await serCollection(name); if (col) main = col; else missing = true; }
   if (main) games.forEach(g => {
     const cs = info.get(g.igdbId) || []; if (!cs.length || cs.some(c => c.id === main.id)) return;
     const t = cs.slice().sort((a, b) => (votes.get(b.id) ? votes.get(b.id).n : 0) - (votes.get(a.id) ? votes.get(a.id).n : 0))[0], e = out.get(t.id) || { col: { id: t.id, name: t.name }, games: [] }; e.games.push(g); out.set(t.id, e);
   });
-  return { name, none: false, linked: games.length, total: scList(name).length, main, rename: !!main && !same, groups: Array.from(out.values()).sort((a, b) => b.games.length - a.games.length) };
+  serStamp(name); saveSet();
+  return { name, none: !games.length, missing, linked: games.length, total: scList(name).length, main, rename: !!main && serKey(main.name) !== key && !(saved && saved.manual), groups: Array.from(out.values()).sort((a, b) => b.games.length - a.games.length) };
 }
 function drawSerFix() {
   const f = S.serFix; if (!f) return;
   const rows = [];
-  if (f.none) rows.push('<p class="sub">The games of this series have no IGDB entries, so there is nothing to check. Add games from IGDB or refresh them from the source.</p>');
-  else if (!f.main) rows.push('<p class="sub">IGDB lists no series for these games.</p>');
+  if (f.missing) rows.push('<div class="fixrow"><div>Series <b>«' + esc(f.name) + '»</b> was not found in IGDB' + (f.linked ? '' : ' (the games have no IGDB entries)') + '. Games: ' + esc(scList(f.name).slice(0, 6).map(x => x.name).join(', ') + (f.total > 6 ? '…' : '')) + '</div><button class="btn acc" data-act="serFixDelete">Delete the series and clear it in the games</button></div>');
   if (f.rename) rows.push('<div class="fixrow"><div>In IGDB this series is called <b>«' + esc(f.main.name) + '»</b>, and yours is “' + esc(f.name) + '».</div><button class="btn acc" data-act="serFixRename">Rename to “' + esc(f.main.name) + '»</button></div>');
   f.groups.forEach((g, i) => rows.push('<div class="fixrow"><div><b>' + gWord(g.games.length) + '</b> belong to the series in IGDB <b>«' + esc(g.col.name) + '»</b>: ' + esc(g.games.slice(0, 6).map(x => x.name).join(', ') + (g.games.length > 6 ? '…' : '')) + '</div><button class="btn acc" data-act="serFixMove" data-i="' + i + '">Move to “' + esc(g.col.name) + '»</button></div>'));
-  if (!rows.length || (f.main && !f.rename && !f.groups.length)) rows.push('<p class="sub">✓ The series name matches IGDB, and every game with an IGDB entry belongs to it.</p>');
+  if (!f.missing && (!rows.length || (f.main && !f.rename && !f.groups.length))) rows.push('<p class="sub">✓ The series name matches IGDB, and every game with an IGDB entry belongs to it.</p>');
   openSheet('<div class="hdr2"><h2>Series name</h2></div><p class="sub">Series “' + esc(f.name) + '”: games ' + f.total + ', of them with an IGDB entry ' + f.linked + '</p>' + rows.join('') + '<button class="btn acc" style="width:100%;margin-top:14px" data-act="closeSheet">Done</button>');
+}
+/* ====== Сверка серий и игр с IGDB: существование серии, правильная серия у игры, отметки времени ====== */
+const SER_VER_DAYS = 30; // проверенные раньше этого срока считаются проверенными давно
+const verMap = () => { const v = S.set.serVer = S.set.serVer || {}; v.s = v.s || {}; v.g = v.g || {}; return v; };
+const serVerTs = name => { const v = verMap(); return Math.min.apply(null, [v.s[serKey(name)] || 0].concat(scList(name).map(g => v.g[g.id] || 0))); }; // 0: серия или хотя бы одна её игра не сверялась
+const serStale = (name, mode) => { if (mode === 'all') return true; const t = serVerTs(name); return mode === 'new' ? t === 0 : t === 0 || t < Date.now() - SER_VER_DAYS * 864e5; };
+function serStamp(name) { const v = verMap(), now = Date.now(); v.s[serKey(name)] = now; scList(name).forEach(g => { v.g[g.id] = now; }); }
+const serProgText = () => { const V = S.serVer, A = S.serAll; if (V && V.run) return V.msg || 'Series checked: ' + V.done + ' of ' + V.total; if (A && A.run) return 'Series checked: ' + A.done + ' of ' + A.total; return (V && V.msg) || (A && A.msg) || ''; };
+async function serVerMode(names) {
+  if (!names.some(n => serVerTs(n) > 0)) return 'all';
+  const nNew = names.filter(n => serStale(n, 'new')).length, nOld = names.filter(n => serStale(n, 'old')).length;
+  return choose({ title: 'Checking series against IGDB', items: [{ id: 'old', label: 'Unchecked and checked long ago (' + nOld + ')', sub: 'checked more than ' + SER_VER_DAYS + ' days ago' }, { id: 'new', label: 'Unchecked only (' + nNew + ')' }, { id: 'all', label: 'All series (' + names.length + ')' }] });
+}
+function serVerDraw() { const el = $('#serProg'), b = $('#serVerBtn'), V = S.serVer; if (el) el.textContent = serProgText(); if (b && V) b.textContent = V.run ? 'Stop checking' : 'Check series against IGDB'; }
+async function serVerifyRun(names, V) {
+  const skip = serMap('serSkip'), issues = [], info = new Map(), ids = Array.from(new Set(names.reduce((a, n) => a.concat(scList(n)), []).filter(g => g.igdbId).map(g => g.igdbId)));
+  V.msg = 'Loading game series from IGDB…'; serVerDraw();
+  for (let i = 0; i < ids.length && V.run; i += 100) { const part = ids.slice(i, i + 100), list = await igdb('/games', 'fields collections.id,collections.name; where id = (' + part.join(',') + '); limit ' + part.length + ';'); list.forEach(x => info.set(x.id, x.collections || [])); }
+  V.msg = ''; serVerDraw();
+  const gv = new Map(); info.forEach(cs => cs.forEach(c => gv.set(c.id, (gv.get(c.id) || 0) + 1)));
+  for (const name of names) {
+    if (!V.run) break;
+    const key = serKey(name), gs = scList(name), linked = gs.filter(g => g.igdbId && info.has(g.igdbId)), votes = new Map(), saved = serMap('serCol')[key], manual = !!(saved && saved.manual);
+    linked.forEach(g => info.get(g.igdbId).forEach(c => { const x = votes.get(c.id) || { id: c.id, name: c.name, n: 0 }; x.n++; votes.set(c.id, x); }));
+    const all = Array.from(votes.values()).sort((a, b) => b.n - a.n), same = all.find(c => serKey(c.name) === key); let main = manual ? saved : same || all[0] || null;
+    if (!main) {
+      let col = null, err = false; try { col = await serCollection(name); } catch (e) { err = true; V.bad++; logErr('series check', e); }
+      if (err) { if (S.block) break; V.done++; continue; }
+      if (col) main = col; else if (!skip['m|' + key]) issues.push({ kind: 'missing', series: name, games: gs.map(g => g.id) });
+    }
+    if (main) {
+      if (serKey(main.name) !== key && !manual && !skip['r|' + key]) issues.push({ kind: 'rename', series: name, to: main.name, games: gs.map(g => g.id) });
+      const out = new Map();
+      linked.forEach(g => {
+        const cs = info.get(g.igdbId); if (!cs.length || cs.some(c => c.id === main.id) || skip['g|' + g.id]) return;
+        const t = cs.slice().sort((a, b) => (gv.get(b.id) || 0) - (gv.get(a.id) || 0))[0], e = out.get(t.id) || { kind: 'move', series: name, to: t.name, games: [] }; e.games.push(g.id); out.set(t.id, e);
+      });
+      out.forEach(e => issues.push(e));
+    }
+    serStamp(name); V.done++; if (V.done % 10 === 0) { saveSet(); serVerDraw(); }
+  }
+  saveSet(); return issues;
+}
+async function serApplyIssue(iss) {
+  if (iss.kind === 'missing') {
+    const games = scList(iss.series), k = serKey(iss.series); for (const g of games) g.series = ''; await saveGames(games);
+    S.set.f.series = S.set.f.series.filter(x => serKey(x) !== k); ['serOk', 'serCol', 'serChk', 'serIgnore'].forEach(m => { delete serMap(m)[k]; }); delete verMap().s[k];
+  } else if (iss.kind === 'rename') await serRenameAll(iss.series, iss.to, true);
+  else { const games = iss.games.map(gameById).filter(Boolean), n = canonSeries(iss.to); for (const g of games) g.series = n; await saveGames(games); }
+  saveSet();
+}
+async function serVerifyAll() {
+  const V0 = S.serVer; if (V0 && V0.run) { V0.run = false; return; }
+  if (S.serAll && S.serAll.run) return toast('Wait for the completeness check to finish or stop it');
+  if (!PROV.igdb.ready()) return toast('IGDB is unavailable: check the keys or the local server in the settings');
+  const all = Array.from(seriesGroups().keys()).filter(Boolean); if (!all.length) return toast('No series yet');
+  const mode = await serVerMode(all); if (!mode) return;
+  const names = all.filter(n => serStale(n, mode)); if (!names.length) return toast('All series were checked recently');
+  const V = S.serVer = { run: true, done: 0, total: names.length, bad: 0, msg: '' }; serVerDraw();
+  let issues = []; try { issues = await serVerifyRun(names, V); } catch (e) { logErr('series checking', e); toast(e.message); }
+  const stopped = !V.run; V.run = false; S.serIssues = issues;
+  V.msg = (stopped ? 'Checking stopped. ' : '') + 'Series checked: ' + V.done + ', problems found: ' + issues.length + (V.bad ? ', errors: ' + V.bad : '');
+  if (S.tab === 'series') render(); toast(V.msg); if (issues.length) drawSerIssues();
+}
+function drawSerIssues() {
+  const L = S.serIssues || [], nm = id => (gameById(id) || {}).name || '', list = ids => esc(ids.slice(0, 6).map(nm).filter(Boolean).join(', ') + (ids.length > 6 ? '…' : ''));
+  const row = (x, i) => '<div class="fixrow"><div>' + (x.kind === 'missing' ? 'Series <b>«' + esc(x.series) + '»</b> was not found in IGDB. Games (' + x.games.length + '): ' + list(x.games)
+    : x.kind === 'rename' ? 'Series <b>«' + esc(x.series) + '»</b> is called in IGDB <b>«' + esc(x.to) + '»</b> (games: ' + x.games.length + ')'
+      : 'In the series <b>«' + esc(x.series) + '»</b>: <b>' + gWord(x.games.length) + '</b> belong to the series in IGDB <b>«' + esc(x.to) + '»</b>: ' + list(x.games)) + '</div>'
+    + '<div class="fxb"><button class="btn acc" data-act="serIssueApply" data-i="' + i + '">' + (x.kind === 'missing' ? 'Delete the series and clear it in the games' : x.kind === 'rename' ? 'Rename to “' + esc(x.to) + '»' : 'Move to “' + esc(x.to) + '»') + '</button><button class="btn" data-act="serIssueSkip" data-i="' + i + '">Keep as is</button></div></div>';
+  openSheet('<div class="hdr2"><h2>Checking series against IGDB</h2></div>' + (L.length ? '<p class="sub">Problems found: ' + L.length + '. “Keep as is” remembers your choice, and this problem is not shown again.</p><button class="btn acc" style="width:100%;margin-bottom:6px" data-act="serIssuesAll">Apply all (' + L.length + ')</button>' + L.map(row).join('') : '<p class="sub">✓ No problems: the series exist in IGDB and the games belong to the right series.</p>') + '<button class="btn acc" style="width:100%;margin-top:14px" data-act="closeSheet">Done</button>');
 }
 /* ====== Серии IGDB: поиск серий и проверка полноты ====== */
 const SER_TYPE_LIST = [[0, 'Games'], [8, 'Remakes'], [9, 'Remasters'], [4, 'Standalone add-ons'], [10, 'Expanded'], [11, 'Ports'], [3, 'Bundles'], [6, 'Episodes']];
@@ -1053,7 +1125,7 @@ async function serAddSelected() {
 }
 function serDrawProg() {
   const A = S.serAll, el = $('#serProg'), b = $('#serAllBtn'); if (!A) return;
-  if (el) el.textContent = A.run ? 'Series checked: ' + A.done + ' of ' + A.total : A.msg || '';
+  if (el) el.textContent = serProgText();
   if (b) b.textContent = A.run ? 'Stop checking' : 'Check series completeness';
 }
 async function serCheckAll() {
@@ -2649,7 +2721,7 @@ function viewSeries() {
   const hasNames = Array.from(seriesGroups().keys()).some(Boolean);
   return '<div class="top"><div class="hdr2"><h2>Game series</h2>' + modeBtns('series') + '</div>'
     + '<div class="bar"><div class="sbox"><span>🔍</span><input id="sfind" placeholder="Search series" value="' + esc(S.sFind) + '"></div></div>'
-    + (hasNames ? '<div class="toolbar" style="margin:2px 0 4px"><button class="btn" id="serAllBtn" data-act="serCheckAll">' + (S.serAll && S.serAll.run ? 'Stop checking' : 'Check series completeness') + '</button><button class="p' + (S.set.serOnlyInc ? ' on' : '') + '" data-act="serOnlyInc">Incomplete only</button></div><div class="sub" id="serProg" style="margin:0 2px 4px">' + (S.serAll ? (S.serAll.run ? 'Series checked: ' + S.serAll.done + ' of ' + S.serAll.total : S.serAll.msg || '') : '') + '</div>' : '')
+    + (hasNames ? '<div class="toolbar" style="margin:2px 0 4px"><button class="btn" id="serAllBtn" data-act="serCheckAll">' + (S.serAll && S.serAll.run ? 'Stop checking' : 'Check series completeness') + '</button><button class="p' + (S.set.serOnlyInc ? ' on' : '') + '" data-act="serOnlyInc">Incomplete only</button><button class="btn" id="serVerBtn" data-act="serVerifyAll">' + (S.serVer && S.serVer.run ? 'Stop checking' : 'Check series against IGDB') + '</button>' + (S.serIssues && S.serIssues.length ? '<button class="btn" data-act="serIssues">Problems: ' + S.serIssues.length + '</button>' : '') + '</div><div class="sub" id="serProg" style="margin:0 2px 4px">' + serProgText() + '</div>' : '')
     + '</div><div class="scrl">' + dupBanner('series')
     + boxHtml('series', seriesTilesHtml())
     + (hasNames ? '<p class="sub" style="text-align:center;margin-top:12px">Long-press a series: export, rename or remove</p>' : '')
@@ -3529,6 +3601,17 @@ const ACT = {
     const f = S.serFix, g = f && f.groups[+t.dataset.i]; if (!g) return; const n = canonSeries(g.col.name), snap = takeSnap();
     for (const x of g.games) x.series = n; await saveGames(g.games); f.groups.splice(+t.dataset.i, 1); f.total = scList(f.name).length; render(); drawSerFix(); toastUndo('Moved to “' + n + '»: ' + g.games.length, snap);
   },
+  serFixDelete: async () => { const f = S.serFix; if (!f) return; const snap = takeSnap(); await serApplyIssue({ kind: 'missing', series: f.name }); closeSheet(); S.retGame = null; S.tab = 'series'; render(); toastUndo('Series deleted and cleared in the games', snap); },
+  serVerifyAll: () => serVerifyAll(),
+  serIssues: () => drawSerIssues(),
+  serIssueApply: async t => { const L = S.serIssues || [], i = +t.dataset.i, x = L[i]; if (!x) return; const snap = takeSnap(); await serApplyIssue(x); L.splice(i, 1); render(); drawSerIssues(); toastUndo('Fixed', snap); },
+  serIssueSkip: t => { const L = S.serIssues || [], i = +t.dataset.i, x = L[i]; if (!x) return; const k = serMap('serSkip'); if (x.kind === 'move') x.games.forEach(id => { k['g|' + id] = 1; }); else k[(x.kind === 'missing' ? 'm|' : 'r|') + serKey(x.series)] = 1; saveSet(); L.splice(i, 1); render(); drawSerIssues(); },
+  serIssuesAll: async () => {
+    const L = S.serIssues || []; if (!L.length) return; const m = L.filter(x => x.kind === 'move').reduce((a, x) => a + x.games.length, 0), r = L.filter(x => x.kind === 'rename').length, d = L.filter(x => x.kind === 'missing').length;
+    if (!await confirmBox('Apply all fixes? Games to move: ' + m + ', series to rename: ' + r + ', series to delete: ' + d + '. You can undo this.', 'Apply')) return;
+    const snap = takeSnap(); for (const k of ['move', 'rename', 'missing']) for (const x of L.filter(y => y.kind === k)) await serApplyIssue(x);
+    S.serIssues = []; closeSheet(); render(); toastUndo('Problems fixed: ' + L.length, snap);
+  },
   serCheckAll: () => serCheckAll(),
   serOnlyInc: () => { S.set.serOnlyInc = !S.set.serOnlyInc; saveSet(); render(); },
   serType: t => { const v = +t.dataset.v, cur = serTypes().slice(), i = cur.indexOf(v); if (i >= 0) { if (cur.length < 2) return; cur.splice(i, 1); } else cur.push(v); S.set.serTypes = cur; saveSet(); serApply(); renderSearchBody(); },
@@ -3931,7 +4014,7 @@ function applyTheme() {
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
   const m = document.querySelector('meta[name=theme-color]'); if (m) m.setAttribute('content', dark ? '#0b0b0d' : '#f2f3f6');
 }
-window.__GC = { serKey, serNameCheck, openSerCard, scList, viewSerCard, serRowHtml, serRenameAll, chooseSeries, chipMode, typeCountsHtml, viewRes, viewSearch, serCheck, serAnalyze, serCollection, collGames, showSeriesView, serCheckAll, searchCollections, serBadge, serMiss, serApply, runColSearch, sortResults, filterGames, collTilesHtml, seriesTilesHtml, NO_COLL, showBundle, popSearchState, sourceResolve, searchTypes, sheetOpen: () => !!sheetEl, logErr, ERRLOG, takeSnap, undoLast, UNDO, toastUndo, removeGame, sheetSibling, itemLine, animOn, reviewOne, catalogMatch, matchCfg, reviewItems, autoResolve, ipMask, addrOf, textLines, syncNow, SY, DB, reloadData, nextPool, PRESETS, applyFilterSet, withSeries, buildEntries, groupGames, textHtml, listHtml, cardHtml, openYoutube, canonPlat, canonGenre, canonAll, dictMerge, dictRename, dictRewrite, openDict, mergeGroups, openMergeCompare, applyMerge, mgBase, renderKeep, toggleInSel, handleShared, applyExtra, addParsed, openExport, exportText, copyText, gameLine, zipBuild, zipRead, shotStats, delShots, rawgQuotaTick, refreshOne, rawg, effItem, applyDefaults, linkItem, itemOpts, viewInbox, bulkMore, openLb, libToolsHtml: () => { renderLibHead(); return $('#libTools').innerHTML; }, filterGames, getShots, putShots, collTilesHtml, seriesTilesHtml, viewCollections, viewSeries, DONE_ID, autoResolve, viewStats, restoreGames, removeGame, canonSeries, findDupes, mergeAllDupes, collectSheet, persistDraft, closeSheet, S, ACT, bump, igdb, hltbFind, sgdbAuto, openSgdb, applyTheme, colsFor, usageHtml, serMenu, viewInbox, addItems, linkItem, createList, pendingItem, render, runSearch, addFromIgdb, importData, openIgdbSheet, openGameSheet, openFilters, openCols, selectionAction, loadAll, renderSearchBody };
+window.__GC = { serVerifyRun, serApplyIssue, serStale, serVerTs, serStamp, serVerMode, drawSerIssues, serKey, serNameCheck, openSerCard, scList, viewSerCard, serRowHtml, serRenameAll, chooseSeries, chipMode, typeCountsHtml, viewRes, viewSearch, serCheck, serAnalyze, serCollection, collGames, showSeriesView, serCheckAll, searchCollections, serBadge, serMiss, serApply, runColSearch, sortResults, filterGames, collTilesHtml, seriesTilesHtml, NO_COLL, showBundle, popSearchState, sourceResolve, searchTypes, sheetOpen: () => !!sheetEl, logErr, ERRLOG, takeSnap, undoLast, UNDO, toastUndo, removeGame, sheetSibling, itemLine, animOn, reviewOne, catalogMatch, matchCfg, reviewItems, autoResolve, ipMask, addrOf, textLines, syncNow, SY, DB, reloadData, nextPool, PRESETS, applyFilterSet, withSeries, buildEntries, groupGames, textHtml, listHtml, cardHtml, openYoutube, canonPlat, canonGenre, canonAll, dictMerge, dictRename, dictRewrite, openDict, mergeGroups, openMergeCompare, applyMerge, mgBase, renderKeep, toggleInSel, handleShared, applyExtra, addParsed, openExport, exportText, copyText, gameLine, zipBuild, zipRead, shotStats, delShots, rawgQuotaTick, refreshOne, rawg, effItem, applyDefaults, linkItem, itemOpts, viewInbox, bulkMore, openLb, libToolsHtml: () => { renderLibHead(); return $('#libTools').innerHTML; }, filterGames, getShots, putShots, collTilesHtml, seriesTilesHtml, viewCollections, viewSeries, DONE_ID, autoResolve, viewStats, restoreGames, removeGame, canonSeries, findDupes, mergeAllDupes, collectSheet, persistDraft, closeSheet, S, ACT, bump, igdb, hltbFind, sgdbAuto, openSgdb, applyTheme, colsFor, usageHtml, serMenu, viewInbox, addItems, linkItem, createList, pendingItem, render, runSearch, addFromIgdb, importData, openIgdbSheet, openGameSheet, openFilters, openCols, selectionAction, loadAll, renderSearchBody };
 (async () => {
   try {
     await loadAll();

@@ -605,6 +605,26 @@ const L = require('../www/app.js');
     const rn = await G.serRenameAll('Dissidia Final Fantasy', 'Dissidia FF'); need(G.scList('Dissidia FF').length === 2 && rn.n === 'Dissidia FF', 'серия переименована');
     G.ACT.tab({ dataset: { tab: 'series' } }); delete global.__collections; gs.forEach(g => { const i = S.games.indexOf(g); if (i >= 0) S.games.splice(i, 1); });
   });
+  await step('сверка серий с IGDB: нет серии, неправильная серия у игры, метки времени, пропуск', async () => {
+    const need = (c, m) => { if (!c) throw new Error(m); };
+    const mk = (id, igdb, name, series, y) => Object.assign({}, S.games[0], { id, igdbId: igdb, name, year: y, series, done: false, collections: [], added: 1 });
+    const gs = [mk('v1', 601, 'V Ok', 'Fallout', 2001), mk('v2', 602, 'V Wrong', 'Fallout', 2002), mk('v3', 603, 'V Ghost', 'Ghostly', 2003), mk('v4', null, 'V Nowhere', 'Nowhere', 2004)]; gs.forEach(g => S.games.push(g));
+    global.__collections = { 601: [{ id: 7, name: 'Fallout' }], 602: [{ id: 80, name: 'Dissidia' }], 603: [] };
+    S.set.serVer = {}; S.set.serSkip = {}; S.set.serCol = {}; S.set.serIssues = undefined;
+    need(G.serStale('Ghostly', 'new') && G.serStale('Ghostly', 'old') && G.serStale('Ghostly', 'all') && G.serVerTs('Ghostly') === 0, 'до сверки серия не проверена');
+    const V = { run: true, done: 0, total: 3, bad: 0, msg: '' }, issues = await G.serVerifyRun(['Fallout', 'Ghostly', 'Nowhere'], V);
+    const mv = issues.find(x => x.kind === 'move'), ms = issues.filter(x => x.kind === 'missing');
+    need(issues.length === 3 && mv && mv.series === 'Fallout' && mv.to === 'Dissidia' && mv.games.length === 1 && mv.games[0] === 'v2', 'неправильная серия у игры найдена: ' + JSON.stringify(issues));
+    need(ms.length === 2 && ms.some(x => x.series === 'Ghostly') && ms.some(x => x.series === 'Nowhere'), 'серии, которых нет в IGDB, найдены');
+    need(V.done === 3 && G.serVerTs('Ghostly') > 0 && !G.serStale('Ghostly', 'new') && !G.serStale('Ghostly', 'old') && G.serStale('Ghostly', 'all'), 'метки времени серии и игр проставлены');
+    S.set.serVer.s[G.serKey('Ghostly')] = Date.now() - 40 * 864e5; need(G.serStale('Ghostly', 'old') && !G.serStale('Ghostly', 'new'), 'проверенная давно серия попадает в режим «давно»');
+    await G.serApplyIssue(ms.find(x => x.series === 'Ghostly')); need(!S.games.find(g => g.id === 'v3').series && G.scList('Ghostly').length === 0, 'серия удалена, у игры очищена');
+    await G.serApplyIssue(mv); need(S.games.find(g => g.id === 'v2').series === 'Dissidia', 'игре назначена правильная серия из IGDB');
+    S.serIssues = issues.filter(x => x.series === 'Nowhere'); G.ACT.serIssueSkip({ dataset: { i: '0' } }); need(S.set.serSkip['m|' + G.serKey('Nowhere')], 'пропуск запоминается');
+    const again = await G.serVerifyRun(['Nowhere'], { run: true, done: 0, total: 1, bad: 0, msg: '' }); need(!again.length, 'пропущенная проблема больше не показывается');
+    G.drawSerIssues(); G.ACT.closeSheet();
+    delete global.__collections; gs.forEach(g => { const i = S.games.indexOf(g); if (i >= 0) S.games.splice(i, 1); }); S.serIssues = [];
+  });
   await step('синхронизация с сервером: отправка, восстановление, правка, удаление', async () => {
     const fs = require('fs'), os = require('os'), path = require('path');
     const { createServer } = await import('../server/server.mjs');

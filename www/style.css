@@ -866,3 +866,11 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .sprow .serbd{height:auto;min-height:22px;padding:1px 9px;font-size:13px;border-radius:11px;border-width:1.5px}
 
 .fxb{display:flex;gap:8px;flex-wrap:wrap}
+
+/* франшизы */
+.kswitch{display:inline-flex;gap:6px}.kswitch .p{font-size:14px;padding:5px 12px}
+.frsec{display:flex;align-items:center;gap:10px;margin:14px 2px 6px;font-size:14px}.frsec b{font-size:15px}.frsec span{color:var(--mut);font-size:12px}.frsec i{margin-left:auto;font-style:normal;color:var(--mut)}.frsec[data-act]{cursor:pointer}
+
+/* карточки серии и франшизы: в одну строку без подписей кнопок */
+.scbar .ib .lbl{display:none}
+.scbar{overflow-x:auto}

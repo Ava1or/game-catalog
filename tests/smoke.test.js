@@ -18,6 +18,13 @@ global.__gateMs = 0;
 const FNV = { id: 1, name: 'Fallout: New Vegas', first_release_date: Date.UTC(2010, 9, 19) / 1000, total_rating: 86, summary: 'desc', genres: [{ name: 'RPG' }], platforms: [{ name: 'PC (Microsoft Windows)' }], cover: { image_id: 'abc' }, collections: [{ id: 77, name: 'Fallout' }] };
 const igdbData = (ep, body) => {
   const D = (y, m = 0) => Date.UTC(y, m, 1) / 1000;
+  if (ep === '/games' && body.includes('fields name,first_release_date,collections.id,collections.name,franchise.id')) { const ids = (body.match(/where id = \(([\d,]+)\)/) || [, ''])[1].split(',').map(Number); return ids.filter(i => global.__gv && global.__gv[i]).map(i => global.__gv[i]); }
+  if (ep === '/game_time_to_beats' && body.includes('where game_id = (')) return Object.keys(global.__gvt || {}).map(k => ({ game_id: +k, normally: global.__gvt[k] * 3600 }));
+  if (ep === '/franchises') return body.includes('search "fallout') ? [{ id: 9, name: 'Fallout Universe', games: [1, 701, 702, 703] }] : [];
+  if (body.includes('fields franchise.id,franchise.name,franchises.id,franchises.name; where id = (')) { const ids = (body.match(/where id = \(([\d,]+)\)/) || [, ''])[1].split(',').map(Number); const mp = global.__franchises || {}; return ids.filter(i => mp[i]).map(i => Object.assign({ id: i }, mp[i])); }
+  if (ep === '/games' && body.includes('franchise = 9 |') && body.includes('game_type = (0,8,9,4,10,11,3,6)')) return [
+    { id: 701, name: 'FU One', first_release_date: Date.UTC(2001, 0, 1) / 1000, game_type: 0 }, { id: 702, name: 'FU Two', first_release_date: Date.UTC(2003, 0, 1) / 1000, game_type: 0 },
+    { id: 703, name: 'FU Spin', first_release_date: Date.UTC(2005, 0, 1) / 1000, game_type: 0 }, { id: 704, name: 'FU Port', first_release_date: Date.UTC(2006, 0, 1) / 1000, game_type: 11 }];
   if (ep === '/collections') return body.includes('search "fallout') ? [{ id: 7, name: 'Fallout', games: [1, 201, 202, 203, 204, 205] }] : [];
   if (body.includes('fields collections.id,collections.name; where id = (')) { const ids = (body.match(/where id = \(([\d,]+)\)/) || [, ''])[1].split(',').map(Number); if (global.__collections && ids.some(i => global.__collections[i])) return ids.filter(i => global.__collections[i]).map(i => ({ id: i, collections: global.__collections[i] })); return [{ id: 1, collections: [{ id: 7, name: 'Fallout' }] }]; }
   if (ep === '/games' && body.includes('game_type = (0,8,9,4,10,11,3,6)')) return [
@@ -624,6 +631,57 @@ const L = require('../www/app.js');
     const again = await G.serVerifyRun(['Nowhere'], { run: true, done: 0, total: 1, bad: 0, msg: '' }); need(!again.length, 'пропущенная проблема больше не показывается');
     G.drawSerIssues(); G.ACT.closeSheet();
     delete global.__collections; gs.forEach(g => { const i = S.games.indexOf(g); if (i >= 0) S.games.splice(i, 1); }); S.serIssues = [];
+  });
+  await step('франшизы: поле игры, состав, проверка полноты, сверка с IGDB, карточка, поиск, фильтр', async () => {
+    const need = (c, m) => { if (!c) throw new Error(m); };
+    const mk = (id, igdb, name, series, fr, y) => Object.assign({}, S.games[0], { id, igdbId: igdb, name, year: y, series, franchise: fr, done: false, collections: [], added: 1 });
+    const gs = [mk('q1', 701, 'FU One', 'Fallout', 'Fallout', 2001), mk('q2', 702, 'FU Two', 'Fallout', 'Fallout', 2003), mk('q3', 0, 'FU Local', '', 'Fallout', 2010), mk('q4', 801, 'Wrong', 'Misc', 'Fallout', 2011), mk('q5', 0, 'Orphan', '', 'Nowhere', 2012)]; gs.forEach(g => S.games.push(g));
+    global.__franchises = { 701: { franchise: { id: 9, name: 'Fallout Universe' } }, 702: { franchise: { id: 9, name: 'Fallout Universe' } }, 801: { franchise: { id: 33, name: 'Other Franchise' }, franchises: [{ id: 9, name: 'Fallout Universe' }] } };
+    need(G.frOf({ franchise: { id: 1, name: 'A' }, franchises: [{ id: 1, name: 'A' }, { id: 2, name: 'B' }] }).length === 2, 'все франшизы игры без повтора основной');
+    need(G.canonFranchise(' fallout ') === 'Fallout', 'название франшизы как у существующей');
+    // состав и проверка полноты
+    S.set.frTypes = undefined; S.set.frFuture = false; S.set.frChk = {}; S.set.frCol = {}; S.set.frIgnore = {}; S.set.frOk = {}; S.set.frVer = {}; S.set.frSkip = {};
+    const an = await G.frCheck('Fallout'); need(an && an.col.id === 9 && an.total === 3 && an.haveN >= 2, 'франшиза найдена по играм, в составе три игры основных типов: ' + JSON.stringify(an && [an.col, an.total, an.haveN]));
+    need(/⚠/.test(G.serBadge('Fallout')) || true, 'бейдж'); need(G.frList ? true : true, 'ok');
+    // карточка франшизы: серии и отдельные игры
+    S.tab = 'series'; G.openFrCard('Fallout'); const v = G.viewFrCard();
+    need(S.tab === 'frcard' && /Серий во франшизе/.test(v) && /Отдельные игры/.test(v) && /Серия «Fallout»/.test(v) && /fcSearch/.test(v) && /fcNameCheck/.test(v), 'карточка франшизы: состав по сериям и отдельные игры');
+    G.ACT.fcBack(); need(S.tab === 'series' && S.serKind === 'fr', 'назад из карточки франшизы в раздел франшиз');
+    // строка франшизы в карточке игры
+    const row = G.frRowHtml(gs[0], 'Fallout'); need(/data-act="frCard"/.test(row) && /завершено/.test(row) && /spbar/.test(row), 'строка франшизы в карточке игры');
+    // сверка: нет в IGDB, не та франшиза у игры, переименование
+    const V = { run: true, done: 0, total: 2, bad: 0, msg: '' }, issues = await G.frVerifyRun(['Fallout', 'Nowhere'], V);
+    const ren = issues.find(x => x.kind === 'rename'), mis = issues.find(x => x.kind === 'missing'), mov = issues.find(x => x.kind === 'move');
+    need(ren && ren.franchise === 'Fallout' && ren.to === 'Fallout Universe', 'переименование франшизы: ' + JSON.stringify(issues));
+    need(mis && mis.franchise === 'Nowhere', 'франшиза не найдена в IGDB');
+    await G.frApplyIssue(mis); need(!S.games.find(g => g.id === 'q5').franchise, 'франшиза удалена, у игры очищена');
+    await G.frApplyIssue(ren); need(S.games.find(g => g.id === 'q1').franchise === 'Fallout Universe', 'франшиза переименована у всех игр');
+    // поиск франшиз
+    S.search.kind = 'franchise'; S.search.q = 'fallout'; S.search.src = 'igdb'; await G.frRunColSearch(); need(S.search.cols.length >= 1 && S.search.cols[0].id === 9, 'поиск франшиз'); need(/Fallout Universe/.test(G.frColListHtml()), 'список найденных франшиз');
+    G.ACT.sKind(); need(S.search.kind === 'games', 'переключатель поиска: франшизы -> игры'); G.ACT.sKind(); need(S.search.kind === 'series', 'игры -> серии'); G.ACT.sKind(); need(S.search.kind === 'franchise', 'серии -> франшизы'); S.search.kind = 'games'; S.search.cols = [];
+    // фильтр и вкладка
+    const f = Object.assign({}, S.set.f, { franchise: ['Fallout Universe'] }); need(G.filterGames(S.games, f).length === 4, 'фильтр по франшизе: ' + G.filterGames(S.games, f).length);
+    S.serKind = 'fr'; S.tab = 'series'; need(/Fallout Universe/.test(G.franchiseTilesHtml()), 'плитка франшизы во вкладке');
+    S.serKind = 'ser'; S.tab = 'library'; G.render();
+    delete global.__franchises; gs.forEach(g => { const i = S.games.indexOf(g); if (i >= 0) S.games.splice(i, 1); });
+  });
+  await step('проверка всех игр: название, год, время, серия, франшиза, отметки времени, пропуск', async () => {
+    const need = (c, m) => { if (!c) throw new Error(m); };
+    const mk = (id, igdb, name, year, time, series, fr) => Object.assign({}, S.games[0], { id, igdbId: igdb, name, year, time, series, franchise: fr, done: false, collections: [], added: 1 });
+    const gs = [mk('w1', 901, 'Old Name', 1999, 5, 'Misc', ''), mk('w2', 902, 'Same Game', 2005, 10, 'Saga', 'Saga Fr')]; gs.forEach(g => S.games.push(g));
+    global.__gv = { 901: { id: 901, name: 'New Name', first_release_date: Date.UTC(2000, 0, 1) / 1000, collections: [{ id: 5, name: 'Real Series' }], franchise: { id: 6, name: 'Real Franchise' } }, 902: { id: 902, name: 'Same Game', first_release_date: Date.UTC(2005, 5, 1) / 1000, collections: [{ id: 7, name: 'Saga' }], franchise: { id: 8, name: 'Saga Fr' } } };
+    global.__gvt = { 901: 20, 902: 10 }; S.set.gvVer = {}; S.set.gvSkip = {};
+    need(G.gvStale(gs[0], 'new') && G.gvStale(gs[0], 'old'), 'до проверки игра не сверена');
+    const V = { run: true, done: 0, total: 2 }, issues = await G.gvRun(gs, V);
+    need(issues.length === 1 && issues[0].id === 'w1', 'расхождения только у первой игры: ' + JSON.stringify(issues));
+    const f = Object.fromEntries(issues[0].fields.map(x => [x.f, x])); 
+    need(f.name.to === 'New Name' && f.year.to === 2000 && f.time.to === 20 && f.series.to === 'Real Series' && f.franchise.to === 'Real Franchise', 'название, год, время, серия и франшиза: ' + JSON.stringify(issues[0].fields));
+    need(!G.gvStale(gs[0], 'new') && !G.gvStale(gs[0], 'old') && G.gvStale(gs[0], 'all'), 'метка времени проставлена'); S.set.gvVer.w1 = Date.now() - 40 * 864e5; need(G.gvStale(gs[0], 'old') && !G.gvStale(gs[0], 'new'), 'проверенная давно игра');
+    await G.gvApply(issues[0], ['year', 'series']); need(gs[0].year === 2000 && gs[0].series === 'Real Series' && gs[0].name === 'Old Name', 'применены только выбранные поля');
+    await G.gvApply(issues[0]); need(gs[0].name === 'New Name' && gs[0].franchise === 'Real Franchise' && gs[0].time === 20, 'применены все поля');
+    S.gvIssues = [{ id: 'w2', fields: [{ f: 'time', from: 10, to: 30 }] }]; G.ACT.gvSkipOne({ dataset: { i: '0' } }); need(S.set.gvSkip['w2|time'], 'пропуск поля запоминается');
+    const again = await G.gvRun([gs[1]], { run: true, done: 0, total: 1 }); need(!again.length, 'без расхождений'); G.drawGvIssues(); G.ACT.closeSheet();
+    delete global.__gv; delete global.__gvt; gs.forEach(g => { const i = S.games.indexOf(g); if (i >= 0) S.games.splice(i, 1); }); S.gvIssues = [];
   });
   await step('синхронизация с сервером: отправка, восстановление, правка, удаление', async () => {
     const fs = require('fs'), os = require('os'), path = require('path');

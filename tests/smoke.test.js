@@ -20,6 +20,12 @@ const igdbData = (ep, body) => {
   const D = (y, m = 0) => Date.UTC(y, m, 1) / 1000;
   if (ep === '/games' && body.includes('fields name,first_release_date,collections.id,collections.name,franchise.id')) { const ids = (body.match(/where id = \(([\d,]+)\)/) || [, ''])[1].split(',').map(Number); return ids.filter(i => global.__gv && global.__gv[i]).map(i => global.__gv[i]); }
   if (ep === '/game_time_to_beats' && body.includes('where game_id = (')) return Object.keys(global.__gvt || {}).map(k => ({ game_id: +k, normally: global.__gvt[k] * 3600 }));
+  if (ep === '/games' && body.startsWith('fields *; where id =')) return [{ id: 4100, name: 'Dump Game', collections: [5, 6], franchise: 9, franchises: [] }];
+  if (ep === '/collections' && body.startsWith('fields *;')) return [{ id: 5, name: 'Parent' }, { id: 6, name: 'Child', as_child_relations: [1] }];
+  if (ep === '/collection_relations') return [{ id: 1, parent_collection: 5, child_collection: 6 }];
+  if (ep === '/franchises' && body.startsWith('fields *;')) return [{ id: 9, name: 'Dump Franchise' }];
+  if (ep === '/game_time_to_beats' && body.startsWith('fields *;')) return [];
+  if (ep === '/collections' && body.includes('as_child_relations.parent_collection')) { const ids = (body.match(/where id = \(([\d,]+)\)/) || [, ''])[1].split(',').map(Number), mp = global.__colrel || {}; return ids.filter(i => mp[i]).map(i => ({ id: i, games: new Array(mp[i].n).fill(1), as_child_relations: (mp[i].parents || []).map(x => ({ parent_collection: x })) })); }
   if (ep === '/franchises') return body.includes('search "fallout') ? [{ id: 9, name: 'Fallout Universe', games: [1, 701, 702, 703] }] : [];
   if (body.includes('fields franchise.id,franchise.name,franchises.id,franchises.name; where id = (')) { const ids = (body.match(/where id = \(([\d,]+)\)/) || [, ''])[1].split(',').map(Number); const mp = global.__franchises || {}; return ids.filter(i => mp[i]).map(i => Object.assign({ id: i }, mp[i])); }
   if (ep === '/games' && body.includes('franchise = 9 |') && body.includes('game_type = (0,8,9,4,10,11,3,6)')) return [
@@ -682,6 +688,41 @@ const L = require('../www/app.js');
     S.gvIssues = [{ id: 'w2', fields: [{ f: 'time', from: 10, to: 30 }] }]; G.ACT.gvSkipOne({ dataset: { i: '0' } }); need(S.set.gvSkip['w2|time'], 'пропуск поля запоминается');
     const again = await G.gvRun([gs[1]], { run: true, done: 0, total: 1 }); need(!again.length, 'без расхождений'); G.drawGvIssues(); G.ACT.closeSheet();
     delete global.__gv; delete global.__gvt; gs.forEach(g => { const i = S.games.indexOf(g); if (i >= 0) S.games.splice(i, 1); }); S.gvIssues = [];
+  });
+  await step('серия игры: главной считается дочерняя серия IGDB (Judgment, а не Yakuza: Like a Dragon)', async () => {
+    const need = (c, m) => { if (!c) throw new Error(m); };
+    global.__colrel = { 4001: { n: 30, parents: [] }, 4002: { n: 5, parents: [4001] }, 4003: { n: 8, parents: [] } };
+    const cs = [{ id: 4001, name: 'Yakuza: Like a Dragon' }, { id: 4002, name: 'Judgment' }];
+    const pr = await G.primaryCollection(cs); need(pr && pr.id === 4002, 'главная серия: дочерняя, а не первая в списке: ' + JSON.stringify(pr));
+    need((await G.primaryCollection([{ id: 4001, name: 'A' }])).id === 4001, 'одна коллекция - она и главная');
+    need(!G.leafOf([{ id: 4001, name: 'A' }, { id: 4003, name: 'B' }]), 'несвязанные коллекции: без выбора (остаётся первая)');
+    // проверка всех игр находит ошибку, когда указана родительская серия
+    const g = Object.assign({}, S.games[0], { id: 'jd1', igdbId: 4100, name: 'Judgment', year: 2018, time: 31, series: 'Yakuza: Like a Dragon', franchise: 'Yakuza: Like a Dragon', collections: [], added: 1 }); S.games.push(g);
+    global.__gv = { 4100: { id: 4100, name: 'Judgment', first_release_date: Date.UTC(2018, 11, 13) / 1000, collections: cs, franchise: { id: 7, name: 'Yakuza: Like a Dragon' } } }; global.__gvt = { 4100: 31 }; S.set.gvSkip = {}; S.set.serCol = {};
+    const iss = await G.gvRun([g], { run: true, done: 0, total: 1 });
+    need(iss.length === 1 && iss[0].fields.length === 1 && iss[0].fields[0].f === 'series' && iss[0].fields[0].to === 'Judgment', 'проверка игр: серия Yakuza вместо Judgment найдена: ' + JSON.stringify(iss));
+    g.series = 'Judgment'; need(!(await G.gvRun([g], { run: true, done: 0, total: 1 })).length, 'с правильной серией ошибок нет');
+    // проверка серий: игра в родительской серии предлагается к переносу в дочернюю
+    g.series = 'Yakuza: Like a Dragon'; global.__franchises = { 4100: { franchise: { id: 7, name: 'Yakuza: Like a Dragon' } } };
+    const x = Object.assign({}, S.games[0], { id: 'jd2', igdbId: 4200, name: 'Yakuza Other', year: 2020, series: 'Yakuza: Like a Dragon', franchise: '', collections: [], added: 1 }); S.games.push(x);
+    global.__collections = { 4100: cs, 4200: [{ id: 4001, name: 'Yakuza: Like a Dragon' }] };
+    const out = await G.serVerifyRun(['Yakuza: Like a Dragon'], { run: true, done: 0, total: 1, bad: 0, msg: '' }), mv = out.find(i => i.kind === 'move');
+    need(mv && mv.to === 'Judgment' && mv.games.length === 1 && mv.games[0] === 'jd1', 'проверка серий: игра Judgment переносится в серию Judgment: ' + JSON.stringify(out));
+    delete global.__colrel; delete global.__gv; delete global.__gvt; delete global.__collections; delete global.__franchises; [g, x].forEach(y => { const i = S.games.indexOf(y); if (i >= 0) S.games.splice(i, 1); });
+  });
+  await step('режим отладки: дампы ответов, дамп игры, файл, очистка', async () => {
+    const need = (c, m) => { if (!c) throw new Error(m); };
+    G.DBG.list = []; G.DBG.bytes = 0; S.set.debug = false;
+    await G.frGames(9).catch(() => 0); need(G.DBG.list.length === 0, 'при выключенной отладке ответы не записываются');
+    S.set.debug = true; await G.collGames(7777).catch(() => 0);
+    need(G.DBG.list.length >= 1 && G.DBG.list[G.DBG.list.length - 1].src === 'igdb' && G.DBG.list[G.DBG.list.length - 1].ep === '/games' && /fields/.test(G.DBG.list[G.DBG.list.length - 1].q) && Array.isArray(G.DBG.list[G.DBG.list.length - 1].data), 'при включённой отладке записаны запрос и ответ IGDB');
+    need(!/Bearer|Client-ID|Authorization/i.test(G.dbgText()), 'ключи и токены в дамп не попадают');
+    S.set.debug = false; G.DBG.list = [];
+    await G.dbgGameDump(4100); G.ACT.closeModal && G.ACT.closeModal();
+    const last = G.DBG.list[G.DBG.list.length - 1]; need(G.DBG.list.length >= 5 && last.ep === 'дамп игры 4100' && last.data.game.name === 'Dump Game' && last.data.collections.length === 2 && last.data.collection_relations.length === 1 && last.data.franchises.length === 1, 'дамп игры собран без включённой отладки: ' + JSON.stringify(last && last.data).slice(0, 200));
+    need(JSON.parse(G.dbgText()).entries.length === G.DBG.list.length && /Дампы ответов/.test(G.dbgSecHtml()), 'файл дампа и раздел настроек');
+    G.ACT.dbgToggle(); need(S.set.debug === true, 'переключатель отладки'); G.ACT.dbgToggle();
+    G.ACT.dbgClear(); need(G.DBG.list.length === 0, 'очистка');
   });
   await step('синхронизация с сервером: отправка, восстановление, правка, удаление', async () => {
     const fs = require('fs'), os = require('os'), path = require('path');

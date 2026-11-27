@@ -741,17 +741,34 @@ const IGDB_FIELDS = 'name,first_release_date,total_rating,cover.image_id,genres.
 const IGDB_DETAIL = IGDB_FIELDS + ',summary,url,collections.id,collections.name,franchise.id,franchise.name,franchises.id,franchises.name';
 /* серия игры в IGDB: у игры может быть несколько коллекций (например, «Judgment» и родительская «Yakuza: Like a Dragon»); главной считается дочерняя, как «Series» на сайте IGDB */
 const colInfo = new Map(); // id коллекции -> { n: число игр, parents: Set id родительских коллекций }
-async function loadColInfo(ids) {
-  const need = Array.from(new Set(ids)).filter(id => !colInfo.has(id));
-  for (let i = 0; i < need.length; i += 100) {
-    const part = need.slice(i, i + 100), r = await igdb('/collections', 'fields name,games,as_child_relations.parent_collection; where id = (' + part.join(',') + '); limit ' + part.length + ';');
-    r.forEach(c => colInfo.set(c.id, { n: (c.games || []).length, parents: new Set((c.as_child_relations || []).map(x => x && typeof x.parent_collection === 'object' ? x.parent_collection.id : x && x.parent_collection).filter(Boolean)) }));
-    part.forEach(id => { if (!colInfo.has(id)) colInfo.set(id, { n: 1e9, parents: new Set() }); });
+const colUp = new Map(); // id коллекции -> Set id прямых родителей (по /collection_relations, в IGDB это «Is a spin-off of»/«Series»)
+const relParent = x => x && (x.parent_collection && typeof x.parent_collection === 'object' ? x.parent_collection.id : x.parent_collection);
+const relChild = x => x && (x.child_collection && typeof x.child_collection === 'object' ? x.child_collection.id : x.child_collection);
+async function loadColUp(ids) { // родители коллекций: берём из /collection_relations (в раскрытом поле as_child_relations IGDB отдаёт только id связи)
+  let level = Array.from(new Set(ids)).filter(id => !colUp.has(id));
+  for (let depth = 0; depth < 3 && level.length; depth++) {
+    const next = [];
+    for (let i = 0; i < level.length; i += 50) {
+      const part = level.slice(i, i + 50), r = await igdb('/collection_relations', 'fields parent_collection,child_collection; where child_collection = (' + part.join(',') + '); limit 500;');
+      part.forEach(id => colUp.set(id, new Set()));
+      r.forEach(x => { const c = relChild(x), p = relParent(x); if (c && p && colUp.has(c)) { colUp.get(c).add(p); if (!colUp.has(p) && !next.includes(p)) next.push(p); } });
+    }
+    level = next.filter(id => !colUp.has(id));
   }
 }
-function leafOf(cs) { // дочерняя коллекция, если между коллекциями игры есть родство; иначе null
-  if (!cs || cs.length < 2) return null; const par = c => (colInfo.get(c.id) || {}).parents || new Set();
-  const leaves = cs.filter(c => !cs.some(o => o.id !== c.id && par(o).has(c.id))); if (leaves.length === cs.length) return null;
+const colAnc = id => { const out = new Set(), st = [id]; while (st.length) { const c = st.pop(); (colUp.get(c) || []).forEach(p => { if (!out.has(p) && p !== id) { out.add(p); st.push(p); } }); } return out; };
+async function loadColInfo(ids) {
+  const all = Array.from(new Set(ids)), need = all.filter(id => !colInfo.has(id));
+  await loadColUp(all); // сначала связи: без них серия определится неверно, ошибку не глотаем и ничего не кэшируем
+  for (let i = 0; i < need.length; i += 100) {
+    const part = need.slice(i, i + 100), r = await igdb('/collections', 'fields name,games; where id = (' + part.join(',') + '); limit ' + part.length + ';');
+    r.forEach(c => colInfo.set(c.id, { n: (c.games || []).length, parents: colUp.get(c.id) || new Set() }));
+    part.forEach(id => { if (!colInfo.has(id)) colInfo.set(id, { n: 1e9, parents: colUp.get(id) || new Set() }); });
+  }
+}
+function leafOf(cs) { // дочерняя коллекция, если между коллекциями игры есть родство (в том числе через промежуточные); иначе null
+  if (!cs || cs.length < 2) return null;
+  const leaves = cs.filter(c => !cs.some(o => o.id !== c.id && colAnc(o.id).has(c.id))); if (leaves.length === cs.length) return null;
   return leaves.slice().sort((a, b) => ((colInfo.get(a.id) || {}).n || 1e9) - ((colInfo.get(b.id) || {}).n || 1e9))[0];
 }
 async function primaryCollection(cs) { cs = cs || []; if (cs.length > 1) { try { await loadColInfo(cs.map(c => c.id)); } catch (e) { if (S.block) throw e; } } return leafOf(cs) || cs[0] || null; }
@@ -1257,9 +1274,9 @@ function dbgCapture(rec) { // rec: { src, ep, q, status, ms, data, error }; пи
 const dbgText = () => JSON.stringify({ app: 'game-catalog', time: new Date().toISOString(), agent: (typeof navigator !== 'undefined' && navigator.userAgent) || '', count: DBG.list.length, entries: DBG.list.map(x => Object.assign({}, x, { time: new Date(x.t).toISOString() })) }, null, 1);
 function dbgSecHtml() {
   const n = DBG.list.length, on = !!S.set.debug;
-  return '<div class="sec"><h3 style="margin-top:0">IGDB and RAWG response dumps</h3><p class="sub">When the mode is on, every request to IGDB and RAWG (address, query, status, response body) is kept in the app memory: up to ' + DBG_MAX + ' latest entries. Keys and tokens are not recorded. The dump can be viewed, copied or downloaded as a file and sent for analysis. The entries are cleared when the app restarts.</p>'
+  return '<div class="sec"><h3 style="margin-top:0">IGDB and RAWG response dumps</h3><p class="sub">When the mode is on, every request to IGDB and RAWG (address, query, status, response body) is kept in the app memory: up to ' + DBG_MAX + ' latest entries. Keys and tokens are not recorded. The dump can be viewed, copied or sent as a file to another app (like a backup). The entries are cleared when the app restarts.</p>'
     + '<div class="chips"><button class="p' + (on ? ' on' : '') + '" data-act="dbgToggle">' + (on ? '✓ Debugging is on' : 'Debugging is off') + '</button></div>'
-    + '<div class="toolbar"><button class="btn" data-act="dbgView">View (' + n + ')</button><button class="btn" data-act="dbgDownload"' + (n ? '' : ' disabled') + '>Download file</button><button class="btn" data-act="dbgCopy"' + (n ? '' : ' disabled') + '>Copy</button><button class="btn red" data-act="dbgClear"' + (n ? '' : ' disabled') + '>Empty</button></div>'
+    + '<div class="toolbar"><button class="btn" data-act="dbgView">View (' + n + ')</button><button class="btn" data-act="dbgDownload"' + (n ? '' : ' disabled') + '>Send file</button><button class="btn" data-act="dbgCopy"' + (n ? '' : ' disabled') + '>Copy</button><button class="btn red" data-act="dbgClear"' + (n ? '' : ' disabled') + '>Empty</button></div>'
     + '<p class="sub" style="margin-top:10px">A full dump of one IGDB game (the game, its series, relations between series, franchises, time to beat) is collected even with debugging off:</p><div class="toolbar"><button class="btn" data-act="dbgGame">Dump an IGDB game…</button></div></div>';
 }
 async function dbgGameDump(idOrName) { // сырые данные игры из IGDB: все поля, коллекции, связи между коллекциями, франшизы, время прохождения
@@ -4649,7 +4666,12 @@ Object.assign(ACT, {
     modalCancel = () => closeModal(); m.onclick = e => { if (e.target.closest('[data-x]')) closeModal(); };
   },
   dbgCopy: async () => { toast(await copyText(dbgText()) ? 'Dump copied' : 'Could not copy'); },
-  dbgDownload: () => { if (!DBG.list.length) return toast('No entries'); dl('gc-debug-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.json', dbgText()); toast('Dump file saved'); },
+  dbgDownload: async () => {
+    if (!DBG.list.length) return toast('No entries');
+    const name = 'gc-debug-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.json', text = dbgText(), FS = plug('Filesystem'), SH = plug('Share');
+    if (isNative() && FS && SH) { try { const r = await FS.writeFile({ path: name, data: text, directory: 'CACHE', encoding: 'utf8' }); await SH.share({ title: 'Game catalog: debug dump', url: r.uri, dialogTitle: 'Send debug dump' }); } catch (e) { toast('Could not share: ' + (e.message || e)); } return; }
+    dl(name, new Blob([text], { type: 'application/json' })); toast('Dump file saved');
+  },
   dbgClear: () => { DBG.list = []; DBG.bytes = 0; render(); toast('Entries cleared'); },
   dbgGame: async () => { const v = await askPrompt('IGDB game dump', '', 'IGDB game id or name'); if (v) dbgGameDump(v); },
   gvAll: () => gvAll(),

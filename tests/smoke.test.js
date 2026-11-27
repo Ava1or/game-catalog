@@ -22,10 +22,11 @@ const igdbData = (ep, body) => {
   if (ep === '/game_time_to_beats' && body.includes('where game_id = (')) return Object.keys(global.__gvt || {}).map(k => ({ game_id: +k, normally: global.__gvt[k] * 3600 }));
   if (ep === '/games' && body.startsWith('fields *; where id =')) return [{ id: 4100, name: 'Dump Game', collections: [5, 6], franchise: 9, franchises: [] }];
   if (ep === '/collections' && body.startsWith('fields *;')) return [{ id: 5, name: 'Parent' }, { id: 6, name: 'Child', as_child_relations: [1] }];
+  if (ep === '/collection_relations' && body.startsWith('fields parent_collection,child_collection;')) { const ids = (body.match(/where child_collection = \(([\d,]+)\)/) || [, ''])[1].split(',').map(Number), mp = global.__colrel || {}, out = []; ids.forEach(i => ((mp[i] || {}).parents || []).forEach(x => out.push({ id: i * 1000 + x, parent_collection: x, child_collection: i }))); return out; }
   if (ep === '/collection_relations') return [{ id: 1, parent_collection: 5, child_collection: 6 }];
   if (ep === '/franchises' && body.startsWith('fields *;')) return [{ id: 9, name: 'Dump Franchise' }];
   if (ep === '/game_time_to_beats' && body.startsWith('fields *;')) return [];
-  if (ep === '/collections' && body.includes('as_child_relations.parent_collection')) { const ids = (body.match(/where id = \(([\d,]+)\)/) || [, ''])[1].split(',').map(Number), mp = global.__colrel || {}; return ids.filter(i => mp[i]).map(i => ({ id: i, games: new Array(mp[i].n).fill(1), as_child_relations: (mp[i].parents || []).map(x => ({ parent_collection: x })) })); }
+  if (ep === '/collections' && body.startsWith('fields name,games;')) { const ids = (body.match(/where id = \(([\d,]+)\)/) || [, ''])[1].split(',').map(Number), mp = global.__colrel || {}; return ids.filter(i => mp[i]).map(i => ({ id: i, games: new Array(mp[i].n).fill(1), as_child_relations: [] })); }
   if (ep === '/franchises') return body.includes('search "fallout') ? [{ id: 9, name: 'Fallout Universe', games: [1, 701, 702, 703] }] : [];
   if (body.includes('fields franchise.id,franchise.name,franchises.id,franchises.name; where id = (')) { const ids = (body.match(/where id = \(([\d,]+)\)/) || [, ''])[1].split(',').map(Number); const mp = global.__franchises || {}; return ids.filter(i => mp[i]).map(i => Object.assign({ id: i }, mp[i])); }
   if (ep === '/games' && body.includes('franchise = 9 |') && body.includes('game_type = (0,8,9,4,10,11,3,6)')) return [

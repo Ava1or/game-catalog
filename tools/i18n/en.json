@@ -1325,7 +1325,6 @@
  "байт": "bytes",
  "Дампы ответов IGDB и RAWG": "IGDB and RAWG response dumps",
  "Когда режим включён, каждый запрос к IGDB и RAWG (адрес, запрос, статус, тело ответа) сохраняется в памяти приложения: до": "When the mode is on, every request to IGDB and RAWG (address, query, status, response body) is kept in the app memory: up to",
- "последних записей. Ключи и токены не записываются. Дамп можно посмотреть, скопировать или скачать файлом и прислать для разбора. После перезапуска приложения записи очищаются.": "latest entries. Keys and tokens are not recorded. The dump can be viewed, copied or downloaded as a file and sent for analysis. The entries are cleared when the app restarts.",
  "✓ Отладка включена": "✓ Debugging is on",
  "Отладка выключена": "Debugging is off",
  "Просмотр (": "View (",
@@ -1356,5 +1355,9 @@
  "Файл дампа сохранён": "Dump file saved",
  "Записи очищены": "Entries cleared",
  "Дамп игры из IGDB": "IGDB game dump",
- "id игры IGDB или название": "IGDB game id or name"
+ "id игры IGDB или название": "IGDB game id or name",
+ "последних записей. Ключи и токены не записываются. Дамп можно посмотреть, скопировать или отправить файлом в другое приложение (как копию базы). После перезапуска приложения записи очищаются.": "latest entries. Keys and tokens are not recorded. The dump can be viewed, copied or sent as a file to another app (like a backup). The entries are cleared when the app restarts.",
+ "Отправить файл": "Send file",
+ "Каталог игр: дамп отладки": "Game catalog: debug dump",
+ "Отправить дамп отладки": "Send debug dump"
 }
